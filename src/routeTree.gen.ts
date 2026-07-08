@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as StatsRouteImport } from './routes/stats'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as QuietRouteImport } from './routes/quiet'
 import { Route as OutstandRouteImport } from './routes/outstand'
 import { Route as FocusRouteImport } from './routes/focus'
@@ -18,6 +19,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const StatsRoute = StatsRouteImport.update({
   id: '/stats',
   path: '/stats',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const QuietRoute = QuietRouteImport.update({
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/focus': typeof FocusRoute
   '/outstand': typeof OutstandRoute
   '/quiet': typeof QuietRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/stats': typeof StatsRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/focus': typeof FocusRoute
   '/outstand': typeof OutstandRoute
   '/quiet': typeof QuietRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/stats': typeof StatsRoute
 }
 export interface FileRoutesById {
@@ -61,14 +69,22 @@ export interface FileRoutesById {
   '/focus': typeof FocusRoute
   '/outstand': typeof OutstandRoute
   '/quiet': typeof QuietRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/stats': typeof StatsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/focus' | '/outstand' | '/quiet' | '/stats'
+  fullPaths: '/' | '/focus' | '/outstand' | '/quiet' | '/sitemap.xml' | '/stats'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/focus' | '/outstand' | '/quiet' | '/stats'
-  id: '__root__' | '/' | '/focus' | '/outstand' | '/quiet' | '/stats'
+  to: '/' | '/focus' | '/outstand' | '/quiet' | '/sitemap.xml' | '/stats'
+  id:
+    | '__root__'
+    | '/'
+    | '/focus'
+    | '/outstand'
+    | '/quiet'
+    | '/sitemap.xml'
+    | '/stats'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -76,6 +92,7 @@ export interface RootRouteChildren {
   FocusRoute: typeof FocusRoute
   OutstandRoute: typeof OutstandRoute
   QuietRoute: typeof QuietRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   StatsRoute: typeof StatsRoute
 }
 
@@ -86,6 +103,13 @@ declare module '@tanstack/react-router' {
       path: '/stats'
       fullPath: '/stats'
       preLoaderRoute: typeof StatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/quiet': {
@@ -124,6 +148,7 @@ const rootRouteChildren: RootRouteChildren = {
   FocusRoute: FocusRoute,
   OutstandRoute: OutstandRoute,
   QuietRoute: QuietRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   StatsRoute: StatsRoute,
 }
 export const routeTree = rootRouteImport
