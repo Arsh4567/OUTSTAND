@@ -9,8 +9,38 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as StatsRouteImport } from './routes/stats'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as QuietRouteImport } from './routes/quiet'
+import { Route as OutstandRouteImport } from './routes/outstand'
+import { Route as FocusRouteImport } from './routes/focus'
 import { Route as IndexRouteImport } from './routes/index'
 
+const StatsRoute = StatsRouteImport.update({
+  id: '/stats',
+  path: '/stats',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QuietRoute = QuietRouteImport.update({
+  id: '/quiet',
+  path: '/quiet',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OutstandRoute = OutstandRouteImport.update({
+  id: '/outstand',
+  path: '/outstand',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FocusRoute = FocusRouteImport.update({
+  id: '/focus',
+  path: '/focus',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -19,28 +49,90 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/focus': typeof FocusRoute
+  '/outstand': typeof OutstandRoute
+  '/quiet': typeof QuietRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/stats': typeof StatsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/focus': typeof FocusRoute
+  '/outstand': typeof OutstandRoute
+  '/quiet': typeof QuietRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/stats': typeof StatsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/focus': typeof FocusRoute
+  '/outstand': typeof OutstandRoute
+  '/quiet': typeof QuietRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/stats': typeof StatsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/focus' | '/outstand' | '/quiet' | '/sitemap.xml' | '/stats'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/focus' | '/outstand' | '/quiet' | '/sitemap.xml' | '/stats'
+  id:
+    | '__root__'
+    | '/'
+    | '/focus'
+    | '/outstand'
+    | '/quiet'
+    | '/sitemap.xml'
+    | '/stats'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  FocusRoute: typeof FocusRoute
+  OutstandRoute: typeof OutstandRoute
+  QuietRoute: typeof QuietRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  StatsRoute: typeof StatsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/stats': {
+      id: '/stats'
+      path: '/stats'
+      fullPath: '/stats'
+      preLoaderRoute: typeof StatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/quiet': {
+      id: '/quiet'
+      path: '/quiet'
+      fullPath: '/quiet'
+      preLoaderRoute: typeof QuietRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/outstand': {
+      id: '/outstand'
+      path: '/outstand'
+      fullPath: '/outstand'
+      preLoaderRoute: typeof OutstandRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/focus': {
+      id: '/focus'
+      path: '/focus'
+      fullPath: '/focus'
+      preLoaderRoute: typeof FocusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -53,17 +145,12 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  FocusRoute: FocusRoute,
+  OutstandRoute: OutstandRoute,
+  QuietRoute: QuietRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
+  StatsRoute: StatsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
