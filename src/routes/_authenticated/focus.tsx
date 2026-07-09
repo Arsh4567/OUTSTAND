@@ -41,7 +41,8 @@ function FocusPage() {
           setRunning(false);
           if (mode === "focus") {
             recordSession(DURATIONS.focus / 60, true);
-            toast.success("Focus session complete", { description: "+25 XP earned. Take a short break." });
+            addPositive("pomodoro");
+            toast.success("Focus session complete", { description: "+20 dopamine · +25 XP" });
           } else {
             toast("Break over", { description: "Back to work." });
           }
