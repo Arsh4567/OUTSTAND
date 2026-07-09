@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Coffee, Pause, Play, RotateCcw, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAppState } from "@/hooks/use-app-state";
+import { useDailyLog } from "@/hooks/use-dopamine";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
