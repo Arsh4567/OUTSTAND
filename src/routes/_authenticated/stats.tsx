@@ -5,7 +5,7 @@ import { useAppState } from "@/hooks/use-app-state";
 import { lastNDays, levelFromXP } from "@/lib/habits";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/stats")({
+export const Route = createFileRoute("/_authenticated/stats")({
   head: () => ({
     meta: [
       { title: "Stats — Your progress" },

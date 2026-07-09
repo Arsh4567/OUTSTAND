@@ -6,7 +6,7 @@ import { useAppState } from "@/hooks/use-app-state";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/focus")({
+export const Route = createFileRoute("/_authenticated/focus")({
   head: () => ({
     meta: [
       { title: "Focus — Pomodoro sessions" },

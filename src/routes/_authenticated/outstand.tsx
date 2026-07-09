@@ -7,7 +7,7 @@ import { useAppState } from "@/hooks/use-app-state";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/outstand")({
+export const Route = createFileRoute("/_authenticated/outstand")({
   head: () => ({
     meta: [
       { title: "Outstand — 10 minute self-improvement challenge" },

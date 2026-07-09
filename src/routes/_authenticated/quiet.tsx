@@ -4,7 +4,7 @@ import { RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QUOTES, quoteOfTheDay } from "@/lib/quotes";
 
-export const Route = createFileRoute("/quiet")({
+export const Route = createFileRoute("/_authenticated/quiet")({
   head: () => ({
     meta: [
       { title: "Quiet — Calm motivation for students" },
