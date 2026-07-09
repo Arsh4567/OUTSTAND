@@ -80,24 +80,27 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Ember — Habits, focus, and streaks for students" },
+      { title: "Outstand is for those who want to outstand" },
       {
         name: "description",
         content:
           "A premium habit tracker for students. Build streaks, focus with Pomodoro, and take on the daily Outstand challenge.",
       },
       { name: "author", content: "Ember" },
-      { property: "og:title", content: "Ember — Habits, focus, and streaks for students" },
+      { property: "og:title", content: "Outstand is for those who want to outstand" },
       {
         property: "og:description",
-        content: "Track habits, run focus sessions, and outstand every day.",
+        content: "A premium habit tracker for students. Build streaks, focus with Pomodoro, and take on the daily Outstand challenge.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Outstand is for those who want to outstand" },
+      { name: "twitter:description", content: "A premium habit tracker for students. Build streaks, focus with Pomodoro, and take on the daily Outstand challenge." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/MbFMKUuM2TWHnUX1cvLR8J9s9Jf1/social-images/social-1783582818919-1000035610.webp" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/MbFMKUuM2TWHnUX1cvLR8J9s9Jf1/social-images/social-1783582818919-1000035610.webp" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
