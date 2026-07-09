@@ -22,6 +22,7 @@ export const Route = createFileRoute("/_authenticated/outstand")({
 
 function OutstandPage() {
   const { outstand, recordOutstand } = useAppState();
+  const { addPositive } = useDailyLog();
   const [challenge, setChallenge] = useState<OutstandChallenge | null>(null);
   const [remaining, setRemaining] = useState(600);
   const [running, setRunning] = useState(false);
