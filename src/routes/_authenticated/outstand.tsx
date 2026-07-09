@@ -56,7 +56,8 @@ function OutstandPage() {
   const complete = () => {
     if (!challenge) return;
     recordOutstand(challenge.title);
-    toast.success("Outstanding.", { description: `+20 XP · ${challenge.title}` });
+    addPositive("outstand");
+    toast.success("Outstanding.", { description: `+15 dopamine · +20 XP · ${challenge.title}` });
     setChallenge(null);
     setRemaining(600);
     setRunning(false);
