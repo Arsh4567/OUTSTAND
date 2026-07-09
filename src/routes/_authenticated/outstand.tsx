@@ -4,6 +4,7 @@ import { CheckCircle2, Pause, Play, RotateCcw, Sparkles, Zap } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { CHALLENGES, randomChallenge, type OutstandChallenge } from "@/lib/challenges";
 import { useAppState } from "@/hooks/use-app-state";
+import { useDailyLog } from "@/hooks/use-dopamine";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
