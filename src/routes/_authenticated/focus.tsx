@@ -25,6 +25,7 @@ const LABELS: Record<Mode, string> = { focus: "Focus", short: "Short break", lon
 
 function FocusPage() {
   const { sessions, recordSession } = useAppState();
+  const { addPositive, addNegative } = useDailyLog();
   const [mode, setMode] = useState<Mode>("focus");
   const [remaining, setRemaining] = useState(DURATIONS.focus);
   const [running, setRunning] = useState(false);
