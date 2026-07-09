@@ -71,6 +71,7 @@ function FocusPage() {
   const reset = () => {
     if (running && mode === "focus" && remaining < DURATIONS.focus) {
       recordSession(Math.round((DURATIONS.focus - remaining) / 60), false);
+      addNegative("broke_focus");
     }
     setRunning(false);
     setRemaining(DURATIONS[mode]);
