@@ -54,7 +54,7 @@ function FocusPage() {
     return () => {
       if (intervalRef.current) window.clearInterval(intervalRef.current);
     };
-  }, [running, mode, recordSession]);
+  }, [running, mode, recordSession, addPositive]);
 
   const switchMode = (m: Mode) => {
     setMode(m);
