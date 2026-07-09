@@ -1,21 +1,52 @@
-import { Link, Outlet } from "@tanstack/react-router";
-import { Activity, Flame, Sparkles, Timer, Trophy, Zap } from "lucide-react";
+import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Activity, Flame, LogOut, Sparkles, Timer, Trophy, Zap, Brain, BarChart3, User } from "lucide-react";
 import { useAppState } from "@/hooks/use-app-state";
+import { useAuth, displayNameOf } from "@/hooks/use-auth";
 import { levelFromXP } from "@/lib/habits";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: Activity },
+  { to: "/dopamine", label: "Dopamine", icon: Brain },
   { to: "/focus", label: "Focus", icon: Timer },
   { to: "/quiet", label: "Quiet", icon: Sparkles },
+  { to: "/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/stats", label: "Stats", icon: Trophy },
   { to: "/outstand", label: "Outstand", icon: Zap },
 ] as const;
 
 export function AppShell() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isAuthRoute = pathname.startsWith("/auth");
+
+  if (isAuthRoute) return <Outlet />;
+
+  return <ShellWithChrome />;
+}
+
+function ShellWithChrome() {
   const { xp, bestStreak } = useAppState();
+  const { user, profile } = useAuth();
   const { level, into, need } = levelFromXP(xp);
   const pct = Math.min(100, Math.round((into / need) * 100));
+  const navigate = useNavigate();
+  const name = displayNameOf(user, profile);
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    toast("Signed out");
+    navigate({ to: "/auth", replace: true });
+  };
 
   return (
     <div className="min-h-screen">
@@ -26,16 +57,14 @@ export function AppShell() {
               <Flame className="h-5 w-5 text-primary-foreground" />
             </div>
             <div className="min-w-0">
-              <div className="truncate font-display text-lg font-bold tracking-tight">
-                Ember
-              </div>
+              <div className="truncate font-display text-lg font-bold tracking-tight">Ember</div>
               <div className="hidden text-[11px] uppercase tracking-[0.18em] text-muted-foreground sm:block">
-                Habits for students
+                Dopamine recovery
               </div>
             </div>
           </Link>
 
-          <nav className="ml-4 hidden flex-1 items-center gap-1 md:flex">
+          <nav className="ml-4 hidden flex-1 items-center gap-1 lg:flex">
             {NAV.map((item) => (
               <Link
                 key={item.to}
@@ -52,7 +81,7 @@ export function AppShell() {
             ))}
           </nav>
 
-          <div className="ml-auto flex shrink-0 items-center gap-3">
+          <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
             <div className="hidden items-center gap-2 rounded-full border border-border/60 bg-secondary/40 px-3 py-1.5 sm:flex">
               <Flame className="h-4 w-4 text-warning" />
               <span className="text-sm font-medium">{bestStreak}</span>
@@ -74,20 +103,38 @@ export function AppShell() {
                     </linearGradient>
                   </defs>
                 </svg>
-                <span className="absolute inset-0 grid place-items-center text-[10px] font-bold">
-                  {level}
-                </span>
+                <span className="absolute inset-0 grid place-items-center text-[10px] font-bold">{level}</span>
               </div>
-              <div className="text-xs">
+              <div className="hidden text-xs sm:block">
                 <div className="font-semibold">{xp} XP</div>
                 <div className="text-muted-foreground">Lv {level}</div>
               </div>
             </div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger className="grid h-9 w-9 place-items-center rounded-full border border-border/60 bg-secondary/40 text-sm font-semibold transition-colors hover:bg-secondary">
+                {profile?.avatar_url ? (
+                  <img src={profile.avatar_url} alt="" className="h-full w-full rounded-full object-cover" />
+                ) : (
+                  name.charAt(0).toUpperCase()
+                )}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <div className="font-medium">{name}</div>
+                  <div className="truncate text-xs font-normal text-muted-foreground">{user?.email}</div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={signOut}>
+                  <LogOut className="mr-2 h-4 w-4" /> Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
         {/* Mobile nav */}
-        <nav className="flex items-center gap-1 overflow-x-auto border-t border-border/60 px-3 py-2 md:hidden">
+        <nav className="flex items-center gap-1 overflow-x-auto border-t border-border/60 px-3 py-2 lg:hidden">
           {NAV.map((item) => (
             <Link
               key={item.to}
@@ -111,7 +158,7 @@ export function AppShell() {
       </main>
 
       <footer className="border-t border-border/60 py-6 text-center text-xs text-muted-foreground">
-        Built for students who want to Outstand. Stay quiet. Stay consistent.
+        Built to help you Outstand. Stay quiet. Stay consistent.
       </footer>
     </div>
   );

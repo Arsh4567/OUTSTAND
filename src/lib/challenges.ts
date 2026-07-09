@@ -141,3 +141,10 @@ export function randomChallenge(exclude?: string): OutstandChallenge {
   const pool = exclude ? CHALLENGES.filter((c) => c.title !== exclude) : CHALLENGES;
   return pool[Math.floor(Math.random() * pool.length)];
 }
+
+// Deterministic daily pick so everyone sees the same challenge today
+export function dailyChallenge(dateISO: string): OutstandChallenge {
+  let h = 0;
+  for (let i = 0; i < dateISO.length; i++) h = (h * 31 + dateISO.charCodeAt(i)) >>> 0;
+  return CHALLENGES[h % CHALLENGES.length];
+}

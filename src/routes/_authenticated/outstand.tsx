@@ -4,10 +4,11 @@ import { CheckCircle2, Pause, Play, RotateCcw, Sparkles, Zap } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { CHALLENGES, randomChallenge, type OutstandChallenge } from "@/lib/challenges";
 import { useAppState } from "@/hooks/use-app-state";
+import { useDailyLog } from "@/hooks/use-dopamine";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/outstand")({
+export const Route = createFileRoute("/_authenticated/outstand")({
   head: () => ({
     meta: [
       { title: "Outstand — 10 minute self-improvement challenge" },
@@ -21,6 +22,7 @@ export const Route = createFileRoute("/outstand")({
 
 function OutstandPage() {
   const { outstand, recordOutstand } = useAppState();
+  const { addPositive } = useDailyLog();
   const [challenge, setChallenge] = useState<OutstandChallenge | null>(null);
   const [remaining, setRemaining] = useState(600);
   const [running, setRunning] = useState(false);
@@ -54,7 +56,8 @@ function OutstandPage() {
   const complete = () => {
     if (!challenge) return;
     recordOutstand(challenge.title);
-    toast.success("Outstanding.", { description: `+20 XP · ${challenge.title}` });
+    addPositive("outstand");
+    toast.success("Outstanding.", { description: `+15 dopamine · +20 XP · ${challenge.title}` });
     setChallenge(null);
     setRemaining(600);
     setRunning(false);

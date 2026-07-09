@@ -3,10 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import { Coffee, Pause, Play, RotateCcw, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAppState } from "@/hooks/use-app-state";
+import { useDailyLog } from "@/hooks/use-dopamine";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/focus")({
+export const Route = createFileRoute("/_authenticated/focus")({
   head: () => ({
     meta: [
       { title: "Focus — Pomodoro sessions" },
@@ -24,6 +25,7 @@ const LABELS: Record<Mode, string> = { focus: "Focus", short: "Short break", lon
 
 function FocusPage() {
   const { sessions, recordSession } = useAppState();
+  const { addPositive, addNegative } = useDailyLog();
   const [mode, setMode] = useState<Mode>("focus");
   const [remaining, setRemaining] = useState(DURATIONS.focus);
   const [running, setRunning] = useState(false);
@@ -39,7 +41,8 @@ function FocusPage() {
           setRunning(false);
           if (mode === "focus") {
             recordSession(DURATIONS.focus / 60, true);
-            toast.success("Focus session complete", { description: "+25 XP earned. Take a short break." });
+            addPositive("pomodoro");
+            toast.success("Focus session complete", { description: "+20 dopamine · +25 XP" });
           } else {
             toast("Break over", { description: "Back to work." });
           }
@@ -51,7 +54,7 @@ function FocusPage() {
     return () => {
       if (intervalRef.current) window.clearInterval(intervalRef.current);
     };
-  }, [running, mode, recordSession]);
+  }, [running, mode, recordSession, addPositive]);
 
   const switchMode = (m: Mode) => {
     setMode(m);
@@ -68,6 +71,7 @@ function FocusPage() {
   const reset = () => {
     if (running && mode === "focus" && remaining < DURATIONS.focus) {
       recordSession(Math.round((DURATIONS.focus - remaining) / 60), false);
+      addNegative("broke_focus");
     }
     setRunning(false);
     setRemaining(DURATIONS[mode]);
