@@ -56,8 +56,11 @@ function ShellWithChrome() {
             <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[image:var(--gradient-primary)] shadow-[var(--shadow-glow)]">
               <Flame className="h-5 w-5 text-primary-foreground" />
             </div>
-            <div className="min-w-0">
-              <div className="truncate font-display text-lg font-bold tracking-tight">Ember</div>
+            <div className="min-w-0"
+
+<div className="hidden text-[11px] uppercase tracking-[0.18em] text-muted-foreground sm:block">
+  Focus • Discipline • Growth
+</div> <div className="truncate font-display text-lg font-bold tracking-tight">Outstand</div>
               <div className="hidden text-[11px] uppercase tracking-[0.18em] text-muted-foreground sm:block">
                 Dopamine recovery
               </div>
