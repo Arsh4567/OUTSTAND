@@ -12,7 +12,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Sign in — Ember" },
+      { title: "Sign in — Outstand" },
       { name: "description", content: "Sign in to your Ember habit tracker." },
     ],
   }),
