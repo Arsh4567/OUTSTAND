@@ -53,9 +53,15 @@ function ShellWithChrome() {
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/60 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 md:px-6">
           <Link to="/" className="flex min-w-0 items-center gap-2">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[image:var(--gradient-primary)] shadow-[var(--shadow-glow)]">
-              <Flame className="h-5 w-5 text-primary-foreground" />
-            </div>
+            <div className="h-9 w-9 overflow-hidden rounded-xl shadow-[var(--shadow-glow)]">
+  <img
+    src="/outstand-logo.png"
+    alt="Outstand Logo"
+    className="h-full w-full object-cover"
+  />
+</div>
+
+          
             <div className="min-w-0">
   <div className="truncate font-display text-lg font-bold tracking-tight">
     Outstand
