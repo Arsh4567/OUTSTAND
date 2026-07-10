@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Flame, Loader2 } from "lucide-react";
+import { Zap, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +13,7 @@ export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
       { title: "Sign in — Outstand" },
-      { name: "description", content: "Sign in to your Ember habit tracker." },
+      { name: "description", content: "Sign in to your Outstand habit tracker." },
     ],
   }),
   component: AuthPage,
@@ -52,7 +52,7 @@ function AuthPage() {
           },
         });
         if (error) throw error;
-        toast.success("Welcome to Ember", { description: "Check your inbox to confirm your email." });
+        toast.success("Welcome to Outstand", { description: "Check your inbox to confirm your email." });
         navigate({ to: "/", replace: true });
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -87,9 +87,9 @@ function AuthPage() {
       <div className="w-full max-w-md">
         <Link to="/" className="mb-8 flex items-center justify-center gap-2">
           <div className="grid h-10 w-10 place-items-center rounded-xl bg-[image:var(--gradient-primary)] shadow-[var(--shadow-glow)]">
-            <Flame className="h-5 w-5 text-primary-foreground" />
+            <Zap className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="font-display text-2xl font-bold tracking-tight">Ember</span>
+          <span className="font-display text-2xl font-bold tracking-tight">Outstand</span>
         </Link>
 
         <div className="glass-card p-6 md:p-8">
@@ -97,7 +97,7 @@ function AuthPage() {
             {mode === "signin" ? "Welcome back" : "Create your account"}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {mode === "signin" ? "Sign in to keep your streaks alive." : "Start your dopamine recovery today."}
+            {mode === "signin" ? "Stay focused. Beat phone addiction." : "Start your journey to a more focused life.."}
           </p>
 
           <Tabs value={mode} onValueChange={(v) => setMode(v as "signin" | "signup")} className="mt-6">
