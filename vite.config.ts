@@ -5,11 +5,17 @@
 //     error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { loadEnv } from "vite";
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+const env = {
+  ...loadEnv(process.env.NODE_ENV === "development" ? "development" : "production", process.cwd(), ""),
+  ...process.env,
+};
+
+const supabaseUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL || "";
 const supabasePublishableKey =
-  process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || "";
-const nitroPreset = process.env.NITRO_PRESET || (process.env.VERCEL ? "vercel" : undefined);
+  env.VITE_SUPABASE_PUBLISHABLE_KEY || env.SUPABASE_PUBLISHABLE_KEY || "";
+const nitroPreset = env.NITRO_PRESET || (env.VERCEL ? "vercel" : undefined);
 
 export default defineConfig({
   nitro: {
