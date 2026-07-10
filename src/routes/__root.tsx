@@ -86,7 +86,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "A premium habit tracker for students. Build streaks, focus with Pomodoro, and take on the daily Outstand challenge.",
       },
-      { name: "author", content: "Ember" },
+      { name: "author", content: "Outstand" },
       { property: "og:title", content: "Outstand is for those who want to outstand" },
       {
         property: "og:description",
