@@ -143,8 +143,8 @@ function DopaminePage() {
 
       <div className="flex justify-end">
         <Button asChild variant="ghost" className="gap-2">
-          <Link to="/analytics">
-            See full weekly analytics <ArrowRight className="h-4 w-4" />
+          <Link to="/profile">
+            See full stats <ArrowRight className="h-4 w-4" />
           </Link>
         </Button>
       </div>

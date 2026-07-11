@@ -1,11 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Plus, Sparkles, TrendingUp, Timer, Zap, Brain, ArrowRight, Play } from "lucide-react";
+import { useState } from "react";
+import { Plus, Sparkles, TrendingUp, Timer, Zap, Brain, ArrowRight, Play, RefreshCcw, User } from "lucide-react";
 import { AddHabitDialog, HabitCard } from "@/components/habit-card";
 import { Button } from "@/components/ui/button";
 import { useAppState } from "@/hooks/use-app-state";
 import { useAuth, displayNameOf } from "@/hooks/use-auth";
 import { useDailyLog } from "@/hooks/use-dopamine";
-import { quoteOfTheDay } from "@/lib/quotes";
+import { QUOTES, quoteOfTheDay } from "@/lib/quotes";
 import { todayISO } from "@/lib/habits";
 import { dailyChallenge } from "@/lib/challenges";
 import { scoreColor } from "@/lib/dopamine";
@@ -17,6 +18,7 @@ export const Route = createFileRoute("/_authenticated/")({
 
 function Dashboard() {
   const { habits, toggleToday, addHabit, updateHabit, deleteHabit, xp, bestStreak } = useAppState();
+  const [quoteIdx, setQuoteIdx] = useState<number | null>(null);
   const { user, profile } = useAuth();
   const { log } = useDailyLog();
   const navigate = useNavigate();
@@ -25,7 +27,7 @@ function Dashboard() {
   const completedToday = habits.filter((h) => h.history.includes(today)).length;
   const total = habits.length;
   const pct = total ? Math.round((completedToday / total) * 100) : 0;
-  const q = quoteOfTheDay();
+  const q = quoteIdx === null ? quoteOfTheDay() : QUOTES[quoteIdx % QUOTES.length];
   const challenge = dailyChallenge(today);
   const score = log?.score ?? 50;
   const color = scoreColor(score);
@@ -49,9 +51,9 @@ function Dashboard() {
             <h1 className="mt-3 font-display text-3xl font-bold leading-tight md:text-5xl">
               Welcome back, <span className="gradient-text">{name}.</span>
             </h1>
-            <p className="mt-3 max-w-xl text-sm text-muted-foreground md:text-base">
+            <blockquote className="mt-3 max-w-xl text-sm text-muted-foreground md:text-base">
               "{q.text}" <span className="opacity-70">— {q.author}</span>
-            </p>
+            </blockquote>
             <div className="mt-5 flex flex-wrap gap-2">
               <Button asChild className="btn-primary gap-2">
                 <Link to="/focus">
@@ -156,6 +158,28 @@ function Dashboard() {
           </div>
 
           <div className="glass-card p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-muted-foreground">
+                <Sparkles className="h-3.5 w-3.5" /> Quiet moment
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 px-2 text-xs"
+                onClick={() =>
+                  setQuoteIdx((n) =>
+                    ((n ?? 0) + 1 + Math.floor(Math.random() * (QUOTES.length - 1))) % QUOTES.length,
+                  )
+                }
+              >
+                <RefreshCcw className="h-3 w-3" /> New
+              </Button>
+            </div>
+            <p className="mt-3 font-display text-base leading-snug">"{q.text}"</p>
+            <p className="mt-1 text-xs text-muted-foreground">— {q.author}</p>
+          </div>
+
+          <div className="glass-card p-6">
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-muted-foreground">
               <Timer className="h-3.5 w-3.5" /> Quick actions
             </div>
@@ -163,14 +187,14 @@ function Dashboard() {
               <Button variant="outline" size="sm" onClick={() => navigate({ to: "/focus" })}>
                 Start Pomodoro
               </Button>
-              <Button variant="outline" size="sm" onClick={() => navigate({ to: "/quiet" })}>
-                Read a quote
+              <Button variant="outline" size="sm" onClick={() => navigate({ to: "/dopamine" })}>
+                Log dopamine
               </Button>
-              <Button variant="outline" size="sm" onClick={() => navigate({ to: "/stats" })}>
-                See stats
+              <Button variant="outline" size="sm" onClick={() => navigate({ to: "/outstand" })}>
+                Today's challenge
               </Button>
-              <Button variant="outline" size="sm" onClick={() => navigate({ to: "/analytics" })}>
-                Weekly report
+              <Button variant="outline" size="sm" onClick={() => navigate({ to: "/profile" })}>
+                <User className="mr-1 h-3.5 w-3.5" /> My stats
               </Button>
             </div>
           </div>

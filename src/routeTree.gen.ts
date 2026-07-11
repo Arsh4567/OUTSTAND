@@ -13,12 +13,10 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
-import { Route as AuthenticatedStatsRouteImport } from './routes/_authenticated/stats'
-import { Route as AuthenticatedQuietRouteImport } from './routes/_authenticated/quiet'
+import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedOutstandRouteImport } from './routes/_authenticated/outstand'
 import { Route as AuthenticatedFocusRouteImport } from './routes/_authenticated/focus'
 import { Route as AuthenticatedDopamineRouteImport } from './routes/_authenticated/dopamine'
-import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -39,14 +37,9 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedStatsRoute = AuthenticatedStatsRouteImport.update({
-  id: '/stats',
-  path: '/stats',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedQuietRoute = AuthenticatedQuietRouteImport.update({
-  id: '/quiet',
-  path: '/quiet',
+const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedOutstandRoute = AuthenticatedOutstandRouteImport.update({
@@ -64,32 +57,23 @@ const AuthenticatedDopamineRoute = AuthenticatedDopamineRouteImport.update({
   path: '/dopamine',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedAnalyticsRoute = AuthenticatedAnalyticsRouteImport.update({
-  id: '/analytics',
-  path: '/analytics',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/auth': typeof AuthRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/analytics': typeof AuthenticatedAnalyticsRoute
   '/dopamine': typeof AuthenticatedDopamineRoute
   '/focus': typeof AuthenticatedFocusRoute
   '/outstand': typeof AuthenticatedOutstandRoute
-  '/quiet': typeof AuthenticatedQuietRoute
-  '/stats': typeof AuthenticatedStatsRoute
+  '/profile': typeof AuthenticatedProfileRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/analytics': typeof AuthenticatedAnalyticsRoute
   '/dopamine': typeof AuthenticatedDopamineRoute
   '/focus': typeof AuthenticatedFocusRoute
   '/outstand': typeof AuthenticatedOutstandRoute
-  '/quiet': typeof AuthenticatedQuietRoute
-  '/stats': typeof AuthenticatedStatsRoute
+  '/profile': typeof AuthenticatedProfileRoute
   '/': typeof AuthenticatedIndexRoute
 }
 export interface FileRoutesById {
@@ -97,12 +81,10 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
   '/_authenticated/dopamine': typeof AuthenticatedDopamineRoute
   '/_authenticated/focus': typeof AuthenticatedFocusRoute
   '/_authenticated/outstand': typeof AuthenticatedOutstandRoute
-  '/_authenticated/quiet': typeof AuthenticatedQuietRoute
-  '/_authenticated/stats': typeof AuthenticatedStatsRoute
+  '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
 }
 export interface FileRouteTypes {
@@ -111,34 +93,28 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/sitemap.xml'
-    | '/analytics'
     | '/dopamine'
     | '/focus'
     | '/outstand'
-    | '/quiet'
-    | '/stats'
+    | '/profile'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
     | '/sitemap.xml'
-    | '/analytics'
     | '/dopamine'
     | '/focus'
     | '/outstand'
-    | '/quiet'
-    | '/stats'
+    | '/profile'
     | '/'
   id:
     | '__root__'
     | '/_authenticated'
     | '/auth'
     | '/sitemap.xml'
-    | '/_authenticated/analytics'
     | '/_authenticated/dopamine'
     | '/_authenticated/focus'
     | '/_authenticated/outstand'
-    | '/_authenticated/quiet'
-    | '/_authenticated/stats'
+    | '/_authenticated/profile'
     | '/_authenticated/'
   fileRoutesById: FileRoutesById
 }
@@ -178,18 +154,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/stats': {
-      id: '/_authenticated/stats'
-      path: '/stats'
-      fullPath: '/stats'
-      preLoaderRoute: typeof AuthenticatedStatsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/quiet': {
-      id: '/_authenticated/quiet'
-      path: '/quiet'
-      fullPath: '/quiet'
-      preLoaderRoute: typeof AuthenticatedQuietRouteImport
+    '/_authenticated/profile': {
+      id: '/_authenticated/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AuthenticatedProfileRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/outstand': {
@@ -213,33 +182,22 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDopamineRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/analytics': {
-      id: '/_authenticated/analytics'
-      path: '/analytics'
-      fullPath: '/analytics'
-      preLoaderRoute: typeof AuthenticatedAnalyticsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
-  AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
   AuthenticatedDopamineRoute: typeof AuthenticatedDopamineRoute
   AuthenticatedFocusRoute: typeof AuthenticatedFocusRoute
   AuthenticatedOutstandRoute: typeof AuthenticatedOutstandRoute
-  AuthenticatedQuietRoute: typeof AuthenticatedQuietRoute
-  AuthenticatedStatsRoute: typeof AuthenticatedStatsRoute
+  AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
   AuthenticatedDopamineRoute: AuthenticatedDopamineRoute,
   AuthenticatedFocusRoute: AuthenticatedFocusRoute,
   AuthenticatedOutstandRoute: AuthenticatedOutstandRoute,
-  AuthenticatedQuietRoute: AuthenticatedQuietRoute,
-  AuthenticatedStatsRoute: AuthenticatedStatsRoute,
+  AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
 
