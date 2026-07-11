@@ -138,7 +138,6 @@ const complete = () => {
                 <span className="text-3xl">{challenge.emoji}</span>
                 <span className="truncate">{challenge.title}</span>
               </h2>
-           </> 
   <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
     {challenge.description}
   </p>
@@ -174,6 +173,8 @@ const complete = () => {
 
 </div>
 </div>
+ </div>
+
           <div className="mt-8 flex flex-col items-center gap-4">
             <div className={cn("grid h-40 w-40 place-items-center rounded-full bg-secondary/50 backdrop-blur", running && "pulse-ring")}>
               <div className="text-center">
