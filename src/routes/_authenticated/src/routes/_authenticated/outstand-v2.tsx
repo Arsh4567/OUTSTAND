@@ -106,7 +106,7 @@ const [portalOpen, setPortalOpen] = useState(false);
   Generate Mission
 </Button>
 
-</div>
+
 
 <MissionReveal
   open={portalOpen}
