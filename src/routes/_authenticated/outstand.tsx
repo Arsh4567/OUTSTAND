@@ -117,10 +117,45 @@ const complete = () => {
   const secs = remaining % 60;
 return (
   <motion.div
-    animate={{ background: bg }}
-    transition={{ duration: 0.8 }}
-    className="space-y-10 min-h-screen rounded-3xl p-6"
-  >
+  className="relative min-h-screen overflow-hidden rounded-3xl p-6"
+>
+
+  {/* Animated Background */}
+  <motion.div
+    key={bg}
+    initial={{ opacity: 0, scale: 1.08 }}
+    animate={{ opacity: 1, scale: 1 }}
+    transition={{
+      duration: 0.9,
+      ease: "easeOut",
+    }}
+    className="absolute inset-0 -z-10"
+    style={{
+      background: bg,
+      filter: "blur(35px)",
+    }}
+  />
+
+  {/* Glow Layer */}
+  <motion.div
+    animate={{
+      opacity: [0.4, 0.75, 0.4],
+      scale: [1, 1.04, 1],
+    }}
+    transition={{
+      duration: 5,
+      repeat: Infinity,
+      ease: "easeInOut",
+    }}
+    className="absolute inset-0 -z-10"
+    style={{
+      background: bg,
+      mixBlendMode: "screen",
+      filter: "blur(120px)",
+    }}
+  />
+
+  <div className="space-y-10">
   
       <div className="text-center">
         <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-secondary/40 px-3 py-1 text-xs">
