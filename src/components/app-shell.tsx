@@ -1,5 +1,5 @@
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Activity, Flame, LogOut, Sparkles, Timer, Trophy, Zap, Brain, BarChart3, User } from "lucide-react";
+import { Activity, Flame, LogOut, Timer, Zap, Brain, User } from "lucide-react";
 import { useAppState } from "@/hooks/use-app-state";
 import { useAuth, displayNameOf } from "@/hooks/use-auth";
 import { levelFromXP } from "@/lib/habits";
@@ -19,9 +19,6 @@ const NAV = [
   { to: "/", label: "Dashboard", icon: Activity },
   { to: "/dopamine", label: "Dopamine", icon: Brain },
   { to: "/focus", label: "Focus", icon: Timer },
-  { to: "/quiet", label: "Quiet", icon: Sparkles },
-  { to: "/analytics", label: "Analytics", icon: BarChart3 },
-  { to: "/stats", label: "Stats", icon: Trophy },
   { to: "/outstand", label: "Outstand", icon: Zap },
 ] as const;
 
