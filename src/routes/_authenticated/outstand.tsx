@@ -7,9 +7,6 @@ import {
   RotateCcw,
   Sparkles,
   Zap,
-  Star,
-  Palette,
-  Trophy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CHALLENGES, randomChallenge, type OutstandChallenge } from "@/lib/challenges";
@@ -114,66 +111,72 @@ const complete = () => {
       ) : (
         <div className="fade-up glass-card mx-auto max-w-3xl overflow-hidden p-8 md:p-10">
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
-            <div className="min-w-0">
-            <div className="flex items-center gap-2">
-  <span
-    className="rounded-full px-3 py-1 text-xs font-bold"
-    style={{
-      background: challenge.color,
-      color: challenge.rarity === "Common" ? "#000" : "#fff",
-    }}
-  >
-    {challenge.rarity}
-  </span>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
 
-  <span className="text-xs uppercase tracking-widest text-muted-foreground">
-    {challenge.category}
-  </span>
-</div>
-         <div className="mt-2 text-xs font-semibold tracking-widest text-muted-foreground">
-  Mission #{challenge.id.toString().padStart(3, "0")}
-</div>    
-         
-              <h2 className="mt-2 flex items-center gap-3 font-display text-2xl font-bold md:text-3xl">
-                <span className="text-3xl">{challenge.emoji}</span>
-                <span className="truncate">{challenge.title}</span>
-              </h2>
-  <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
-    {challenge.description}
-  </p>
+  <div className="min-w-0">
 
-  <div className="mt-4 flex flex-wrap gap-2">
+    <div className="flex items-center gap-2">
+      <span
+        className="rounded-full px-3 py-1 text-xs font-bold"
+        style={{
+          background: challenge.color,
+          color: challenge.rarity === "Common" ? "#000" : "#fff",
+        }}
+      >
+        {challenge.rarity}
+      </span>
 
-    <span className="rounded-full bg-blue-600/20 px-3 py-1 text-sm">
-      🎯 {challenge.difficulty}
-    </span>
-
-    <span className="rounded-full bg-purple-600/20 px-3 py-1 text-sm">
-      🌍 {challenge.theme}
-    </span>
-
-
-</div>
-
-<div className="shrink-0 rounded-2xl border border-border/60 bg-secondary/40 px-4 py-3 text-center space-y-2">
-
-  <div>
-    <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-      Duration
+      <span className="text-xs uppercase tracking-widest text-muted-foreground">
+        {challenge.category}
+      </span>
     </div>
 
-    <div className="font-display text-2xl font-bold">
-      {challenge.minutes} min
+    <div className="mt-2 text-xs font-semibold tracking-widest text-muted-foreground">
+      Mission #{challenge.id.toString().padStart(3, "0")}
     </div>
+
+    <h2 className="mt-2 flex items-center gap-3 font-display text-2xl font-bold md:text-3xl">
+      <span className="text-3xl">{challenge.emoji}</span>
+      <span>{challenge.title}</span>
+    </h2>
+
+    <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
+      {challenge.description}
+    </p>
+
+    <div className="mt-4 flex flex-wrap gap-2">
+      <span className="rounded-full bg-blue-600/20 px-3 py-1 text-sm">
+        🎯 {challenge.difficulty}
+      </span>
+
+      <span className="rounded-full bg-purple-600/20 px-3 py-1 text-sm">
+        🌍 {challenge.theme}
+      </span>
+    </div>
+
   </div>
 
-  <div className="font-bold text-yellow-400">
-    ⭐ {challenge.xp} XP
+  <div className="shrink-0 rounded-2xl border border-border/60 bg-secondary/40 px-4 py-3 text-center space-y-2">
+
+    <div>
+      <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+        Duration
+      </div>
+
+      <div className="font-display text-2xl font-bold">
+        {challenge.minutes} min
+      </div>
+    </div>
+
+    <div className="font-bold text-yellow-400">
+      ⭐ {challenge.xp} XP
+    </div>
+
   </div>
 
 </div>
-</div>
- </div>
+
+  
 
           <div className="mt-8 flex flex-col items-center gap-4">
             <div className={cn("grid h-40 w-40 place-items-center rounded-full bg-secondary/50 backdrop-blur", running && "pulse-ring")}>
