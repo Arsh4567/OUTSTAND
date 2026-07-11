@@ -111,8 +111,7 @@ const complete = () => {
       ) : (
         <div className="fade-up glass-card mx-auto max-w-3xl overflow-hidden p-8 md:p-10">
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
-
+        
   <div className="min-w-0">
 
     <div className="flex items-center gap-2">
