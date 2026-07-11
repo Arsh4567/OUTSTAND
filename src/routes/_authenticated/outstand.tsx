@@ -174,7 +174,7 @@ const complete = () => {
   </div>
 
 </div>
-
+</div>
   
 
           <div className="mt-8 flex flex-col items-center gap-4">
