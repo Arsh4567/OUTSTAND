@@ -1,3 +1,6 @@
+window.onerror = function(message, source, lineno, colno, error) {
+  alert("App Error: " + message + " at " + source + ":" + lineno);
+};
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
