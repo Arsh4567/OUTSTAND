@@ -115,6 +115,7 @@ export const CHALLENGES: OutstandChallenge[] = [
     color: "#FFFFFF",
   },
 ];
+
 export function randomChallenge(exclude?: string): OutstandChallenge {
   const pool = exclude
     ? CHALLENGES.filter((c) => c.title !== exclude)
@@ -123,7 +124,6 @@ export function randomChallenge(exclude?: string): OutstandChallenge {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-// Deterministic daily pick so everyone sees the same challenge today
 export function dailyChallenge(dateISO: string): OutstandChallenge {
   let h = 0;
 
