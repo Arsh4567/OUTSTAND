@@ -138,7 +138,7 @@ const complete = () => {
                 <span className="text-3xl">{challenge.emoji}</span>
                 <span className="truncate">{challenge.title}</span>
               </h2>
-              <>
+           </> 
   <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
     {challenge.description}
   </p>
@@ -153,13 +153,10 @@ const complete = () => {
       🌍 {challenge.theme}
     </span>
 
-  <>
- ...
-</>
 
 </div>
 
-<div className="shrink-0 rounded-2xl ...
+<div className="shrink-0 rounded-2xl border border-border/60 bg-secondary/40 px-4 py-3 text-center space-y-2">
 
   <div>
     <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
