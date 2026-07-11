@@ -158,6 +158,28 @@ function Dashboard() {
           </div>
 
           <div className="glass-card p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-muted-foreground">
+                <Sparkles className="h-3.5 w-3.5" /> Quiet moment
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 px-2 text-xs"
+                onClick={() =>
+                  setQuoteIdx((n) =>
+                    ((n ?? 0) + 1 + Math.floor(Math.random() * (QUOTES.length - 1))) % QUOTES.length,
+                  )
+                }
+              >
+                <RefreshCcw className="h-3 w-3" /> New
+              </Button>
+            </div>
+            <p className="mt-3 font-display text-base leading-snug">"{q.text}"</p>
+            <p className="mt-1 text-xs text-muted-foreground">— {q.author}</p>
+          </div>
+
+          <div className="glass-card p-6">
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-muted-foreground">
               <Timer className="h-3.5 w-3.5" /> Quick actions
             </div>
@@ -165,14 +187,14 @@ function Dashboard() {
               <Button variant="outline" size="sm" onClick={() => navigate({ to: "/focus" })}>
                 Start Pomodoro
               </Button>
-              <Button variant="outline" size="sm" onClick={() => navigate({ to: "/quiet" })}>
-                Read a quote
+              <Button variant="outline" size="sm" onClick={() => navigate({ to: "/dopamine" })}>
+                Log dopamine
               </Button>
-              <Button variant="outline" size="sm" onClick={() => navigate({ to: "/stats" })}>
-                See stats
+              <Button variant="outline" size="sm" onClick={() => navigate({ to: "/outstand" })}>
+                Today's challenge
               </Button>
-              <Button variant="outline" size="sm" onClick={() => navigate({ to: "/analytics" })}>
-                Weekly report
+              <Button variant="outline" size="sm" onClick={() => navigate({ to: "/profile" })}>
+                <User className="mr-1 h-3.5 w-3.5" /> My stats
               </Button>
             </div>
           </div>
