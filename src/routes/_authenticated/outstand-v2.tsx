@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 import { Sparkles, Zap, CheckCircle2, Pause, Play, RotateCcw } from "lucide-react";
-import MissionReveal from "@/components/outstand/MissionReveal";
 import { Button } from "@/components/ui/button";
 import { randomChallenge, type OutstandChallenge } from "@/lib/challenges";
 import { toast } from "sonner";
