@@ -99,16 +99,18 @@ const [portalOpen, setPortalOpen] = useState(false);
         </div>
 
         <Button
-          onClick={generate}
-          className="h-24 w-72 rounded-full text-2xl"
-        >
-          <Zap className="mr-3" />
+  onClick={generate}
+  className="h-24 w-72 rounded-full text-2xl"
+>
+  <Zap className="mr-3" />
+  Generate Mission
+</Button>
 
-          Generate Mission
-        </Button>
+</div>
 
-      </div>
+<MissionReveal
+  open={portalOpen}
+  color={challenge?.color ?? "#3b82f6"}
+/>
 
-    </div>
-  );
-}
+</div>
