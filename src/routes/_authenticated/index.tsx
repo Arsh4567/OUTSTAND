@@ -1,11 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Plus, Sparkles, TrendingUp, Timer, Zap, Brain, ArrowRight, Play } from "lucide-react";
+import { useState } from "react";
+import { Plus, Sparkles, TrendingUp, Timer, Zap, Brain, ArrowRight, Play, RefreshCcw, User } from "lucide-react";
 import { AddHabitDialog, HabitCard } from "@/components/habit-card";
 import { Button } from "@/components/ui/button";
 import { useAppState } from "@/hooks/use-app-state";
 import { useAuth, displayNameOf } from "@/hooks/use-auth";
 import { useDailyLog } from "@/hooks/use-dopamine";
-import { quoteOfTheDay } from "@/lib/quotes";
+import { QUOTES, quoteOfTheDay } from "@/lib/quotes";
 import { todayISO } from "@/lib/habits";
 import { dailyChallenge } from "@/lib/challenges";
 import { scoreColor } from "@/lib/dopamine";
@@ -17,6 +18,7 @@ export const Route = createFileRoute("/_authenticated/")({
 
 function Dashboard() {
   const { habits, toggleToday, addHabit, updateHabit, deleteHabit, xp, bestStreak } = useAppState();
+  const [quoteIdx, setQuoteIdx] = useState<number | null>(null);
   const { user, profile } = useAuth();
   const { log } = useDailyLog();
   const navigate = useNavigate();
@@ -25,7 +27,7 @@ function Dashboard() {
   const completedToday = habits.filter((h) => h.history.includes(today)).length;
   const total = habits.length;
   const pct = total ? Math.round((completedToday / total) * 100) : 0;
-  const q = quoteOfTheDay();
+  const q = quoteIdx === null ? quoteOfTheDay() : QUOTES[quoteIdx % QUOTES.length];
   const challenge = dailyChallenge(today);
   const score = log?.score ?? 50;
   const color = scoreColor(score);
