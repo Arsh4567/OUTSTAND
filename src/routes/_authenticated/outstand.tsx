@@ -34,15 +34,52 @@ function OutstandPage() {
   const [challenge, setChallenge] = useState<OutstandChallenge | null>(null);
   const [remaining, setRemaining] = useState(600);
   const [running, setRunning] = useState(false);
+  const [bg, setBg] = useState(
+  "linear-gradient(135deg,#0f172a,#111827)"
+);
   const intervalRef = useRef<number | null>(null);
+const generate = () => {
+  const next = randomChallenge(challenge?.title);
 
-  const generate = () => {
-    const next = randomChallenge(challenge?.title);
-    setChallenge(next);
-    setRemaining(next.minutes * 60);
-    setRunning(false);
-  };
+  setChallenge(next);
+  setRemaining(next.minutes * 60);
+  setRunning(false);
 
+  switch (next.theme) {
+    case "Ocean":
+      setBg("linear-gradient(135deg,#0ea5e9,#1e3a8a)");
+      break;
+
+    case "Galaxy":
+      setBg("linear-gradient(135deg,#6d28d9,#312e81)");
+      break;
+
+    case "Forest":
+      setBg("linear-gradient(135deg,#15803d,#14532d)");
+      break;
+
+    case "Sunset":
+      setBg("linear-gradient(135deg,#f97316,#b91c1c)");
+      break;
+
+    case "Ice":
+      setBg("linear-gradient(135deg,#38bdf8,#0f172a)");
+      break;
+
+    case "Volcano":
+      setBg("linear-gradient(135deg,#dc2626,#7f1d1d)");
+      break;
+
+    case "Royal":
+      setBg("linear-gradient(135deg,#7c3aed,#facc15)");
+      break;
+
+    case "Neon":
+      setBg("linear-gradient(135deg,#22d3ee,#a855f7)");
+      break;
+  }
+};
+  
   useEffect(() => {
     if (!running) return;
     intervalRef.current = window.setInterval(() => {
@@ -78,9 +115,13 @@ const complete = () => {
 
   const mins = Math.floor(remaining / 60);
   const secs = remaining % 60;
-
-  return (
-    <div className="space-y-10">
+return (
+  <motion.div
+    animate={{ background: bg }}
+    transition={{ duration: 0.8 }}
+    className="space-y-10 min-h-screen rounded-3xl p-6"
+  >
+  
       <div className="text-center">
         <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-secondary/40 px-3 py-1 text-xs">
           <Sparkles className="h-3.5 w-3.5 text-accent" />
