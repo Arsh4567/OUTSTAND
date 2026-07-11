@@ -51,9 +51,9 @@ function Dashboard() {
             <h1 className="mt-3 font-display text-3xl font-bold leading-tight md:text-5xl">
               Welcome back, <span className="gradient-text">{name}.</span>
             </h1>
-            <p className="mt-3 max-w-xl text-sm text-muted-foreground md:text-base">
+            <blockquote className="mt-3 max-w-xl text-sm text-muted-foreground md:text-base">
               "{q.text}" <span className="opacity-70">— {q.author}</span>
-            </p>
+            </blockquote>
             <div className="mt-5 flex flex-wrap gap-2">
               <Button asChild className="btn-primary gap-2">
                 <Link to="/focus">
