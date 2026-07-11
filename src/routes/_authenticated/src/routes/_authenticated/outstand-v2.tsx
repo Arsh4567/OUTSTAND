@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { Sparkles, Zap } from "lucide-react";
-
+import MissionReveal from "@/components/outstand/MissionReveal";
 import { Button } from "@/components/ui/button";
 import {
   randomChallenge,
@@ -16,17 +16,22 @@ export const Route = createFileRoute("/_authenticated/outstand-v2")({
 function OutstandV2() {
   const [challenge, setChallenge] =
     useState<OutstandChallenge | null>(null);
-
+const [portalOpen, setPortalOpen] = useState(false);
   const [revealing, setRevealing] = useState(false);
 
   const generate = () => {
-    setRevealing(true);
+  const next = randomChallenge();
 
-    setTimeout(() => {
-      setChallenge(randomChallenge(challenge?.title));
-      setRevealing(false);
-    }, 1400);
-  };
+  setPortalOpen(true);
+
+  setTimeout(() => {
+    setChallenge(next);
+  }, 1500);
+
+  setTimeout(() => {
+    setPortalOpen(false);
+  }, 2600);
+};
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-black">
