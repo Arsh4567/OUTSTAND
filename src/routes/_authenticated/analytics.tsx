@@ -8,7 +8,7 @@ import { todayISO } from "@/lib/habits";
 export const Route = createFileRoute("/_authenticated/analytics")({
   head: () => ({
     meta: [
-      { title: "Weekly Analytics — Ember" },
+      { title: "Weekly Analytics — Outstand" },
       { name: "description", content: "Weekly dopamine and productivity analytics." },
     ],
   }),

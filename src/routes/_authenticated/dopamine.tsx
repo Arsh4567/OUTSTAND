@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/dopamine")({
   head: () => ({
     meta: [
-      { title: "Dopamine Recovery — Ember" },
+      { title: "Dopamine Recovery — Outstand" },
       { name: "description", content: "Track your daily dopamine recovery score and rebuild focus." },
     ],
   }),
