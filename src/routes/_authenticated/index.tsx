@@ -49,7 +49,12 @@ function Dashboard() {
           <h1 className="text-4xl font-bold tracking-tight text-white">
             Welcome back, <span className="text-indigo-400">{name}.</span>
           </h1>
-          <p className="text-slate-400 mt-2 text-lg">Your focus flow is looking strong today.</p>
+          <p className="text-slate-400 mt-2 text-lg">
+  {stats.pct >= 80 
+    ? "You're on a roll! Keep that momentum going." 
+    : "Let's turn your intentions into action today."}
+</p>
+          
         </div>
         <div className="flex gap-3">
            <Button variant="secondary" onClick={() => navigate({ to: "/dopamine" })}>Log Dopamine</Button>
@@ -79,9 +84,23 @@ function Dashboard() {
           </div>
           
           <div className="grid sm:grid-cols-2 gap-3">
-            {habits.map((h) => (
-              <HabitCard key={h.id} habit={h} onToggle={() => toggleToday(h.id)} onEdit={(d) => updateHabit(h.id, d)} onDelete={() => deleteHabit(h.id)} />
-            ))}
+          {/* Only show the first 3 habits, or add a "View All" link if there are more */}
+{habits.slice(0, 3).map((h) => (
+  <HabitCard 
+    key={h.id} 
+    habit={h} 
+    onToggle={() => toggleToday(h.id)} 
+    onEdit={(d) => updateHabit(h.id, d)} 
+    onDelete={() => deleteHabit(h.id)} 
+  />
+))}
+
+{habits.length > 3 && (
+  <Button variant="ghost" className="w-full text-slate-400" onClick={() => navigate({ to: "/habits" })}>
+    View all {habits.length} habits →
+  </Button>
+)}
+          
           </div>
         </div>
 
