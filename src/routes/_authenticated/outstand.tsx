@@ -1,6 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, Pause, Play, RotateCcw, Sparkles, Zap } from "lucide-react";
+import {
+  CheckCircle2,
+  Pause,
+  Play,
+  RotateCcw,
+  Sparkles,
+  Zap,
+  Star,
+  Palette,
+  Trophy,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CHALLENGES, randomChallenge, type OutstandChallenge } from "@/lib/challenges";
 import { useAppState } from "@/hooks/use-app-state";
@@ -52,16 +62,21 @@ function OutstandPage() {
       if (intervalRef.current) window.clearInterval(intervalRef.current);
     };
   }, [running]);
+const complete = () => {
+  if (!challenge) return;
 
-  const complete = () => {
-    if (!challenge) return;
-    recordOutstand(challenge.title);
-    addPositive("outstand");
-    description: `+15 dopamine · +${challenge.xp} XP · ${challenge.title}`
-    setChallenge(null);
-    setRemaining(600);
-    setRunning(false);
-  };
+  recordOutstand(challenge.title);
+  addPositive("outstand");
+
+  toast.success("Outstanding.", {
+    description: `+15 dopamine · +${challenge.xp} XP · ${challenge.title}`,
+  });
+
+  setChallenge(null);
+  setRemaining(600);
+  setRunning(false);
+};
+  
 
   const mins = Math.floor(remaining / 60);
   const secs = remaining % 60;
@@ -138,10 +153,13 @@ function OutstandPage() {
       🌍 {challenge.theme}
     </span>
 
-  </div>
+  <>
+ ...
 </>
-              </p>
-            <div className="shrink-0 rounded-2xl border border-border/60 bg-secondary/40 px-4 py-3 text-center space-y-2">
+
+</div>
+
+<div className="shrink-0 rounded-2xl ...
 
   <div>
     <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -158,7 +176,7 @@ function OutstandPage() {
   </div>
 
 </div>
-
+</div>
           <div className="mt-8 flex flex-col items-center gap-4">
             <div className={cn("grid h-40 w-40 place-items-center rounded-full bg-secondary/50 backdrop-blur", running && "pulse-ring")}>
               <div className="text-center">
