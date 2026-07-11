@@ -86,8 +86,12 @@ function AuthPage() {
     <div className="grid min-h-screen place-items-center px-4 py-10">
       <div className="w-full max-w-md">
         <Link to="/" className="mb-8 flex items-center justify-center gap-2">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-[image:var(--gradient-primary)] shadow-[var(--shadow-glow)]">
-            <Zap className="h-5 w-5 text-primary-foreground" />
+          <div className="h-10 w-10 overflow-hidden rounded-xl shadow-[var(--shadow-glow)]">
+            <img
+              src="/outstand-logo.png"
+              alt="Outstand Logo"
+              className="h-full w-full object-cover"
+            />
           </div>
           <span className="font-display text-2xl font-bold tracking-tight">Outstand</span>
         </Link>
