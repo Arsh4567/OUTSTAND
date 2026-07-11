@@ -266,6 +266,7 @@ return (
           </ul>
         )}
       </div>
-    </div>
+        </div>
+    </motion.div>
   );
 }
