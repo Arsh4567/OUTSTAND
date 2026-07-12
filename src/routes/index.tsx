@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Zap, Target, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import outstandLogo from "@/assets/outstand-logo.png.asset.json";
 
 export const Route = createFileRoute("/")({
   component: LandingPage,
@@ -12,7 +13,7 @@ function LandingPage() {
       {/* Navigation */}
       <nav className="mx-auto flex max-w-7xl items-center justify-between p-6">
         <div className="flex items-center gap-2 font-display text-xl font-bold">
-          <Zap className="h-6 w-6 text-indigo-500" />
+          <img src={outstandLogo.url} alt="Outstand logo" className="h-8 w-8 rounded-lg" />
           Outstand
         </div>
         <Button asChild variant="secondary" className="rounded-full px-6">
