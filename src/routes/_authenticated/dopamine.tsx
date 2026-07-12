@@ -47,7 +47,18 @@ const itemVariants = {
 };
 
 function MomentumPage() {
-  const { log, togglePositive, toggleNegative } = useDailyLog();
+  const { log, loading, togglePositive, toggleNegative } = useDailyLog();
+  
+  // 1. SAFEGUARD: If still loading from Supabase, show a simple loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] text-indigo-400">
+        <div className="animate-pulse font-bold tracking-widest uppercase">Loading Momentum...</div>
+      </div>
+    );
+  }
+
+  // 2. SAFEGUARD: If log is null, use a fallback to prevent crashes
   const score = log?.score ?? 50;
   const color = scoreColor(score);
   
@@ -55,6 +66,11 @@ function MomentumPage() {
     () => (log ? generateInsights(log.positives, log.negatives, score) : []),
     [log, score],
   );
+
+  return (
+    <div className="relative min-h-[calc(100vh-4rem)] pb-20 overflow-hidden">
+      {/* ... keep the rest of your JSX exactly as it was ... */}
+      
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)] pb-20 overflow-hidden">
