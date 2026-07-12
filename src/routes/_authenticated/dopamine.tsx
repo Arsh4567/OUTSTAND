@@ -15,6 +15,7 @@ import {
 } from "@/lib/dopamine";
 import { cn } from "@/lib/utils";
 
+// 🚨 CRASH REPORTER ADDED HERE 🚨
 export const Route = createFileRoute("/_authenticated/dopamine")({
   head: () => ({
     meta: [
@@ -23,6 +24,17 @@ export const Route = createFileRoute("/_authenticated/dopamine")({
     ],
   }),
   component: MomentumPage,
+  errorComponent: ({ error }) => (
+    <div className="min-h-screen bg-slate-950 p-6 flex flex-col items-center justify-center font-mono text-center">
+      <div className="text-4xl mb-4">🚨</div>
+      <h1 className="text-2xl font-bold text-white mb-4">Crash Report</h1>
+      <div className="bg-rose-500/10 p-4 rounded-xl border border-rose-500/50 text-rose-400 text-sm mb-4 w-full max-w-md break-words text-left">
+        <strong>Error Message:</strong> <br /><br />
+        {error?.message || "Unknown error occurred"}
+      </div>
+      <p className="text-slate-400 text-xs mb-2">Please copy this text or screenshot it and send it to me!</p>
+    </div>
+  ),
 });
 
 function MomentumPage() {
@@ -352,4 +364,4 @@ function WeeklySection() {
       </div>
     </section>
   );
-}
+                }
