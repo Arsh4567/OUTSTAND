@@ -127,13 +127,15 @@ export function useWeeklyLogs(days = 7) {
     const dates = lastNDays(days);
     const start = dates[0];
     
-    supabase
-      .from("daily_logs")
-      .select("log_date, positives, negatives, score")
-      .eq("user_id", user.id)
-      .gte("log_date", start)
-      .order("log_date", { ascending: true })
-      .then(({ data }) => {
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("daily_logs")
+          .select("log_date, positives, negatives, score")
+          .eq("user_id", user.id)
+          .gte("log_date", start)
+          .order("log_date", { ascending: true });
+
         const byDate = new Map<string, DailyLog>();
         (data ?? []).forEach((d) => {
           byDate.set(d.log_date, {
@@ -143,18 +145,19 @@ export function useWeeklyLogs(days = 7) {
             score: typeof d.score === 'number' ? d.score : 50,
           });
         });
-        
+
         setLogs(
           dates.map(
             (d) => byDate.get(d) ?? { log_date: d, positives: [], negatives: [], score: 50 },
           ),
         );
-        setLoading(false);
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error("Failed to load weekly logs:", err);
+      } finally {
         setLoading(false);
-      });
+      }
+    })();
+
   }, [user, days]);
 
   return { logs, loading };
