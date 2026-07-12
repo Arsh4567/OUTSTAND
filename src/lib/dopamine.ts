@@ -44,12 +44,16 @@ export function computeScore(positives: string[], negatives: string[]): number {
   for (const k of negatives) s += NEGATIVES.find((n) => n.key === k)?.points ?? 0;
   return Math.max(0, Math.min(100, s));
 }
-
 export function scoreColor(score: number): { hex: string; label: string; tone: "danger" | "warn" | "good" } {
-  if (score >= 70) return { hex: "oklch(0.74 0.17 155)", label: "Recovering well", tone: "good" };
-  if (score >= 40) return { hex: "oklch(0.82 0.16 80)", label: "Rebuilding", tone: "warn" };
+  // Clamp the score to 0-100 to prevent weird colors
+  const s = Math.max(0, Math.min(100, score));
+  
+  if (s >= 70) return { hex: "oklch(0.74 0.17 155)", label: "Recovering well", tone: "good" };
+  if (s >= 40) return { hex: "oklch(0.82 0.16 80)", label: "Rebuilding", tone: "warn" };
   return { hex: "oklch(0.65 0.22 25)", label: "Depleted", tone: "danger" };
 }
+
+
 
 export function generateInsights(
   positives: string[],
