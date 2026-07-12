@@ -25,6 +25,27 @@ export const Route = createFileRoute("/_authenticated/dopamine")({
   component: MomentumPage,
 });
 
+// Animation variants for the staggered grid
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.95 },
+  show: { 
+    opacity: 1, 
+    y: 0, 
+    scale: 1,
+    transition: { type: "spring", stiffness: 300, damping: 24 }
+  },
+};
+
 function MomentumPage() {
   const { log, togglePositive, toggleNegative } = useDailyLog();
   const score = log?.score ?? 50;
@@ -37,7 +58,7 @@ function MomentumPage() {
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)] pb-20 overflow-hidden">
-      {/* 3. DYNAMIC AURA BACKGROUND */}
+      {/* DYNAMIC AURA BACKGROUND */}
       <motion.div 
         className="fixed inset-0 -z-20 opacity-20 pointer-events-none blur-3xl"
         animate={{ 
@@ -47,7 +68,7 @@ function MomentumPage() {
       />
       <div className="absolute inset-0 bg-slate-950/50 -z-10 pointer-events-none" />
 
-      {/* 4. FLOW STATE TRIGGER BADGE */}
+      {/* FLOW STATE TRIGGER BADGE */}
       <AnimatePresence>
         {score >= 85 && (
           <motion.div
@@ -114,7 +135,7 @@ function MomentumPage() {
                     key={idx}
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.4 + idx * 0.1, duration: 0.5 }}
+                    transition={{ delay: 0.4 + idx * 0.1, duration: 0.5, type: "spring", bounce: 0.3 }}
                     className="flex gap-3 rounded-xl border border-white/5 bg-white/5 p-4 text-sm text-slate-200 shadow-sm"
                   >
                     <Zap className="mt-0.5 h-4 w-4 shrink-0 text-indigo-400" />
@@ -139,7 +160,12 @@ function MomentumPage() {
             </TabsList>
 
             <TabsContent value="positives">
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <motion.div 
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+                className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+              >
                 {POSITIVES.map((p) => {
                   const active = log?.positives.includes(p.key) ?? false;
                   return (
@@ -155,11 +181,16 @@ function MomentumPage() {
                     />
                   );
                 })}
-              </div>
+              </motion.div>
             </TabsContent>
 
             <TabsContent value="negatives">
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <motion.div 
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+                className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+              >
                 {NEGATIVES.map((n) => {
                   const active = log?.negatives.includes(n.key) ?? false;
                   return (
@@ -175,7 +206,7 @@ function MomentumPage() {
                     />
                   );
                 })}
-              </div>
+              </motion.div>
             </TabsContent>
           </Tabs>
         </section>
@@ -201,7 +232,6 @@ function ScoreRing({ score, color }: { score: number; color: string }) {
   const [display, setDisplay] = useState(0);
   
   useEffect(() => {
-    // Framer Motion spring animation for the rolling numbers
     const controls = animate(display, score, {
       type: "spring",
       stiffness: 50,
@@ -251,16 +281,15 @@ function ScoreRing({ score, color }: { score: number; color: string }) {
   );
 }
 
-// 2. TACTILE "HEAVY" ACTION CARDS
+// 2. ACCESSIBLE & TACTILE ACTION CARDS
 function ActionCard({ active, emoji, label, description, points, tone, onClick }: any) {
   
   const handleTactileClick = () => {
-    // Premium Haptic Feedback Profile
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       if (tone === "good") {
-        navigator.vibrate(40); // Short, sharp success snap
+        navigator.vibrate(40); 
       } else {
-        navigator.vibrate([30, 50, 30]); // Heavier, double-buzz for friction
+        navigator.vibrate([30, 50, 30]); 
       }
     }
     onClick();
@@ -268,18 +297,26 @@ function ActionCard({ active, emoji, label, description, points, tone, onClick }
 
   return (
     <motion.button
-      whileHover={{ scale: 1.02 }}
+      variants={itemVariants}
+      whileHover={{ scale: 1.03, y: -2 }}
       whileTap={{ scale: 0.94 }}
       onClick={handleTactileClick}
+      // Accessibility (A11y) Implementation
+      role="checkbox"
+      aria-checked={active}
+      aria-label={`${label}, ${points > 0 ? '+' : ''}${points} points, ${active ? 'Selected' : 'Not selected'}`}
       className={cn(
         "group relative flex w-full flex-col text-left rounded-2xl border p-5 transition-colors duration-300",
-        active && tone === "good" ? "border-emerald-500/50 bg-emerald-500/10 shadow-[0_0_20px_rgba(16,185,129,0.15)]" 
-        : active && tone === "bad" ? "border-rose-500/50 bg-rose-500/10 shadow-[0_0_20px_rgba(244,63,94,0.15)]"
-        : "border-white/5 bg-slate-900/40 hover:bg-slate-800/80 hover:border-white/10"
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950",
+        active && tone === "good" ? "border-emerald-500/50 bg-emerald-500/10 shadow-[0_0_20px_rgba(16,185,129,0.15)] focus-visible:ring-emerald-500" 
+        : active && tone === "bad" ? "border-rose-500/50 bg-rose-500/10 shadow-[0_0_20px_rgba(244,63,94,0.15)] focus-visible:ring-rose-500"
+        : "border-white/5 bg-slate-900/40 hover:bg-slate-800/80 hover:border-white/10 focus-visible:ring-slate-400"
       )}
     >
       <div className="flex w-full items-start justify-between gap-3 relative z-10">
-        <div className="text-3xl drop-shadow-sm transition-transform duration-300 group-hover:scale-110">{emoji}</div>
+        <div className="text-3xl drop-shadow-sm transition-transform duration-300 group-hover:scale-110" aria-hidden="true">
+          {emoji}
+        </div>
         <span
           className={cn(
             "rounded-md px-2 py-1 text-[10px] font-bold tracking-wider transition-colors",
@@ -335,6 +372,7 @@ function WeeklySection() {
               <motion.div
                 initial={{ height: 0 }}
                 animate={{ height: `${h}%` }}
+                whileHover={{ filter: "brightness(1.3)", scale: 1.05 }} // Added hover pop to the graph
                 transition={{ type: "spring", bounce: 0.2, duration: 1, delay: i * 0.1 }}
                 className="w-full rounded-md shadow-sm cursor-pointer relative group"
                 style={{ background: `linear-gradient(180deg, ${color.hex}, ${color.hex}22)` }}
@@ -353,4 +391,4 @@ function WeeklySection() {
       </div>
     </section>
   );
-}
+                          }
