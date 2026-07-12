@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import outstandLogo from "@/assets/outstand-logo.png.asset.json";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: Activity },
@@ -52,7 +53,7 @@ function ShellWithChrome() {
           <Link to="/" className="flex min-w-0 items-center gap-2">
             <div className="h-9 w-9 overflow-hidden rounded-xl shadow-[var(--shadow-glow)]">
   <img
-    src="/outstand-logo.png"
+    src={outstandLogo.url}
     alt="Outstand Logo"
     className="h-full w-full object-cover"
   />
