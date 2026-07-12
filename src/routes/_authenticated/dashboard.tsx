@@ -1,9 +1,4 @@
-// Change this line:
-export const Route = createFileRoute("/_authenticated/")({
-
-// To this:
-export const Route = createFileRoute("/_authenticated/dashboard")({
-  
+ 
 import { useMemo } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Plus, Sparkles, TrendingUp, Timer, Zap, Brain, ArrowRight, Play, RefreshCcw, User } from "lucide-react";
@@ -23,7 +18,8 @@ import { todayISO } from "@/lib/habits";
 import { dailyChallenge } from "@/lib/challenges";
 import { scoreColor } from "@/lib/dopamine";
 
-export const Route = createFileRoute("/_authenticated/")({
+export const Route = createFileRoute("/_authenticated/dashboard")({
+  
   component: Dashboard,
 });
 
