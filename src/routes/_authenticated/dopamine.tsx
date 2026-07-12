@@ -15,7 +15,7 @@ import {
 } from "@/lib/dopamine";
 import { cn } from "@/lib/utils";
 
-// 🚨 CRASH REPORTER ADDED HERE 🚨
+// 🚨 CRASH REPORTER 🚨
 export const Route = createFileRoute("/_authenticated/dopamine")({
   head: () => ({
     meta: [
@@ -40,18 +40,7 @@ export const Route = createFileRoute("/_authenticated/dopamine")({
 function MomentumPage() {
   const { log, loading, togglePositive, toggleNegative } = useDailyLog();
   
-  // SAFEGUARD 1: Clean Loading State
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh] text-indigo-400">
-        <div className="animate-pulse font-bold tracking-widest uppercase text-sm">
-          Loading Momentum...
-        </div>
-      </div>
-    );
-  }
-
-  // SAFEGUARD 2: Fallback values if log is somehow missing
+  // 1. ALL HOOKS MUST GO HERE (Before any early returns)
   const score = log?.score ?? 50;
   const color = scoreColor(score);
   const positives = log?.positives ?? [];
@@ -61,6 +50,17 @@ function MomentumPage() {
     () => generateInsights(positives, negatives, score),
     [positives, negatives, score],
   );
+
+  // 2. SAFEGUARD: Clean Loading State (Now safely below the hooks!)
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] text-indigo-400">
+        <div className="animate-pulse font-bold tracking-widest uppercase text-sm">
+          Loading Momentum...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)] pb-20 overflow-hidden">
@@ -242,7 +242,7 @@ function ScoreRing({ score, color }: { score: number; color: string }) {
           strokeDasharray={c}
           initial={{ strokeDashoffset: c }}
           animate={{ strokeDashoffset: offset }}
-          transition={{ duration: 1, ease: "easeOut" }} // Removed heavy spring physics
+          transition={{ duration: 1, ease: "easeOut" }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
@@ -277,9 +277,8 @@ function ActionCard({ active, emoji, label, description, points, tone, onClick }
 
   return (
     <motion.button
-      whileTap={{ scale: 0.95 }} // Simple, safe tap animation
+      whileTap={{ scale: 0.95 }}
       onClick={handleTactileClick}
-      // Accessibility Fix: ensure active is strictly a boolean
       role="checkbox"
       aria-checked={!!active} 
       aria-label={`${label}, ${points > 0 ? '+' : ''}${points} points, ${active ? 'Selected' : 'Not selected'}`}
@@ -308,7 +307,6 @@ function ActionCard({ active, emoji, label, description, points, tone, onClick }
       <div className="mt-4 text-base font-bold text-slate-200 relative z-10">{label}</div>
       <div className="mt-1 text-xs text-slate-400 leading-relaxed relative z-10">{description}</div>
       
-      {/* Active Indicator Flare (Safe CSS) */}
       {active && (
         <div 
           className={cn(
@@ -346,11 +344,10 @@ function WeeklySection() {
               <motion.div
                 initial={{ height: 0 }}
                 animate={{ height: `${h}%` }}
-                transition={{ duration: 0.8, ease: "easeOut" }} // Removed heavy spring physics
+                transition={{ duration: 0.8, ease: "easeOut" }}
                 className="w-full rounded-md shadow-sm relative group"
                 style={{ background: `linear-gradient(180deg, ${color.hex}, ${color.hex}22)` }}
               >
-                {/* Tooltip on tap/hover */}
                 <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/90 text-white text-xs py-1 px-2 rounded pointer-events-none whitespace-nowrap z-10">
                   {l.score} pts
                 </div>
@@ -364,4 +361,5 @@ function WeeklySection() {
       </div>
     </section>
   );
-                }
+        }
+                                      
