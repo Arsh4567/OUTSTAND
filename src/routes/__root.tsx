@@ -80,23 +80,26 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Outstand is for those who want to outstand" },
-      {
-        name: "description",
-        content:
-          "A premium habit tracker for students. Build streaks, focus with Pomodoro, and take on the daily Outstand challenge.",
-      },
-      { name: "author", content: "Outstand" },
-      { property: "og:title", content: "Outstand is for those who want to outstand" },
-      {
-        property: "og:description",
-        content: "A premium habit tracker for students. Build streaks, focus with Pomodoro, and take on the daily Outstand challenge.",
-      },
+      
+      // 1. Core SEO (Tells Google exactly who you are)
+      { title: "Outstand by Arsh | Focus & Momentum Tracker" },
+      { name: "description", content: "Outstand by Arsh is a premium habit tracker for students. Build streaks, master your focus with Pomodoro, and take on daily challenges." },
+      { name: "author", content: "Arsh" },
+      
+      // 2. Open Graph (The "Social Billboard" for WhatsApp, Discord, LinkedIn)
+      { property: "og:site_name", content: "Outstand by Arsh" },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "Outstand is for those who want to outstand" },
-      { name: "twitter:description", content: "A premium habit tracker for students. Build streaks, focus with Pomodoro, and take on the daily Outstand challenge." },
+      { property: "og:url", content: "https://outstand-by-arsh.vercel.app" }, // Update this if you get a custom domain!
+      { property: "og:title", content: "Outstand by Arsh | Focus & Momentum Tracker" },
+      { property: "og:description", content: "Outstand by Arsh is a premium habit tracker for students. Build streaks, master your focus, and take on daily challenges." },
       { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/MbFMKUuM2TWHnUX1cvLR8J9s9Jf1/social-images/social-1783582818919-1000035610.webp" },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+      
+      // 3. Twitter Cards (For sharing on X/Twitter)
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Outstand by Arsh | Focus & Momentum Tracker" },
+      { name: "twitter:description", content: "Build your momentum and master your focus. Check out Outstand by Arsh." },
       { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/MbFMKUuM2TWHnUX1cvLR8J9s9Jf1/social-images/social-1783582818919-1000035610.webp" },
     ],
     links: [
@@ -139,5 +142,4 @@ function RootComponent() {
       <Toaster />
     </QueryClientProvider>
   );
-}
-
+    }
