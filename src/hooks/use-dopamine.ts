@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { computeScore, type PositiveKey, type NegativeKey } from "@/lib/dopamine";
-import { todayISO, lastNDays } from "@/lib/habits";
+import { todayISO } from "@/lib/habits";
 
 export type DailyLog = {
   log_date: string;
@@ -11,77 +11,84 @@ export type DailyLog = {
   score: number;
 };
 
-// Key for Local Storage backup
 const getStorageKey = (date: string) => `dopamine_log_${date}`;
 
 export function useDailyLog(dateISO: string = todayISO()) {
   const { user } = useAuth();
-    const [log, setLog] = useState<DailyLog | null>(() => {
+  
+  // 1. SAFE INITIALIZATION: Try-catch handles corrupted local storage
+  const [log, setLog] = useState<DailyLog | null>(() => {
     try {
       const saved = localStorage.getItem(getStorageKey(dateISO));
       return saved ? JSON.parse(saved) : null;
     } catch (e) {
-      console.error("Failed to parse local storage, clearing cache:", e);
-      localStorage.removeItem(getStorageKey(dateISO)); // Clear corrupted data
+      localStorage.removeItem(getStorageKey(dateISO));
       return null;
     }
   });
   
   const [loading, setLoading] = useState(true);
 
+  // 2. ROBUST REFETCH: Sanitizes data incoming from Supabase
   const refetch = useCallback(async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from("daily_logs")
-      .select("log_date, positives, negatives, score")
-      .eq("user_id", user.id)
-      .eq("log_date", dateISO)
-      .maybeSingle();
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      const { data, error } = await supabase
+        .from("daily_logs")
+        .select("log_date, positives, negatives, score")
+        .eq("user_id", user.id)
+        .eq("log_date", dateISO)
+        .maybeSingle();
 
-    const fetchedLog: DailyLog = data
-      ? {
-          log_date: data.log_date,
-          positives: (data.positives as PositiveKey[]) ?? [],
-          negatives: (data.negatives as NegativeKey[]) ?? [],
-          score: data.score,
-        }
-      : { log_date: dateISO, positives: [], negatives: [], score: 50 };
+      if (error) throw error;
 
-    setLog(fetchedLog);
-    // Sync backup with server result
-    localStorage.setItem(getStorageKey(dateISO), JSON.stringify(fetchedLog));
-    setLoading(false);
+      // Sanitization: Ensure data arrays are actually arrays and score is a number
+      const fetchedLog: DailyLog = {
+        log_date: data?.log_date ?? dateISO,
+        positives: Array.isArray(data?.positives) ? (data.positives as PositiveKey[]) : [],
+        negatives: Array.isArray(data?.negatives) ? (data.negatives as NegativeKey[]) : [],
+        score: typeof data?.score === 'number' ? data.score : 50,
+      };
+
+      setLog(fetchedLog);
+      localStorage.setItem(getStorageKey(dateISO), JSON.stringify(fetchedLog));
+    } catch (err) {
+      console.error("Data fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
   }, [user, dateISO]);
 
   useEffect(() => {
     refetch();
   }, [refetch]);
 
+  // 3. OPTIMISTIC UPSERT: Updates UI instantly, saves locally, syncs to server
   const upsert = useCallback(
     async (positives: PositiveKey[], negatives: NegativeKey[]) => {
       if (!user) return;
+      
       const score = computeScore(positives, negatives);
       const optimistic: DailyLog = { log_date: dateISO, positives, negatives, score };
       
-      // 1. Optimistic Update (UI updates instantly)
+      // Update UI immediately
       setLog(optimistic);
-      
-      // 2. Local Backup (Offline readiness)
       localStorage.setItem(getStorageKey(dateISO), JSON.stringify(optimistic));
 
-      // 3. Background Sync (Server update)
+      // Attempt background sync
       const { error } = await supabase
         .from("daily_logs")
         .upsert({ user_id: user.id, log_date: dateISO, positives, negatives, score }, { onConflict: "user_id,log_date" });
       
-      if (error) {
-        console.error("Sync failed, but backup is saved:", error);
-      }
+      if (error) console.error("Sync failed:", error);
     },
     [user, dateISO],
   );
 
-  // Toggle/Add functions use the same upsert flow
   const togglePositive = useCallback(async (key: PositiveKey) => {
     const positives = log?.positives ?? [];
     const negatives = log?.negatives ?? [];
@@ -107,9 +114,4 @@ export function useDailyLog(dateISO: string = todayISO()) {
   }, [log, upsert]);
 
   return { log, loading, togglePositive, toggleNegative, addPositive, addNegative, refetch };
-}
-
-// Keep useWeeklyLogs as is, or apply similar storage logic if needed
-export function useWeeklyLogs(days = 7) {
-  // ... (Existing logic for weekly view)
-                                     }
+                                         }
