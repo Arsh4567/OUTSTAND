@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { computeScore, type PositiveKey, type NegativeKey } from "@/lib/dopamine";
-import { todayISO } from "@/lib/habits";
+import { todayISO, lastNDays } from "@/lib/habits";
 
 export type DailyLog = {
   log_date: string;
@@ -114,4 +114,48 @@ export function useDailyLog(dateISO: string = todayISO()) {
   }, [log, upsert]);
 
   return { log, loading, togglePositive, toggleNegative, addPositive, addNegative, refetch };
-                                         }
+}
+
+// 4. MISSING EXPORT ADDED: useWeeklyLogs logic for trend tracking
+export function useWeeklyLogs(days = 7) {
+  const { user } = useAuth();
+  const [logs, setLogs] = useState<DailyLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    const dates = lastNDays(days);
+    const start = dates[0];
+    
+    supabase
+      .from("daily_logs")
+      .select("log_date, positives, negatives, score")
+      .eq("user_id", user.id)
+      .gte("log_date", start)
+      .order("log_date", { ascending: true })
+      .then(({ data }) => {
+        const byDate = new Map<string, DailyLog>();
+        (data ?? []).forEach((d) => {
+          byDate.set(d.log_date, {
+            log_date: d.log_date,
+            positives: (d.positives as PositiveKey[]) ?? [],
+            negatives: (d.negatives as NegativeKey[]) ?? [],
+            score: typeof d.score === 'number' ? d.score : 50,
+          });
+        });
+        
+        setLogs(
+          dates.map(
+            (d) => byDate.get(d) ?? { log_date: d, positives: [], negatives: [], score: 50 },
+          ),
+        );
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to load weekly logs:", err);
+        setLoading(false);
+      });
+  }, [user, days]);
+
+  return { logs, loading };
+}
