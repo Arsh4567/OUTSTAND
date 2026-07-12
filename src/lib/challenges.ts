@@ -74,7 +74,7 @@ export const CHALLENGES: OutstandChallenge[] = [
   { id: 10, title: "Future Self Journal", description: "Write a letter to yourself exactly 6 months from today. What do you hope you've achieved?", emoji: "✍️", minutes: 10, category: "Mindset", difficulty: "Medium", rarity: "Rare", xp: 60, theme: "Galaxy", color: "#a855f7" },
   { id: 11, title: "The Purge", description: "Find 3 items in your room to throw away or donate. Declutter your physical space.", emoji: "📦", minutes: 10, category: "Discipline", difficulty: "Easy", rarity: "Rare", xp: 60, theme: "Forest", color: "#22c55e" },
   { id: 12, title: "Brain Dump", description: "Write down every single task, worry, or idea in your head on a piece of paper.", emoji: "🧠", minutes: 10, category: "Focus", difficulty: "Easy", rarity: "Rare", xp: 60, theme: "Neon", color: "#c084fc" },
-  { id: 13, title: "Blind Flight", description: "Turn on airplane mode. Do not turn it off until the 10 minutes are up.", emoji: "✈️", minutes: 10, category: "Phone Detox", difficulty: "Easy", rarity: "Rare", xp: 60, theme: "Ice", color: "#38bdf8" },
+  { id: 13, title: "Blind Flight", description: "Turn on airplane mode. Do not turn it off until the 10 minutes are up.", emoji: "✈️", minutes: 10, category: "Phone Detox", difficulty: "Easy", rarity: "Rare", xp: 60, theme: "Sky", color: "#38bdf8" },
 
   // Uncommon (Good XP, Easy/Medium)
   { id: 14, title: "Iron Legs", description: "Complete 40 bodyweight squats with perfect form, then stretch.", emoji: "🦵", minutes: 10, category: "Fitness", difficulty: "Easy", rarity: "Uncommon", xp: 35, theme: "Forest", color: "#22c55e" },

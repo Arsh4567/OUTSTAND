@@ -13,7 +13,6 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppShell } from "@/components/app-shell";
 import { Toaster } from "@/components/ui/sonner";
-import outstandLogo from "@/assets/outstand-logo.png.asset.json";
 
 
 function NotFoundComponent() {
@@ -84,26 +83,28 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       
       // 1. Core SEO (Tells Google exactly who you are)
       { title: "Outstand by Arsh | Focus & Momentum Tracker" },
-      { name: "description", content: "Outstand is a premium habit tracker app which is built for students who want to quit phone addiction" },
+      { name: "description", content: "Outstand by Arsh is a premium habit tracker for students. Build streaks, master your focus with Pomodoro, and take on daily challenges." },
       { name: "author", content: "Arsh" },
-
+      
       // 2. Open Graph (The "Social Billboard" for WhatsApp, Discord, LinkedIn)
       { property: "og:site_name", content: "Outstand by Arsh" },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://outstand.lovable.app" },
+      { property: "og:url", content: "https://outstand-by-arsh.vercel.app" }, // Update this if you get a custom domain!
       { property: "og:title", content: "Outstand by Arsh | Focus & Momentum Tracker" },
-      { property: "og:description", content: "Outstand is a premium habit tracker app which is built for students who want to quit phone addiction" },
-      { property: "og:image", content: `https://outstand.lovable.app${outstandLogo.url}` },
-
+      { property: "og:description", content: "Outstand by Arsh is a premium habit tracker for students. Build streaks, master your focus, and take on daily challenges." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/MbFMKUuM2TWHnUX1cvLR8J9s9Jf1/social-images/social-1783582818919-1000035610.webp" },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+      
       // 3. Twitter Cards (For sharing on X/Twitter)
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "Outstand by Arsh | Focus & Momentum Tracker" },
-      { name: "twitter:description", content: "Outstand is a premium habit tracker app which is built for students who want to quit phone addiction" },
-      { name: "twitter:image", content: `https://outstand.lovable.app${outstandLogo.url}` },
+      { name: "twitter:description", content: "Build your momentum and master your focus. Check out Outstand by Arsh." },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/MbFMKUuM2TWHnUX1cvLR8J9s9Jf1/social-images/social-1783582818919-1000035610.webp" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", type: "image/png", href: outstandLogo.url },
+      { rel: "icon", type: "image/png", href: "/outstand-logo.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
