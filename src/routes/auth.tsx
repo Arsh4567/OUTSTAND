@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
+// Removed lovable import as we will use native Supabase for Google Auth
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/auth")({
@@ -27,9 +27,10 @@ function AuthPage() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // 1. FIXED: If they are already logged in, send them to the dashboard
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/", replace: true });
+      if (data.session) navigate({ to: "/dashboard", replace: true });
     });
   }, [navigate]);
 
@@ -47,17 +48,20 @@ function AuthPage() {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/`,
+            // FIXED: Redirect back to dashboard after email confirm
+            emailRedirectTo: `${window.location.origin}/dashboard`,
             data: { display_name: name || email.split("@")[0] },
           },
         });
         if (error) throw error;
         toast.success("Welcome to Outstand", { description: "Check your inbox to confirm your email." });
-        navigate({ to: "/", replace: true });
+        // FIXED: Route to dashboard
+        navigate({ to: "/dashboard", replace: true });
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        navigate({ to: "/", replace: true });
+        // FIXED: Route to dashboard
+        navigate({ to: "/dashboard", replace: true });
       }
     } catch (err) {
       toast.error("Auth failed", { description: (err as Error).message });
@@ -66,26 +70,33 @@ function AuthPage() {
     }
   };
 
+  // 2. FIXED: Changed to native Supabase OAuth for reliability
   const google = async () => {
     setLoading(true);
     try {
-      const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-      if (result.error) {
-        toast.error("Google sign-in failed", { description: result.error.message });
-        return;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+        },
+      });
+      
+      if (error) {
+        toast.error("Google sign-in failed", { description: error.message });
       }
-      if (!result.redirected) {
-        navigate({ to: "/", replace: true });
-      }
+      // Note: We don't need a navigate() here because Supabase redirects the whole page to Google, 
+      // and Google will redirect back to the `redirectTo` URL we provided above.
+    } catch (err) {
+      toast.error("An unexpected error occurred");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="grid min-h-screen place-items-center px-4 py-10">
-      <div className="w-full max-w-md">
-        <Link to="/" className="mb-8 flex items-center justify-center gap-2">
+    <div className="grid min-h-screen place-items-center px-4 py-10 selection:bg-indigo-500/30">
+      <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <Link to="/" className="mb-8 flex items-center justify-center gap-2 transition-transform hover:scale-105">
           <div className="h-10 w-10 overflow-hidden rounded-xl shadow-[var(--shadow-glow)]">
             <img
               src="/outstand-logo.png"
@@ -93,33 +104,33 @@ function AuthPage() {
               className="h-full w-full object-cover"
             />
           </div>
-          <span className="font-display text-2xl font-bold tracking-tight">Outstand</span>
+          <span className="font-display text-2xl font-bold tracking-tight text-white">Outstand</span>
         </Link>
 
-        <div className="glass-card p-6 md:p-8">
-          <h1 className="font-display text-2xl font-bold">
+        <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-6 shadow-xl backdrop-blur-sm md:p-8">
+          <h1 className="text-2xl font-bold text-white">
             {mode === "signin" ? "Welcome back" : "Create your account"}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {mode === "signin" ? "Stay focused. Beat phone addiction." : "Start your journey to a more focused life.."}
+          <p className="mt-2 text-sm text-slate-400">
+            {mode === "signin" ? "Stay focused. Beat phone addiction." : "Start your journey to a more focused life."}
           </p>
 
           <Tabs value={mode} onValueChange={(v) => setMode(v as "signin" | "signup")} className="mt-6">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="signin">Sign in</TabsTrigger>
-              <TabsTrigger value="signup">Sign up</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 rounded-full bg-slate-950/80 p-1 mb-6">
+              <TabsTrigger value="signin" className="rounded-full data-[state=active]:bg-indigo-600 data-[state=active]:text-white">Sign in</TabsTrigger>
+              <TabsTrigger value="signup" className="rounded-full data-[state=active]:bg-indigo-600 data-[state=active]:text-white">Sign up</TabsTrigger>
             </TabsList>
 
-            <form onSubmit={submit} className="mt-6 space-y-4">
+            <form onSubmit={submit} className="space-y-4">
               <TabsContent value="signup" className="m-0 space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="name">Display name</Label>
-                  <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Alex" />
+                  <Label htmlFor="name" className="text-slate-300">Display name</Label>
+                  <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Alex" className="bg-black/20 border-white/10" />
                 </div>
               </TabsContent>
 
               <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-slate-300">Email</Label>
                 <Input
                   id="email"
                   type="email"
@@ -128,10 +139,11 @@ function AuthPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@school.edu"
+                  className="bg-black/20 border-white/10"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" className="text-slate-300">Password</Label>
                 <Input
                   id="password"
                   type="password"
@@ -141,25 +153,26 @@ function AuthPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="At least 6 characters"
+                  className="bg-black/20 border-white/10"
                 />
               </div>
 
-              <Button type="submit" disabled={loading} className="btn-primary w-full">
+              <Button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white h-11 mt-2">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === "signin" ? "Sign in" : "Create account"}
               </Button>
             </form>
           </Tabs>
 
-          <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
-            <div className="h-px flex-1 bg-border" />
-            or continue with
-            <div className="h-px flex-1 bg-border" />
+          <div className="my-6 flex items-center gap-3 text-xs text-slate-500 font-medium uppercase tracking-widest">
+            <div className="h-px flex-1 bg-white/10" />
+            or
+            <div className="h-px flex-1 bg-white/10" />
           </div>
 
           <Button
             type="button"
             variant="outline"
-            className="w-full gap-2"
+            className="w-full gap-3 h-11 border-white/10 bg-white/5 hover:bg-white/10 text-white"
             onClick={google}
             disabled={loading}
           >
@@ -175,4 +188,4 @@ function AuthPage() {
       </div>
     </div>
   );
-}
+                                                                                                                                             }
