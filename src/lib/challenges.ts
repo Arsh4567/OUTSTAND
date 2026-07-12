@@ -112,4 +112,3 @@ export function dailyChallenge(dateISO: string): OutstandChallenge {
     h = (h * 31 + dateISO.charCodeAt(i)) >>> 0;
   }
   return CHALLENGES[h % CHALLENGES.length];
-    }
