@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence, animate } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Zap, ArrowRight, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,56 +25,34 @@ export const Route = createFileRoute("/_authenticated/dopamine")({
   component: MomentumPage,
 });
 
-// Animation variants for the staggered grid
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.05,
-    },
-  },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20, scale: 0.95 },
-  show: { 
-    opacity: 1, 
-    y: 0, 
-    scale: 1,
-    transition: { type: "spring", stiffness: 300, damping: 24 }
-  },
-};
-
 function MomentumPage() {
   const { log, loading, togglePositive, toggleNegative } = useDailyLog();
   
-  // 1. SAFEGUARD: If still loading from Supabase, show a simple loading state
+  // SAFEGUARD 1: Clean Loading State
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh] text-indigo-400">
-        <div className="animate-pulse font-bold tracking-widest uppercase">Loading Momentum...</div>
+        <div className="animate-pulse font-bold tracking-widest uppercase text-sm">
+          Loading Momentum...
+        </div>
       </div>
     );
   }
 
-  // 2. SAFEGUARD: If log is null, use a fallback to prevent crashes
+  // SAFEGUARD 2: Fallback values if log is somehow missing
   const score = log?.score ?? 50;
   const color = scoreColor(score);
+  const positives = log?.positives ?? [];
+  const negatives = log?.negatives ?? [];
   
   const insights = useMemo(
-    () => (log ? generateInsights(log.positives, log.negatives, score) : []),
-    [log, score],
+    () => generateInsights(positives, negatives, score),
+    [positives, negatives, score],
   );
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)] pb-20 overflow-hidden">
-      {/* ... keep the rest of your JSX exactly as it was ... */}
-      
-
-  return (
-    <div className="relative min-h-[calc(100vh-4rem)] pb-20 overflow-hidden">
-      {/* DYNAMIC AURA BACKGROUND */}
+      {/* DYNAMIC AURA BACKGROUND (Safe CSS transition) */}
       <motion.div 
         className="fixed inset-0 -z-20 opacity-20 pointer-events-none blur-3xl"
         animate={{ 
@@ -88,13 +66,13 @@ function MomentumPage() {
       <AnimatePresence>
         {score >= 85 && (
           <motion.div
-            initial={{ opacity: 0, y: -50, scale: 0.8 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.8 }}
-            className="fixed top-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900/80 backdrop-blur-xl border border-emerald-500/30 px-6 py-2 rounded-full shadow-[0_0_30px_rgba(16,185,129,0.3)] flex items-center gap-3"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 backdrop-blur-xl border border-emerald-500/30 px-6 py-2 rounded-full shadow-lg flex items-center gap-3"
           >
             <Sparkles className="text-emerald-400 h-5 w-5 animate-pulse" />
-            <span className="text-white font-bold tracking-widest uppercase text-sm drop-shadow-[0_0_8px_rgba(16,185,129,0.8)]">
+            <span className="text-white font-bold tracking-widest uppercase text-sm">
               Flow State Active
             </span>
           </motion.div>
@@ -103,7 +81,7 @@ function MomentumPage() {
 
       <div className="max-w-6xl mx-auto space-y-10 p-4 pt-10">
         {/* Header Section */}
-        <header className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out">
+        <header className="animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-400">
             <TrendingUp className="h-3.5 w-3.5" />
             Daily Momentum
@@ -118,27 +96,26 @@ function MomentumPage() {
 
         {/* Main Stats & Insights Grid */}
         <section className="grid gap-6 lg:grid-cols-[1fr_1.5fr]">
-          <div className="rounded-3xl border border-white/5 bg-slate-900/50 p-8 shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150 fill-mode-both">
+          <div className="rounded-3xl border border-white/5 bg-slate-900/50 p-8 shadow-xl animate-in fade-in duration-500 delay-150 fill-mode-both">
             <ScoreRing score={score} color={color.hex} />
             <div className="mt-6 text-center">
               <motion.div
                 animate={{ borderColor: color.hex, color: color.hex, backgroundColor: `${color.hex}15` }}
-                transition={{ duration: 1 }}
-                className="inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-semibold shadow-sm"
+                className="inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-semibold"
               >
                 <motion.span 
                   animate={{ backgroundColor: color.hex }}
-                  className="h-2 w-2 rounded-full shadow-[0_0_10px_currentColor]" 
+                  className="h-2 w-2 rounded-full" 
                 />
                 {color.label}
               </motion.div>
               <p className="mt-4 text-sm text-slate-400">
-                {log ? `${log.positives.length} accelerators · ${log.negatives.length} drains today` : "Loading your state…"}
+                {positives.length} accelerators · {negatives.length} drains today
               </p>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/5 bg-slate-900/50 p-8 shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300 fill-mode-both">
+          <div className="rounded-3xl border border-white/5 bg-slate-900/50 p-8 shadow-xl animate-in fade-in duration-500 delay-300 fill-mode-both">
             <h2 className="text-xl font-bold text-white">Momentum Insights</h2>
             <p className="mt-1 text-sm text-slate-400">Your personalized focus analysis.</p>
             
@@ -147,16 +124,13 @@ function MomentumPage() {
                 <li className="text-sm text-slate-500 italic">Log an action below to unlock your insights.</li>
               ) : (
                 insights.map((i, idx) => (
-                  <motion.li
+                  <li
                     key={idx}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.4 + idx * 0.1, duration: 0.5, type: "spring", bounce: 0.3 }}
                     className="flex gap-3 rounded-xl border border-white/5 bg-white/5 p-4 text-sm text-slate-200 shadow-sm"
                   >
                     <Zap className="mt-0.5 h-4 w-4 shrink-0 text-indigo-400" />
                     <span className="leading-relaxed">{i}</span>
-                  </motion.li>
+                  </li>
                 ))
               )}
             </ul>
@@ -164,26 +138,21 @@ function MomentumPage() {
         </section>
 
         {/* Interactive Logging Section */}
-        <section className="animate-in fade-in slide-in-from-bottom-8 duration-700 delay-500 fill-mode-both">
+        <section className="animate-in fade-in duration-500 delay-500 fill-mode-both">
           <Tabs defaultValue="positives" className="w-full">
             <TabsList className="mb-6 grid w-full max-w-md grid-cols-2 rounded-full bg-slate-900/80 p-1 border border-white/5">
-              <TabsTrigger value="positives" className="rounded-full data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all">
+              <TabsTrigger value="positives" className="rounded-full data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
                 Accelerators
               </TabsTrigger>
-              <TabsTrigger value="negatives" className="rounded-full data-[state=active]:bg-slate-800 data-[state=active]:text-white transition-all">
+              <TabsTrigger value="negatives" className="rounded-full data-[state=active]:bg-slate-800 data-[state=active]:text-white">
                 Friction
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="positives">
-              <motion.div 
-                variants={containerVariants}
-                initial="hidden"
-                animate="show"
-                className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
-              >
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {POSITIVES.map((p) => {
-                  const active = log?.positives.includes(p.key) ?? false;
+                  const active = positives.includes(p.key);
                   return (
                     <ActionCard
                       key={p.key}
@@ -197,18 +166,13 @@ function MomentumPage() {
                     />
                   );
                 })}
-              </motion.div>
+              </div>
             </TabsContent>
 
             <TabsContent value="negatives">
-              <motion.div 
-                variants={containerVariants}
-                initial="hidden"
-                animate="show"
-                className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
-              >
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {NEGATIVES.map((n) => {
-                  const active = log?.negatives.includes(n.key) ?? false;
+                  const active = negatives.includes(n.key);
                   return (
                     <ActionCard
                       key={n.key}
@@ -222,7 +186,7 @@ function MomentumPage() {
                     />
                   );
                 })}
-              </motion.div>
+              </div>
             </TabsContent>
           </Tabs>
         </section>
@@ -232,7 +196,7 @@ function MomentumPage() {
         </div>
 
         <div className="flex justify-end pt-4">
-          <Button asChild variant="ghost" className="text-slate-400 hover:text-white hover:bg-white/5 transition-colors">
+          <Button asChild variant="ghost" className="text-slate-400 hover:text-white hover:bg-white/5">
             <Link to="/profile">
               View full history <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
@@ -243,15 +207,8 @@ function MomentumPage() {
   );
 }
 
-// 1. PHYSICS-BASED RING ANIMATION
+// 1. SAFE SCORE RING
 function ScoreRing({ score, color }: { score: number; color: string }) {
-  const [display, setDisplay] = useState(0);
-  
-  useEffect(() => {
-    // We use a safe ref or simple timeout if 'animate' is being finicky in your build
-    setDisplay(score); 
-  }, [score]);
-
   const size = 220;
   const stroke = 14;
   const r = (size - stroke) / 2;
@@ -273,13 +230,16 @@ function ScoreRing({ score, color }: { score: number; color: string }) {
           strokeDasharray={c}
           initial={{ strokeDashoffset: c }}
           animate={{ strokeDashoffset: offset }}
-          transition={{ type: "spring", bounce: 0, duration: 1.5 }}
+          transition={{ duration: 1, ease: "easeOut" }} // Removed heavy spring physics
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-        <div className="text-7xl font-black tabular-nums tracking-tighter" style={{ color }}>
+        <motion.div 
+          className="text-7xl font-black tabular-nums tracking-tighter" 
+          animate={{ color }}
+        >
           {score}
-        </div>
+        </motion.div>
         <div className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
           State
         </div>
@@ -288,11 +248,11 @@ function ScoreRing({ score, color }: { score: number; color: string }) {
   );
 }
 
-
-// 2. ACCESSIBLE & TACTILE ACTION CARDS
+// 2. SAFE & TACTILE ACTION CARDS (Optimized for Mobile)
 function ActionCard({ active, emoji, label, description, points, tone, onClick }: any) {
   
   const handleTactileClick = () => {
+    // Haptic Feedback for Mobile
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       if (tone === "good") {
         navigator.vibrate(40); 
@@ -305,31 +265,29 @@ function ActionCard({ active, emoji, label, description, points, tone, onClick }
 
   return (
     <motion.button
-      variants={itemVariants}
-      whileHover={{ scale: 1.03, y: -2 }}
-      whileTap={{ scale: 0.94 }}
+      whileTap={{ scale: 0.95 }} // Simple, safe tap animation
       onClick={handleTactileClick}
-      // Accessibility (A11y) Implementation
+      // Accessibility Fix: ensure active is strictly a boolean
       role="checkbox"
-      aria-checked={active}
+      aria-checked={!!active} 
       aria-label={`${label}, ${points > 0 ? '+' : ''}${points} points, ${active ? 'Selected' : 'Not selected'}`}
       className={cn(
         "group relative flex w-full flex-col text-left rounded-2xl border p-5 transition-colors duration-300",
-        "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950",
-        active && tone === "good" ? "border-emerald-500/50 bg-emerald-500/10 shadow-[0_0_20px_rgba(16,185,129,0.15)] focus-visible:ring-emerald-500" 
-        : active && tone === "bad" ? "border-rose-500/50 bg-rose-500/10 shadow-[0_0_20px_rgba(244,63,94,0.15)] focus-visible:ring-rose-500"
-        : "border-white/5 bg-slate-900/40 hover:bg-slate-800/80 hover:border-white/10 focus-visible:ring-slate-400"
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400",
+        active && tone === "good" ? "border-emerald-500/50 bg-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.1)]" 
+        : active && tone === "bad" ? "border-rose-500/50 bg-rose-500/10 shadow-[0_0_15px_rgba(244,63,94,0.1)]"
+        : "border-white/5 bg-slate-900/40 hover:bg-slate-800/80"
       )}
     >
       <div className="flex w-full items-start justify-between gap-3 relative z-10">
-        <div className="text-3xl drop-shadow-sm transition-transform duration-300 group-hover:scale-110" aria-hidden="true">
+        <div className="text-3xl drop-shadow-sm" aria-hidden="true">
           {emoji}
         </div>
         <span
           className={cn(
             "rounded-md px-2 py-1 text-[10px] font-bold tracking-wider transition-colors",
             tone === "good" ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400",
-            !active && "opacity-50 group-hover:opacity-100"
+            !active && "opacity-50"
           )}
         >
           {points > 0 ? `+${points}` : points}
@@ -338,29 +296,25 @@ function ActionCard({ active, emoji, label, description, points, tone, onClick }
       <div className="mt-4 text-base font-bold text-slate-200 relative z-10">{label}</div>
       <div className="mt-1 text-xs text-slate-400 leading-relaxed relative z-10">{description}</div>
       
-      {/* Active Indicator Flare */}
-      <AnimatePresence>
-        {active && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0 }}
-            className={cn(
-              "absolute right-4 bottom-4 h-2 w-2 rounded-full shadow-[0_0_10px_currentColor]",
-              tone === "good" ? "bg-emerald-400 text-emerald-400" : "bg-rose-400 text-rose-400"
-            )} 
-          />
-        )}
-      </AnimatePresence>
+      {/* Active Indicator Flare (Safe CSS) */}
+      {active && (
+        <div 
+          className={cn(
+            "absolute right-4 bottom-4 h-2 w-2 rounded-full",
+            tone === "good" ? "bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" : "bg-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.8)]"
+          )} 
+        />
+      )}
     </motion.button>
   );
 }
 
+// 3. SAFE WEEKLY SECTION
 function WeeklySection() {
   const { logs } = useWeeklyLogs(7);
   const max = 100;
   return (
-    <section className="rounded-3xl border border-white/5 bg-slate-900/50 p-8 shadow-xl backdrop-blur-md mt-8">
+    <section className="rounded-3xl border border-white/5 bg-slate-900/50 p-8 shadow-xl mt-8">
       <div className="flex items-baseline justify-between gap-4">
         <h2 className="text-xl font-bold text-white">7-Day Trend</h2>
         <span className="rounded-full bg-white/5 px-3 py-1 text-xs font-semibold text-slate-400">
@@ -368,7 +322,7 @@ function WeeklySection() {
         </span>
       </div>
       <div className="mt-8 grid grid-cols-7 items-end gap-3 h-40">
-        {logs.map((l, i) => {
+        {logs.map((l) => {
           const color = scoreColor(l.score);
           const h = Math.max(6, (l.score / max) * 100);
           const d = new Date(l.log_date + "T00:00");
@@ -380,13 +334,12 @@ function WeeklySection() {
               <motion.div
                 initial={{ height: 0 }}
                 animate={{ height: `${h}%` }}
-                whileHover={{ filter: "brightness(1.3)", scale: 1.05 }} // Added hover pop to the graph
-                transition={{ type: "spring", bounce: 0.2, duration: 1, delay: i * 0.1 }}
-                className="w-full rounded-md shadow-sm cursor-pointer relative group"
+                transition={{ duration: 0.8, ease: "easeOut" }} // Removed heavy spring physics
+                className="w-full rounded-md shadow-sm relative group"
                 style={{ background: `linear-gradient(180deg, ${color.hex}, ${color.hex}22)` }}
               >
-                {/* Tooltip on hover */}
-                <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 text-white text-xs py-1 px-2 rounded pointer-events-none whitespace-nowrap z-10">
+                {/* Tooltip on tap/hover */}
+                <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/90 text-white text-xs py-1 px-2 rounded pointer-events-none whitespace-nowrap z-10">
                   {l.score} pts
                 </div>
               </motion.div>
@@ -399,4 +352,4 @@ function WeeklySection() {
       </div>
     </section>
   );
-   }
+}
