@@ -184,16 +184,17 @@ function OutstandPage() {
                   </Button>
                 </div>
 
-                <Button 
+                                <Button 
                   onClick={complete} 
                   className={cn(
                     "w-full h-14 rounded-2xl font-bold text-lg text-black transition-transform active:scale-95 shadow-xl", 
-                    rarityTheme.bg.replace('/10', '/90') // Uses the theme color but makes it solid
+                    rarityTheme?.bg.replace('/10', '/90')
                   )}
                   style={{ backgroundColor: challenge.color }}
                 >
                   <CheckCircle2 className="mr-2 h-5 w-5" /> COMPLETE (+{challenge.xp} XP)
                 </Button>
+                    
               </div>
             </motion.div>
           )}
