@@ -16,11 +16,17 @@ const getStorageKey = (date: string) => `dopamine_log_${date}`;
 
 export function useDailyLog(dateISO: string = todayISO()) {
   const { user } = useAuth();
-  const [log, setLog] = useState<DailyLog | null>(() => {
-    // Attempt to load from Local Storage immediately (Offline Readiness)
-    const saved = localStorage.getItem(getStorageKey(dateISO));
-    return saved ? JSON.parse(saved) : null;
+    const [log, setLog] = useState<DailyLog | null>(() => {
+    try {
+      const saved = localStorage.getItem(getStorageKey(dateISO));
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      console.error("Failed to parse local storage, clearing cache:", e);
+      localStorage.removeItem(getStorageKey(dateISO)); // Clear corrupted data
+      return null;
+    }
   });
+  
   const [loading, setLoading] = useState(true);
 
   const refetch = useCallback(async () => {
