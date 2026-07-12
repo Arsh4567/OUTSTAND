@@ -232,13 +232,8 @@ function ScoreRing({ score, color }: { score: number; color: string }) {
   const [display, setDisplay] = useState(0);
   
   useEffect(() => {
-    const controls = animate(display, score, {
-      type: "spring",
-      stiffness: 50,
-      damping: 15,
-      onUpdate: (value) => setDisplay(Math.round(value)),
-    });
-    return controls.stop;
+    // We use a safe ref or simple timeout if 'animate' is being finicky in your build
+    setDisplay(score); 
   }, [score]);
 
   const size = 220;
@@ -262,17 +257,13 @@ function ScoreRing({ score, color }: { score: number; color: string }) {
           strokeDasharray={c}
           initial={{ strokeDashoffset: c }}
           animate={{ strokeDashoffset: offset }}
-          transition={{ type: "spring", bounce: 0.25, duration: 2 }}
+          transition={{ type: "spring", bounce: 0, duration: 1.5 }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-        <motion.div 
-          className="text-7xl font-black tabular-nums tracking-tighter drop-shadow-[0_0_15px_currentColor]" 
-          animate={{ color }}
-          transition={{ duration: 1 }}
-        >
-          {display}
-        </motion.div>
+        <div className="text-7xl font-black tabular-nums tracking-tighter" style={{ color }}>
+          {score}
+        </div>
         <div className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
           State
         </div>
@@ -280,6 +271,7 @@ function ScoreRing({ score, color }: { score: number; color: string }) {
     </div>
   );
 }
+
 
 // 2. ACCESSIBLE & TACTILE ACTION CARDS
 function ActionCard({ active, emoji, label, description, points, tone, onClick }: any) {
@@ -391,4 +383,4 @@ function WeeklySection() {
       </div>
     </section>
   );
-                          }
+   }
