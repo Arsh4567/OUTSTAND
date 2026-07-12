@@ -105,10 +105,11 @@ export function randomChallenge(excludeTitle?: string): OutstandChallenge {
     : CHALLENGES;
   return pool[Math.floor(Math.random() * pool.length)];
 }
-
 export function dailyChallenge(dateISO: string): OutstandChallenge {
   let h = 0;
   for (let i = 0; i < dateISO.length; i++) {
     h = (h * 31 + dateISO.charCodeAt(i)) >>> 0;
   }
   return CHALLENGES[h % CHALLENGES.length];
+}
+
