@@ -8,7 +8,7 @@ export type OutstandChallenge = {
   difficulty: "Easy" | "Medium" | "Hard";
   rarity: "Common" | "Uncommon" | "Rare" | "Epic" | "Legendary";
   xp: number;
-  theme: "Ocean" | "Forest" | "Galaxy" | "Sunset" | "Volcano" | "Royal" | "Ice" | "Neon";
+  theme: "Ocean" | "Forest" | "Galaxy" | "Sunset" | "Volcano" | "Royal" | "Ice" | "Neon" | "Sky";
   color: string;
 };
 

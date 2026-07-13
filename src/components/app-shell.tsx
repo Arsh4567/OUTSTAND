@@ -1,5 +1,6 @@
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Activity, Flame, LogOut, Timer, Zap, Brain, User } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useAppState } from "@/hooks/use-app-state";
 import { useAuth, displayNameOf } from "@/hooks/use-auth";
 import { levelFromXP } from "@/lib/habits";
@@ -13,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ChatAssistant } from "@/components/chat-assistant";
 import { toast } from "sonner";
 
 const NAV = [
@@ -38,6 +40,11 @@ function ShellWithChrome() {
   const pct = Math.min(100, Math.round((into / need) * 100));
   const navigate = useNavigate();
   const name = displayNameOf(user, profile);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -170,6 +177,8 @@ function ShellWithChrome() {
       <footer className="border-t border-border/60 py-6 text-center text-xs text-muted-foreground">
         Built to help you Outstand. Stay quiet. Stay consistent.
       </footer>
+
+      {isClient && user && <ChatAssistant />}
     </div>
   );
 }
