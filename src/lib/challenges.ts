@@ -125,6 +125,48 @@ export const CHALLENGES: OutstandChallenge[] = [
   { id: 58, title: "Clear the Sink", description: "Wash whatever dishes are currently sitting in the sink.", emoji: "🍽️", minutes: 10, category: "Productivity", difficulty: "Easy", rarity: "Common", xp: 20, theme: "Ocean", color: "#0ea5e9" },
   { id: 59, title: "Unfollow Spree", description: "Unfollow 5 accounts on social media that don't add value to your life.", emoji: "✂️", minutes: 10, category: "Phone Detox", difficulty: "Easy", rarity: "Common", xp: 20, theme: "Neon", color: "#c084fc" },
   { id: 60, title: "Set Tomorrow", description: "Write down the #1 most important task you need to do tomorrow.", emoji: "📝", minutes: 10, category: "Focus", difficulty: "Easy", rarity: "Common", xp: 20, theme: "Galaxy", color: "#a855f7" }
+  // --- BATCH 3: 30 NEW CHALLENGES (IDs 61-90) ---
+  
+  // Legendary (Massive XP, Hard)
+  { id: 61, title: "The Void", description: "Sit in a dark room in complete silence. No thoughts, no movement. Just exist.", emoji: "🕳️", minutes: 10, category: "Mindset", difficulty: "Hard", rarity: "Legendary", xp: 150, theme: "Galaxy", color: "#a855f7" },
+  { id: 62, title: "Max Out", description: "Do as many pull-ups or push-ups as you can until absolute muscular failure.", emoji: "🦍", minutes: 10, category: "Fitness", difficulty: "Hard", rarity: "Legendary", xp: 150, theme: "Volcano", color: "#ef4444" },
+  
+  // Epic (High XP, Medium/Hard)
+  { id: 63, title: "Idea Machine", description: "Write down 20 completely new ideas for businesses, apps, or projects.", emoji: "💡", minutes: 10, category: "Knowledge", difficulty: "Medium", rarity: "Epic", xp: 100, theme: "Neon", color: "#c084fc" },
+  { id: 64, title: "The Hard Thing", description: "Identify the one task you are most afraid to do right now, and start it.", emoji: "💀", minutes: 10, category: "Discipline", difficulty: "Hard", rarity: "Epic", xp: 100, theme: "Royal", color: "#eab308" },
+  { id: 65, title: "Zero Distraction", description: "Put your phone in another room. Work on your main project with zero background noise.", emoji: "🔕", minutes: 10, category: "Focus", difficulty: "Medium", rarity: "Epic", xp: 100, theme: "Ice", color: "#38bdf8" },
+  { id: 66, title: "Cold Outreach", description: "Find someone who is 5 steps ahead of you in life and send them a cold message.", emoji: "🧊", minutes: 10, category: "Social", difficulty: "Hard", rarity: "Epic", xp: 100, theme: "Ocean", color: "#0ea5e9" },
+
+  // Rare (Solid XP, Medium)
+  { id: 67, title: "Financial Forecast", description: "Map out exactly where you want to be financially in 1 year and the math to get there.", emoji: "📈", minutes: 10, category: "Productivity", difficulty: "Medium", rarity: "Rare", xp: 60, theme: "Forest", color: "#22c55e" },
+  { id: 68, title: "Dead Hang", description: "Find a pull-up bar or ledge. Hang from it for as long as your grip can hold.", emoji: "🐒", minutes: 10, category: "Fitness", difficulty: "Medium", rarity: "Rare", xp: 60, theme: "Volcano", color: "#ef4444" },
+  { id: 69, title: "Skill Deconstruction", description: "Pick a skill you want to learn. Write down the 3 smallest sub-skills to practice first.", emoji: "🔨", minutes: 10, category: "Knowledge", difficulty: "Medium", rarity: "Rare", xp: 60, theme: "Sky", color: "#38bdf8" },
+  { id: 70, title: "Clean Slate", description: "Close every single open tab on your browser. Start entirely fresh.", emoji: "🧹", minutes: 10, category: "Productivity", difficulty: "Medium", rarity: "Rare", xp: 60, theme: "Neon", color: "#c084fc" },
+  { id: 71, title: "The Stoic Review", description: "Write down 3 things that went wrong today and how you will prevent them tomorrow.", emoji: "🏛️", minutes: 10, category: "Mindset", difficulty: "Medium", rarity: "Rare", xp: 60, theme: "Royal", color: "#eab308" },
+  { id: 72, title: "Social Purge", description: "Mute or block 10 people whose content makes you feel negative or jealous.", emoji: "🚫", minutes: 10, category: "Phone Detox", difficulty: "Medium", rarity: "Rare", xp: 60, theme: "Sunset", color: "#f97316" },
+
+  // Uncommon (Good XP, Easy/Medium)
+  { id: 73, title: "Calf Burn", description: "Do 100 calf raises while standing in place.", emoji: "🦵", minutes: 10, category: "Fitness", difficulty: "Easy", rarity: "Uncommon", xp: 35, theme: "Forest", color: "#22c55e" },
+  { id: 74, title: "To-Do Triage", description: "Look at your to-do list. Delete or cross off the bottom 3 least important things.", emoji: "✂️", minutes: 10, category: "Productivity", difficulty: "Easy", rarity: "Uncommon", xp: 35, theme: "Ocean", color: "#0ea5e9" },
+  { id: 75, title: "Book Summary", description: "Read a quick summary of a famous book you haven't read yet.", emoji: "📑", minutes: 10, category: "Knowledge", difficulty: "Medium", rarity: "Uncommon", xp: 35, theme: "Galaxy", color: "#a855f7" },
+  { id: 76, title: "Silent Meal", description: "Eat your next meal or snack in complete silence. No screens, no music.", emoji: "🍽️", minutes: 10, category: "Discipline", difficulty: "Medium", rarity: "Uncommon", xp: 35, theme: "Ice", color: "#38bdf8" },
+  { id: 77, title: "Positive Reinforcement", description: "Send a text to a friend telling them why you appreciate them.", emoji: "💬", minutes: 10, category: "Social", difficulty: "Easy", rarity: "Uncommon", xp: 35, theme: "Sunset", color: "#f97316" },
+  { id: 78, title: "Tension Release", description: "Spend 10 minutes stretching your hips and lower back.", emoji: "🧘", minutes: 10, category: "Fitness", difficulty: "Easy", rarity: "Uncommon", xp: 35, theme: "Sky", color: "#38bdf8" },
+  { id: 79, title: "Folder Organization", description: "Organize your messy 'Downloads' folder into proper subfolders.", emoji: "📁", minutes: 10, category: "Productivity", difficulty: "Medium", rarity: "Uncommon", xp: 35, theme: "Neon", color: "#c084fc" },
+  { id: 80, title: "Focus Playlist", description: "Create a 10-track playlist of only instrumental music for deep work.", emoji: "🎵", minutes: 10, category: "Focus", difficulty: "Easy", rarity: "Uncommon", xp: 35, theme: "Royal", color: "#eab308" },
+
+  // Common (Base XP, Easy)
+  { id: 81, title: "Screen Wipe", description: "Clean your phone and computer screens. They are filthy.", emoji: "📱", minutes: 10, category: "Productivity", difficulty: "Easy", rarity: "Common", xp: 20, theme: "Ocean", color: "#0ea5e9" },
+  { id: 82, title: "Water Chug", description: "Drink 500ml of water right now without stopping.", emoji: "💧", minutes: 10, category: "Fitness", difficulty: "Easy", rarity: "Common", xp: 20, theme: "Ice", color: "#38bdf8" },
+  { id: 83, title: "Jumping Jacks", description: "Do 50 jumping jacks to get your blood flowing.", emoji: "🏃", minutes: 10, category: "Fitness", difficulty: "Easy", rarity: "Common", xp: 20, theme: "Volcano", color: "#ef4444" },
+  { id: 84, title: "Delete Spam", description: "Empty the spam folder and trash in your email.", emoji: "🗑️", minutes: 10, category: "Productivity", difficulty: "Easy", rarity: "Common", xp: 20, theme: "Neon", color: "#c084fc" },
+  { id: 85, title: "Look Up", description: "Go outside and look at the sky for 2 minutes to reset your circadian rhythm.", emoji: "☁️", minutes: 10, category: "Mindset", difficulty: "Easy", rarity: "Common", xp: 20, theme: "Sky", color: "#38bdf8" },
+  { id: 86, title: "Read an Article", description: "Read one article on a topic completely outside your usual interests.", emoji: "📰", minutes: 10, category: "Knowledge", difficulty: "Easy", rarity: "Common", xp: 20, theme: "Galaxy", color: "#a855f7" },
+  { id: 87, title: "Fix Posture", description: "Sit up straight, pull your shoulders back, and take a deep breath.", emoji: "🪑", minutes: 10, category: "Discipline", difficulty: "Easy", rarity: "Common", xp: 20, theme: "Forest", color: "#22c55e" },
+  { id: 88, title: "Cable Management", description: "Untangle the charging cables on your desk or nightstand.", emoji: "🔌", minutes: 10, category: "Productivity", difficulty: "Easy", rarity: "Common", xp: 20, theme: "Sunset", color: "#f97316" },
+  { id: 89, title: "No Complaining", description: "Go the next 10 minutes without saying or thinking a single negative thing.", emoji: "🤐", minutes: 10, category: "Mindset", difficulty: "Easy", rarity: "Common", xp: 20, theme: "Royal", color: "#eab308" },
+  { id: 90, title: "Review Goals", description: "Read your top 3 goals for the year out loud.", emoji: "🎯", minutes: 10, category: "Focus", difficulty: "Easy", rarity: "Common", xp: 20, theme: "Ocean", color: "#0ea5e9" }
+   
 ];
 
 // --- LOGIC ---
