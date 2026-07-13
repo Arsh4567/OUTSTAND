@@ -7,7 +7,6 @@ import {
   createLovableAiGatewayProvider,
   getLovableAiGatewayRunId,
   getLovableAiGatewayResponseHeaders,
-  withLovableAiGatewayRunIdHeader,
 } from "@/lib/ai-gateway.server";
 
 const ChatRequestSchema = z.object({
