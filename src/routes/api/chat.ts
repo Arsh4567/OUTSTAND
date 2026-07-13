@@ -139,14 +139,17 @@ export const Route = createFileRoute("/api/chat")({
         }
 
         const initialRunId = getLovableAiGatewayRunId(request);
+        console.log("[chat] creating gateway", { hasKey: !!key, initialRunId });
         const gateway = createLovableAiGatewayProvider(key, initialRunId);
         const model = gateway("openai/gpt-5.5");
         const modelMessages = await convertToModelMessages(messages as UIMessage[]);
+        console.log("[chat] model messages converted", modelMessages.length);
 
         const result = streamText({
           model,
           messages: [{ role: "system", content: buildSystemPrompt(appContext) }, ...modelMessages],
         });
+        console.log("[chat] streamText created");
 
         const response = result.toUIMessageStreamResponse({
           originalMessages: messages as UIMessage[],
