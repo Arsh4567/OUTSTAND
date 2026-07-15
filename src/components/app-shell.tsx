@@ -35,11 +35,9 @@ export function AppShell() {
 }
 
 function ShellWithChrome() {
-  // 1. Only pull the raw XP and Streak from the Brain
   const { xp, bestStreak } = useAppState(); 
   const { user, profile } = useAuth();
   
-  // 2. PERFECT SYNC: Use your official leveling logic so it matches the Profile perfectly
   const { level, into, need } = levelFromXP(xp);
   const pct = Math.min(100, Math.round((into / need) * 100));
   
@@ -61,11 +59,10 @@ function ShellWithChrome() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col pb-24 md:pb-0 overflow-x-hidden">
       
-      {/* PREMIUM HEADER */}
       <header className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl shadow-sm">
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 md:px-6">
-          <Link to="/" className="flex min-w-0 items-center gap-3">
-            <div className="h-9 w-9 overflow-hidden rounded-xl shadow-[0_0_15px_rgba(79,70,229,0.3)]">
+          <Link to="/" className="flex min-w-0 items-center gap-3 group">
+            <div className="h-9 w-9 overflow-hidden rounded-xl shadow-[0_0_15px_rgba(79,70,229,0.3)] transition-all duration-300 group-hover:shadow-[0_0_25px_rgba(79,70,229,0.6)] group-hover:scale-105">
               <img
                 src="/outstand-logo.png"
                 alt="Outstand Logo"
@@ -120,17 +117,32 @@ function ShellWithChrome() {
               <span className="text-xs font-medium text-orange-500/70 uppercase tracking-wider">Streak</span>
             </div>
 
-            {/* LEVEL & XP RING - Now Perfectly Synced */}
+            {/* 🔥 PREMIUM LEVEL & XP RING 🔥 */}
             <div className="flex items-center gap-3 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 shadow-inner">
-              <div className="relative h-7 w-7">
-                <svg viewBox="0 0 36 36" className="h-7 w-7 -rotate-90">
+              <div className="relative h-7 w-7 flex items-center justify-center">
+                
+                {/* 1. Level-Up Shockwave Effect */}
+                <motion.div
+                   key={`shockwave-${level}`}
+                   initial={{ scale: 0.8, opacity: 1, borderWidth: "4px" }}
+                   animate={{ scale: 2.5, opacity: 0, borderWidth: "0px" }}
+                   transition={{ duration: 1, ease: "easeOut" }}
+                   className="absolute inset-0 rounded-full border-indigo-400 pointer-events-none z-0"
+                />
+
+                <svg viewBox="0 0 36 36" className="h-7 w-7 -rotate-90 relative z-10 overflow-visible">
                   <circle cx="18" cy="18" r="15" fill="none" className="stroke-slate-800" strokeWidth="4" />
+                  
+                  {/* 2. Spring-Physics Glowing Ring */}
                   <motion.circle
                     cx="18" cy="18" r="15" fill="none"
                     stroke="url(#lvl)" strokeWidth="4" strokeLinecap="round"
-                    initial={{ strokeDasharray: "0 94.25" }}
-                    animate={{ strokeDasharray: `${(pct / 100) * 94.25} 94.25` }}
-                    transition={{ duration: 1, ease: "easeOut" }}
+                    initial={{ strokeDasharray: "0 94.25", filter: "drop-shadow(0px 0px 0px rgba(99,102,241,0))" }}
+                    animate={{ 
+                      strokeDasharray: `${(pct / 100) * 94.25} 94.25`,
+                      filter: "drop-shadow(0px 0px 6px rgba(99,102,241,0.8))"
+                    }}
+                    transition={{ type: "spring", bounce: 0.4, duration: 1.5 }}
                   />
                   <defs>
                     <linearGradient id="lvl" x1="0" x2="1" y1="0" y2="1">
@@ -139,24 +151,34 @@ function ShellWithChrome() {
                     </linearGradient>
                   </defs>
                 </svg>
-                {/* Synced Level Number */}
+                
                 <motion.span 
                   key={`lvl-${level}`}
-                  initial={{ scale: 1.5, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="absolute inset-0 grid place-items-center text-[11px] font-black text-indigo-100"
+                  initial={{ scale: 1.8, opacity: 0, rotate: -15 }}
+                  animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                  transition={{ type: "spring", bounce: 0.6, duration: 0.8 }}
+                  className="absolute inset-0 grid place-items-center text-[11px] font-black text-indigo-100 z-20"
                 >
                   {level}
                 </motion.span>
               </div>
               
               <div className="hidden text-xs sm:block">
+                {/* 3. The Neon Text Pop */}
                 <motion.div 
                   key={`xp-${xp}`}
-                  initial={{ color: "#4ade80", scale: 1.1 }}
-                  animate={{ color: "#ffffff", scale: 1 }}
-                  transition={{ duration: 0.5 }}
-                  className="font-black tabular-nums tracking-tight"
+                  initial={{ 
+                    color: "#4ade80", 
+                    scale: 1.3,
+                    textShadow: "0px 0px 20px rgba(74,222,128,1)"
+                  }}
+                  animate={{ 
+                    color: "#ffffff", 
+                    scale: 1,
+                    textShadow: "0px 0px 0px rgba(74,222,128,0)"
+                  }}
+                  transition={{ type: "spring", stiffness: 300, damping: 15 }}
+                  className="font-black tabular-nums tracking-tight origin-left"
                 >
                   {xp} XP
                 </motion.div>
@@ -251,5 +273,4 @@ function ShellWithChrome() {
       {isClient && user && <ChatAssistant />}
     </div>
   );
-                                 }
-      
+}
