@@ -5,6 +5,7 @@ import { useChat, type UIMessage } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { Bot, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { motion } from "framer-motion"; // <-- Added for the floating effect
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAppState } from "@/hooks/use-app-state";
@@ -128,23 +129,23 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
 
   return (
     <div className="flex h-full flex-col">
-      <DrawerHeader className="flex shrink-0 items-start justify-between border-b border-border/60 pb-4">
+      <DrawerHeader className="flex shrink-0 items-start justify-between border-b border-white/10 pb-4">
         <div className="text-left">
-          <DrawerTitle className="flex items-center gap-2 text-base">
-            <div className="grid h-6 w-6 place-items-center rounded-lg bg-gradient-to-br from-primary to-accent">
-              <Bot className="h-3.5 w-3.5 text-primary-foreground" />
+          <DrawerTitle className="flex items-center gap-2 text-base text-white">
+            <div className="grid h-6 w-6 place-items-center rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 shadow-lg">
+              <Bot className="h-3.5 w-3.5 text-white" />
             </div>
             Outstand Assistant
           </DrawerTitle>
-          <DrawerDescription className="text-xs">
+          <DrawerDescription className="text-xs text-slate-400">
             Ask for focus tips, habit coaching, or a daily reset.
           </DrawerDescription>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon-sm" onClick={handleClear} title="Clear chat">
+          <Button variant="ghost" size="icon-sm" onClick={handleClear} title="Clear chat" className="text-slate-400 hover:text-white">
             <Trash2 className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon-sm" onClick={onClose} title="Close">
+          <Button variant="ghost" size="icon-sm" onClick={onClose} title="Close" className="text-slate-400 hover:text-white">
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -154,7 +155,7 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
         <ConversationContent>
           {messages.length === 0 ? (
             <ConversationEmptyState
-              icon={<Bot className="h-8 w-8 text-primary" />}
+              icon={<Bot className="h-8 w-8 text-indigo-400" />}
               title="Your Outstand coach is here"
               description="Ask how to improve your streak, what to focus on today, or how to boost your dopamine score."
             />
@@ -204,7 +205,7 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
           {isLoading && (
             <Message from="assistant">
               <MessageContent>
-                <Shimmer className="text-sm text-muted-foreground">Thinking...</Shimmer>
+                <Shimmer className="text-sm text-indigo-400">Thinking...</Shimmer>
               </MessageContent>
             </Message>
           )}
@@ -212,13 +213,14 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="shrink-0 border-t border-border/60 p-4">
+      <div className="shrink-0 border-t border-white/10 p-4 bg-slate-950">
         <PromptInput onSubmit={handleSubmit}>
           <PromptInputTextarea
             placeholder="Ask your coach anything..."
             value={input}
             onChange={(e) => setInput(e.currentTarget.value)}
             disabled={isLoading}
+            className="bg-slate-900 border-white/10 text-white placeholder:text-slate-500"
           />
           <PromptInputFooter className="justify-end pt-2">
             <PromptInputSubmit
@@ -299,23 +301,35 @@ export function ChatAssistant() {
 
   return (
     <>
-      <Button
-        onClick={() => setOpen(true)}
-        className={cn(
-          "fixed bottom-4 right-4 z-50 h-14 w-14 rounded-full p-0 shadow-2xl",
-          "btn-primary animate-in fade-in slide-in-from-bottom-4 duration-500",
-        )}
-        aria-label="Open AI assistant"
+      {/* THE NEW FLOATING, GLOWING AI BUTTON */}
+      <motion.div
+        // Positioned perfectly to avoid the new nav bar
+        className="fixed bottom-28 right-4 md:bottom-8 md:right-8 z-50"
+        // Continuous, gentle floating animation
+        animate={{ y: [0, -10, 0] }}
+        transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
       >
-        <Bot className="h-6 w-6" />
-      </Button>
+        <Button
+          onClick={() => setOpen(true)}
+          className={cn(
+            "relative h-14 w-14 rounded-full p-0 border border-indigo-400/30",
+            "bg-gradient-to-br from-indigo-500 to-blue-600",
+            // The massive, soft premium glow
+            "shadow-[0_0_30px_rgba(99,102,241,0.5)] hover:shadow-[0_0_40px_rgba(99,102,241,0.8)]",
+            "transition-all duration-300 hover:scale-110 active:scale-95"
+          )}
+          aria-label="Open AI assistant"
+        >
+          <Bot className="h-6 w-6 text-white drop-shadow-md" />
+        </Button>
+      </motion.div>
 
       <Drawer open={open} onOpenChange={setOpen} direction="bottom">
-        <DrawerContent className="h-[88dvh] rounded-t-2xl border-border/60 bg-background/95 backdrop-blur-xl">
+        <DrawerContent className="h-[88dvh] rounded-t-2xl border-white/10 bg-slate-950/95 backdrop-blur-xl">
           {loadingHistory ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-              <Bot className="h-8 w-8 animate-pulse text-primary" />
-              <p className="text-sm text-muted-foreground">Loading your conversation...</p>
+              <Bot className="h-8 w-8 animate-pulse text-indigo-500" />
+              <p className="text-sm text-slate-400">Loading your conversation...</p>
             </div>
           ) : (
             <ChatPanel
@@ -330,4 +344,5 @@ export function ChatAssistant() {
       </Drawer>
     </>
   );
-}
+         }
+      
