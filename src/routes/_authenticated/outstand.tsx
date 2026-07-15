@@ -87,7 +87,8 @@ function OutstandPage() {
 
     setTimeout(() => {
       // 2. Database calls (We will upgrade this logic next)
-      recordOutstand(challenge.title, challenge.xp);
+    recordOutstand(challenge.title, challenge.xp);
+      
       addPositive("outstand");
       
       // 3. THE PREMIUM CUSTOM TOAST
