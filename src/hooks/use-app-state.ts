@@ -5,117 +5,50 @@ import {
   todayISO,
   XP_PER_FOCUS,
   XP_PER_HABIT,
-  XP_PER_OUTSTAND,
+  // Removed XP_PER_OUTSTAND since we now use dynamic XP
   type FocusSession,
   type Habit,
   type OutstandCompletion,
 } from "@/lib/habits";
 
-const seedHabits: Habit[] = [
-  {
-    id: "h1",
-    name: "Read 20 minutes",
-    emoji: "📚",
-    color: "primary",
-    createdAt: new Date().toISOString(),
-    history: [],
-  },
-  {
-    id: "h2",
-    name: "Deep work session",
-    emoji: "🧠",
-    color: "accent",
-    createdAt: new Date().toISOString(),
-    history: [],
-  },
-  {
-    id: "h3",
-    name: "Exercise / stretch",
-    emoji: "🏃",
-    color: "success",
-    createdAt: new Date().toISOString(),
-    history: [],
-  },
-  {
-    id: "h4",
-    name: "No phone before class",
-    emoji: "📵",
-    color: "warning",
-    createdAt: new Date().toISOString(),
-    history: [],
-  },
-];
+// ... (Keep your seedHabits array as it is) ...
 
 export function useAppState() {
   const [habits, setHabits] = useLocalStorage<Habit[]>("ht.habits.v1", seedHabits);
   const [sessions, setSessions] = useLocalStorage<FocusSession[]>("ht.sessions.v1", []);
   const [outstand, setOutstand] = useLocalStorage<OutstandCompletion[]>("ht.outstand.v1", []);
 
+  // 1. DYNAMIC XP ENGINE
   const xp = useMemo(() => {
     const habitCompletions = habits.reduce((sum, h) => sum + h.history.length, 0);
     const focus = sessions.filter((s) => s.completed).length;
-    return habitCompletions * XP_PER_HABIT + focus * XP_PER_FOCUS + outstand.length * XP_PER_OUTSTAND;
+    // New logic: total up the xp stored in each outstand completion
+    const outstandXp = outstand.reduce((sum, o) => sum + (o.xp || 0), 0);
+    return habitCompletions * XP_PER_HABIT + focus * XP_PER_FOCUS + outstandXp;
   }, [habits, sessions, outstand]);
 
-  const toggleToday = (id: string) => {
-    const today = todayISO();
-    setHabits((prev) =>
-      prev.map((h) => {
-        if (h.id !== id) return h;
-        const has = h.history.includes(today);
-        return {
-          ...h,
-          history: has ? h.history.filter((d) => d !== today) : [...h.history, today],
-        };
-      }),
-    );
-  };
+  // 2. LEVEL CALCULATOR (New Feature)
+  // Level 1 = 0 XP, Level 2 = 500 XP, Level 3 = 1000 XP...
+  const level = Math.floor(xp / 500) + 1;
+  const progressToNextLevel = (xp % 500) / 5; // Percentage (0-100)
 
-  const addHabit = (data: { name: string; emoji: string; color: string }) => {
-    const habit: Habit = {
-      id: crypto.randomUUID(),
-      name: data.name,
-      emoji: data.emoji,
-      color: data.color,
-      createdAt: new Date().toISOString(),
-      history: [],
-    };
-    setHabits((prev) => [...prev, habit]);
-  };
-
-  const updateHabit = (id: string, data: Partial<Pick<Habit, "name" | "emoji" | "color">>) => {
-    setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, ...data } : h)));
-  };
-
-  const deleteHabit = (id: string) => {
-    setHabits((prev) => prev.filter((h) => h.id !== id));
-  };
-
-  const recordSession = (durationMin: number, completed: boolean) => {
-    const s: FocusSession = {
-      id: crypto.randomUUID(),
-      startedAt: new Date().toISOString(),
-      durationMin,
-      completed,
-    };
-    setSessions((prev) => [s, ...prev].slice(0, 500));
-  };
-
-  const recordOutstand = (title: string) => {
+  // 3. ENHANCED RECORD OUTSTAND
+  const recordOutstand = (title: string, xp: number) => {
     setOutstand((prev) => [
-      { id: crypto.randomUUID(), title, completedAt: new Date().toISOString() },
+      { id: crypto.randomUUID(), title, xp, completedAt: new Date().toISOString() },
       ...prev,
     ].slice(0, 200));
   };
 
-  const streaks = useMemo(() => habits.map((h) => ({ id: h.id, streak: computeStreak(h.history) })), [habits]);
-  const bestStreak = streaks.reduce((a, b) => (b.streak > a ? b.streak : a), 0);
+  // ... (Keep your existing toggleToday, addHabit, updateHabit, deleteHabit, recordSession) ...
 
   return {
     habits,
     sessions,
     outstand,
     xp,
+    level, // New!
+    progressToNextLevel, // New!
     bestStreak,
     streaks,
     toggleToday,
