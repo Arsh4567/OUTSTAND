@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ChatAssistant } from "@/components/chat-assistant";
 import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: Activity },
@@ -36,9 +37,13 @@ export function AppShell() {
 function ShellWithChrome() {
   const { xp, bestStreak } = useAppState();
   const { user, profile } = useAuth();
+  
+  // Uses your existing leveling logic
   const { level, into, need } = levelFromXP(xp);
   const pct = Math.min(100, Math.round((into / need) * 100));
+  
   const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const name = displayNameOf(user, profile);
   const [isClient, setIsClient] = useState(false);
 
@@ -53,132 +58,199 @@ function ShellWithChrome() {
   };
 
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/60 backdrop-blur-xl">
+    // Added pb-24 on mobile to make room for the new floating nav
+    <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col pb-24 md:pb-0 overflow-x-hidden">
+      
+      {/* 1. PREMIUM HEADER */}
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl shadow-sm">
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 md:px-6">
-          <Link to="/" className="flex min-w-0 items-center gap-2">
-            <div className="h-9 w-9 overflow-hidden rounded-xl shadow-[var(--shadow-glow)]">
-  <img
-    src="/outstand-logo.png"
-    alt="Outstand Logo"
-    className="h-full w-full object-cover"
-  />
-</div>
-
-          
+          <Link to="/" className="flex min-w-0 items-center gap-3">
+            <div className="h-9 w-9 overflow-hidden rounded-xl shadow-[0_0_15px_rgba(79,70,229,0.3)]">
+              <img
+                src="/outstand-logo.png"
+                alt="Outstand Logo"
+                className="h-full w-full object-cover"
+              />
+            </div>
             <div className="min-w-0">
-  <div className="truncate font-display text-lg font-bold tracking-tight">
-    Outstand
-  </div>
-
-  <div className="hidden text-[11px] uppercase tracking-[0.18em] text-muted-foreground sm:block">
-    Focus • Discipline • Growth
-  </div>
-</div>
-
+              <div className="truncate font-display text-lg font-black tracking-tight text-white">
+                Outstand
+              </div>
+              <div className="hidden text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-400 sm:block">
+                Focus • Discipline • Growth
+              </div>
+            </div>
           </Link>
 
-          <nav className="ml-4 hidden flex-1 items-center gap-1 lg:flex">
-            {NAV.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                activeOptions={{ exact: item.to === "/" }}
-                className="group rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground data-[status=active]:bg-secondary data-[status=active]:text-foreground"
-                activeProps={{ "data-status": "active" }}
-              >
-                <span className="flex items-center gap-2">
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </span>
-              </Link>
-            ))}
+          {/* Desktop Nav - With Magic Layout Indicator */}
+          <nav className="ml-8 hidden flex-1 items-center gap-2 lg:flex">
+            {NAV.map((item) => {
+              const isActive = pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to));
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={cn(
+                    "relative rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+                    isActive ? "text-white" : "text-slate-400 hover:text-slate-200"
+                  )}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId="desktopNav"
+                      className="absolute inset-0 rounded-lg bg-white/10"
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                    />
+                  )}
+                  <span className="relative z-10 flex items-center gap-2">
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                  </span>
+                </Link>
+              );
+            })}
           </nav>
 
-          <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
-            <div className="hidden items-center gap-2 rounded-full border border-border/60 bg-secondary/40 px-3 py-1.5 sm:flex">
-              <Flame className="h-4 w-4 text-warning" />
-              <span className="text-sm font-medium">{bestStreak}</span>
-              <span className="text-xs text-muted-foreground">day streak</span>
+          <div className="ml-auto flex shrink-0 items-center gap-3 sm:gap-4">
+            
+            {/* Streak Badge */}
+            <div className="hidden items-center gap-2 rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1.5 sm:flex">
+              <Flame className="h-4 w-4 text-orange-500" />
+              <span className="text-sm font-bold text-orange-50">{bestStreak}</span>
+              <span className="text-xs font-medium text-orange-500/70 uppercase tracking-wider">Streak</span>
             </div>
-            <div className="flex items-center gap-2 rounded-full border border-border/60 bg-secondary/40 px-3 py-1.5">
-              <div className="relative h-6 w-6">
-                <svg viewBox="0 0 36 36" className="h-6 w-6 -rotate-90">
-                  <circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" className="text-secondary" strokeWidth="4" />
-                  <circle
+
+            {/* LEVEL & XP RING - Now Animated on Change! */}
+            <div className="flex items-center gap-3 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 shadow-inner">
+              <div className="relative h-7 w-7">
+                <svg viewBox="0 0 36 36" className="h-7 w-7 -rotate-90">
+                  <circle cx="18" cy="18" r="15" fill="none" className="stroke-slate-800" strokeWidth="4" />
+                  <motion.circle
                     cx="18" cy="18" r="15" fill="none"
                     stroke="url(#lvl)" strokeWidth="4" strokeLinecap="round"
-                    strokeDasharray={`${(pct / 100) * 94.25} 94.25`}
+                    initial={{ strokeDasharray: "0 94.25" }}
+                    animate={{ strokeDasharray: `${(pct / 100) * 94.25} 94.25` }}
+                    transition={{ duration: 1, ease: "easeOut" }}
                   />
                   <defs>
                     <linearGradient id="lvl" x1="0" x2="1" y1="0" y2="1">
-                      <stop offset="0%" stopColor="oklch(0.72 0.16 245)" />
-                      <stop offset="100%" stopColor="oklch(0.72 0.18 285)" />
+                      <stop offset="0%" stopColor="#818cf8" />
+                      <stop offset="100%" stopColor="#4f46e5" />
                     </linearGradient>
                   </defs>
                 </svg>
-                <span className="absolute inset-0 grid place-items-center text-[10px] font-bold">{level}</span>
+                {/* Level Number Pops when it changes */}
+                <motion.span 
+                  key={`lvl-${level}`}
+                  initial={{ scale: 1.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="absolute inset-0 grid place-items-center text-[11px] font-black text-indigo-100"
+                >
+                  {level}
+                </motion.span>
               </div>
+              
               <div className="hidden text-xs sm:block">
-                <div className="font-semibold">{xp} XP</div>
-                <div className="text-muted-foreground">Lv {level}</div>
+                {/* XP Text Flashes Green when XP increases */}
+                <motion.div 
+                  key={`xp-${xp}`}
+                  initial={{ color: "#4ade80", scale: 1.1 }}
+                  animate={{ color: "#ffffff", scale: 1 }}
+                  transition={{ duration: 0.5 }}
+                  className="font-black tabular-nums tracking-tight"
+                >
+                  {xp} XP
+                </motion.div>
+                <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">
+                  Lv {level}
+                </div>
               </div>
             </div>
 
+            {/* Profile Dropdown */}
             <DropdownMenu>
-              <DropdownMenuTrigger className="grid h-9 w-9 place-items-center rounded-full border border-border/60 bg-secondary/40 text-sm font-semibold transition-colors hover:bg-secondary">
+              <DropdownMenuTrigger className="grid h-10 w-10 place-items-center rounded-full border-2 border-slate-700 bg-slate-800 text-sm font-bold text-white transition-all hover:border-indigo-500 hover:shadow-[0_0_15px_rgba(99,102,241,0.4)] focus:outline-none">
                 {profile?.avatar_url ? (
                   <img src={profile.avatar_url} alt="" className="h-full w-full rounded-full object-cover" />
                 ) : (
                   name.charAt(0).toUpperCase()
                 )}
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuContent align="end" className="w-56 bg-slate-900 border-white/10 text-slate-100">
                 <DropdownMenuLabel>
-                  <div className="font-medium">{name}</div>
-                  <div className="truncate text-xs font-normal text-muted-foreground">{user?.email}</div>
+                  <div className="font-bold text-base">{name}</div>
+                  <div className="truncate text-xs font-medium text-slate-400">{user?.email}</div>
                 </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate({ to: "/profile" })}>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem onClick={() => navigate({ to: "/profile" })} className="focus:bg-white/10 focus:text-white cursor-pointer">
                   <User className="mr-2 h-4 w-4" /> View profile
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={signOut}>
+                <DropdownMenuItem onClick={signOut} className="focus:bg-red-500/20 focus:text-red-400 cursor-pointer text-red-400">
                   <LogOut className="mr-2 h-4 w-4" /> Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </div>
-
-        {/* Mobile nav */}
-        <nav className="flex items-center gap-1 overflow-x-auto border-t border-border/60 px-3 py-2 lg:hidden">
-          {NAV.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              activeOptions={{ exact: item.to === "/" }}
-              className={cn(
-                "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-muted-foreground transition-colors",
-                "data-[status=active]:bg-secondary data-[status=active]:text-foreground",
-              )}
-              activeProps={{ "data-status": "active" }}
-            >
-              <item.icon className="h-3.5 w-3.5" />
-              {item.label}
-            </Link>
-          ))}
-        </nav>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-8 md:px-6 md:py-10">
-        <Outlet />
-      </main>
+      {/* 2. MAIN CONTENT WITH PAGE TRANSITIONS */}
+      <AnimatePresence mode="wait">
+        <motion.main 
+          key={pathname}
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -15 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 md:px-6 md:py-10"
+        >
+          <Outlet />
+        </motion.main>
+      </AnimatePresence>
 
-      <footer className="border-t border-border/60 py-6 text-center text-xs text-muted-foreground">
-        Built to help you Outstand. Stay quiet. Stay consistent.
+      <footer className="mt-auto border-t border-white/5 py-8 text-center text-xs font-medium text-slate-500">
+        Built to help you Outstand. <span className="text-slate-400">Stay quiet. Stay consistent.</span>
       </footer>
+
+      {/* 3. PREMIUM FLOATING BOTTOM NAV (Mobile Only) */}
+      <div className="fixed bottom-6 left-0 right-0 z-50 flex justify-center px-4 lg:hidden pointer-events-none">
+        <nav className="flex items-center gap-1 rounded-[2rem] border border-white/10 bg-slate-950/80 p-2 backdrop-blur-xl shadow-2xl pointer-events-auto">
+          {NAV.map((item) => {
+            const isActive = pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to));
+            
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={cn(
+                  "relative flex h-14 w-[4.5rem] flex-col items-center justify-center gap-1 rounded-2xl transition-all duration-300 active:scale-90",
+                  isActive ? "text-white" : "text-slate-500 hover:text-slate-300"
+                )}
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="mobileNav"
+                    className="absolute inset-0 rounded-2xl bg-indigo-500/20 shadow-[0_0_20px_rgba(99,102,241,0.15)]"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+                
+                <item.icon 
+                  className={cn("relative z-10 h-5 w-5 transition-transform duration-300", isActive && "scale-110")} 
+                  strokeWidth={isActive ? 2.5 : 2}
+                />
+                
+                <span className="relative z-10 text-[9px] font-bold tracking-wider uppercase">
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
 
       {isClient && user && <ChatAssistant />}
     </div>
   );
-}
+            }
+                  
