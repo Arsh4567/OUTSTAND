@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, Pause, Play, RotateCcw, Zap, SkipForward } from "lucide-react";
+import { CheckCircle2, Pause, Play, RotateCcw, Zap, SkipForward, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CHALLENGES, randomChallenge, getRarityStyle, type OutstandChallenge } from "@/lib/challenges";
 import { useAppState } from "@/hooks/use-app-state";
@@ -21,12 +21,11 @@ function OutstandPage() {
   const [remaining, setRemaining] = useState(600);
   const [running, setRunning] = useState(false);
   
-  // existing states
   const [isShuffling, setIsShuffling] = useState(false);
   const [shuffleDisplay, setShuffleDisplay] = useState({ emoji: "⚡", title: "Locating Mission..." });
   
-  // NEW: Premium Animation State
-  const [isCompleting, setIsCompleting] = useState(false);
+  // Stages: 0 = idle, 1 = completing (imploding & charging), 2 = shooting off screen
+  const [completionStage, setCompletionStage] = useState<0 | 1 | 2>(0);
   
   const intervalRef = useRef<number | null>(null);
 
@@ -68,41 +67,48 @@ function OutstandPage() {
     return () => { if (intervalRef.current) window.clearInterval(intervalRef.current); };
   }, [running]);
 
-  // NEW: Orchestrated Completion Logic
+  // THE MASTER ORCHESTRATOR
   const complete = () => {
-    if (!challenge || isCompleting) return;
+    if (!challenge || completionStage !== 0) return;
     
     setRunning(false);
-    setIsCompleting(true); // 1. Trigger the animation lock
+    setCompletionStage(1); // Start Phase 1: Implosion & Charge
     
-    // Haptic success snap (Apple-style triple tap)
+    // Rhythmic Haptic Heartbeat (Apple-tier feedback)
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate([30, 50, 30]);
+      navigator.vibrate([20, 100, 30, 80, 50, 50, 100]); 
     }
     
-    // 2. Wait exactly 1.2 seconds for the animation to play, then clear state
+    // Start Phase 2: The Rocket Launch
+    setTimeout(() => {
+      setCompletionStage(2);
+    }, 800);
+
+    // Final Cleanup & Reward
     setTimeout(() => {
       recordOutstand(challenge.title);
       addPositive("outstand");
-      toast.success("Mission Accomplished", { description: `+${challenge.xp} XP added to your baseline.` });
+      toast.success("Mission Accomplished", { 
+        description: `+${challenge.xp} XP added to your baseline.`,
+        icon: <Star className="text-yellow-400" fill="currentColor" />
+      });
       setChallenge(null);
-      setIsCompleting(false);
-    }, 1200);
+      setCompletionStage(0);
+    }, 1400);
   };
 
   const mins = Math.floor(remaining / 60);
   const secs = remaining % 60;
-  
   const rarityTheme = challenge ? getRarityStyle(challenge.rarity) : null;
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center p-4 overflow-hidden">
       
-      {/* Background that flashes intensely upon completion */}
+      {/* Cinematic Spotlight: Darkens the rest of the screen when charging */}
       <motion.div 
-        animate={isCompleting ? { backgroundColor: challenge?.color || "#ffffff", opacity: [0, 0.15, 0] } : { opacity: 0 }}
-        transition={{ duration: 0.8 }}
-        className="absolute inset-0 z-0 pointer-events-none" 
+        animate={completionStage === 1 ? { opacity: 0.7 } : completionStage === 2 ? { opacity: 0 } : { opacity: 0 }}
+        transition={{ duration: 0.5 }}
+        className="absolute inset-0 bg-black z-10 pointer-events-none" 
       />
       
       <div className="absolute inset-0 bg-slate-950 -z-10" />
@@ -113,7 +119,7 @@ function OutstandPage() {
         style={{ backgroundImage: "radial-gradient(circle at center, #4f46e5, transparent 70%)" }}
       />
 
-      <div className="w-full max-w-lg z-10 relative">
+      <div className="w-full max-w-lg z-20 relative">
         <AnimatePresence mode="wait">
           {!challenge && !isShuffling ? (
              <motion.div
@@ -149,62 +155,93 @@ function OutstandPage() {
            </motion.div>
           ) : challenge && rarityTheme ? (
             
-            // NEW: The dynamic card that orchestrates the completion animation
             <motion.div
               key="active"
               initial={{ opacity: 0, scale: 0.8 }}
-              // If completing: Scale up slightly to "absorb" energy, then shoot up and disappear
-              animate={isCompleting ? { 
-                scale: [1, 1.05, 0], 
-                y: [0, -10, -300],
-                opacity: [1, 1, 0],
-                filter: ["brightness(1)", "brightness(1.5)", "brightness(1)"]
-              } : { 
-                opacity: 1, scale: 1, y: 0, filter: "brightness(1)" 
-              }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={isCompleting 
-                ? { duration: 1, times: [0, 0.4, 1], ease: "easeInOut" } 
+              // THE MASTER KEYFRAMES
+              animate={
+                completionStage === 1 ? { 
+                  scale: 0.4, // Collapse into a pill
+                  y: 0,
+                  rotateZ: [0, -2, 2, -2, 2, 0], // The "vibrating" charge effect
+                  borderRadius: "100px", 
+                } : completionStage === 2 ? {
+                  scale: [0.4, 0.2, 0], // Compress then vanish
+                  y: [0, 50, -800], // Dip down deep, then rocket up to the top of the screen
+                  opacity: [1, 1, 0],
+                } : { 
+                  opacity: 1, scale: 1, y: 0, borderRadius: "24px"
+                }
+              }
+              // Custom cubic-bezier for the absolute smoothest Apple-like snap
+              transition={
+                completionStage === 1 ? { duration: 0.8, ease: "backInOut" } 
+                : completionStage === 2 ? { duration: 0.6, ease: [0.87, 0, 0.13, 1] } 
                 : { type: "spring", bounce: 0.4, duration: 0.6 }
               }
               className={cn(
-                "relative overflow-hidden p-8 rounded-3xl backdrop-blur-xl border-2 transition-colors duration-700",
+                "relative flex flex-col items-center justify-center overflow-visible p-8 backdrop-blur-xl border-2 shadow-2xl transition-colors duration-700 mx-auto",
                 rarityTheme.bg,
                 rarityTheme.border,
-                rarityTheme.shadow
+                // Lock width when imploding so it forms a perfect pill
+                completionStage > 0 ? "w-[240px] h-[80px] !p-0" : "w-full min-h-[400px]"
               )}
             >
               
-              {/* NEW: The Confetti / Sparkle Burst layer. Only visible when completing */}
-              {isCompleting && (
-                <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none">
-                  {[...Array(12)].map((_, i) => (
-                    <motion.div
-                      key={`spark-${i}`}
-                      initial={{ scale: 0, x: 0, y: 0, opacity: 1 }}
-                      animate={{
-                        scale: [0, 1.5, 0],
-                        opacity: [1, 1, 0],
-                        // Math to shoot particles in a 360 degree circle
-                        x: Math.cos((i * 30 * Math.PI) / 180) * 200,
-                        y: Math.sin((i * 30 * Math.PI) / 180) * 200,
-                      }}
-                      transition={{ duration: 0.8, ease: "easeOut" }}
-                      className="absolute w-3 h-3 rounded-full shadow-[0_0_15px_rgba(255,255,255,0.8)]"
-                      style={{ backgroundColor: challenge.color || "#fff" }}
-                    />
-                  ))}
-                </div>
+              {/* THE SUPERNOVA (Fires in Stage 2) */}
+              {completionStage === 2 && (
+                <>
+                  <motion.div
+                    initial={{ scale: 0.2, opacity: 1, borderWidth: "20px" }}
+                    animate={{ scale: 3, opacity: 0, borderWidth: "0px" }}
+                    transition={{ duration: 0.6, ease: "easeOut" }}
+                    className="absolute rounded-full z-0 pointer-events-none"
+                    style={{ borderColor: challenge.color || "#ffffff", borderStyle: "solid", width: "150px", height: "150px" }}
+                  />
+
+                  <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none">
+                    {/* Dots */}
+                    {[...Array(12)].map((_, i) => (
+                      <motion.div
+                        key={`dot-${i}`}
+                        initial={{ scale: 0, x: 0, y: 0, opacity: 1 }}
+                        animate={{
+                          scale: [0, 1.5, 0],
+                          opacity: [1, 1, 0],
+                          x: Math.cos((i * 30 * Math.PI) / 180) * 300,
+                          y: Math.sin((i * 30 * Math.PI) / 180) * 300,
+                        }}
+                        transition={{ duration: 0.7, ease: "easeOut" }}
+                        className="absolute w-4 h-4 rounded-full shadow-[0_0_20px_rgba(255,255,255,1)]"
+                        style={{ backgroundColor: challenge.color || "#fff" }}
+                      />
+                    ))}
+                    {/* Laser Streaks (Hyperspace effect) */}
+                    {[...Array(8)].map((_, i) => (
+                      <motion.div
+                        key={`streak-${i}`}
+                        initial={{ scaleX: 0, x: 0, y: 0, opacity: 1, rotate: i * 45 }}
+                        animate={{
+                          scaleX: [0, 4, 0],
+                          opacity: [1, 1, 0],
+                          x: Math.cos((i * 45 * Math.PI) / 180) * 400,
+                          y: Math.sin((i * 45 * Math.PI) / 180) * 400,
+                        }}
+                        transition={{ duration: 0.5, ease: "easeOut" }}
+                        className="absolute w-8 h-1 rounded-full origin-left shadow-[0_0_15px_rgba(255,255,255,0.8)]"
+                        style={{ backgroundColor: "#ffffff" }}
+                      />
+                    ))}
+                  </div>
+                </>
               )}
 
+              {/* DYNAMIC CONTENT FADING */}
+              {/* This hides all the normal card info when it collapses into a pill */}
               <motion.div 
-                initial={{ opacity: 0.8, x: "-100%" }}
-                animate={{ opacity: 0, x: "100%" }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-                className="absolute inset-0 bg-white/20 skew-x-12 pointer-events-none"
-              />
-
-              <div className="text-center space-y-6 relative z-10">
+                animate={completionStage > 0 ? { opacity: 0, scale: 0.5, display: "none" } : { opacity: 1, scale: 1, display: "block" }}
+                className="w-full text-center space-y-6 relative z-10"
+              >
                 <div className="flex justify-between items-center text-xs font-bold uppercase tracking-widest">
                   <span className={cn("px-3 py-1 rounded-full bg-black/40", rarityTheme.text)}>
                     {challenge.rarity}
@@ -212,13 +249,7 @@ function OutstandPage() {
                   <span className="text-slate-400">{challenge.category}</span>
                 </div>
 
-                <motion.div 
-                  animate={isCompleting ? { scale: [1, 1.5], rotate: [0, 10] } : {}}
-                  transition={{ duration: 0.5 }}
-                  className="text-6xl drop-shadow-2xl pt-2"
-                >
-                  {challenge.emoji}
-                </motion.div>
+                <div className="text-6xl drop-shadow-2xl pt-2">{challenge.emoji}</div>
                 
                 <div>
                   <h2 className="text-2xl font-bold text-white">{challenge.title}</h2>
@@ -230,40 +261,46 @@ function OutstandPage() {
                 </div>
 
                 <div className="flex gap-3 justify-center">
-                  <Button variant="secondary" onClick={() => setRunning(!running)} disabled={isCompleting} className="rounded-full w-14 h-14 bg-white/10 hover:bg-white/20 border-white/5 disabled:opacity-50">
+                  <Button variant="secondary" onClick={() => setRunning(!running)} className="rounded-full w-14 h-14 bg-white/10 hover:bg-white/20 border-white/5">
                     {running ? <Pause size={24} className="text-white" /> : <Play size={24} className="text-white" />}
                   </Button>
-                  <Button variant="outline" onClick={() => { setRemaining(challenge.minutes * 60); setRunning(false); }} disabled={isCompleting} className="rounded-full w-14 h-14 bg-black/40 border-white/10 hover:bg-white/10 text-white disabled:opacity-50">
+                  <Button variant="outline" onClick={() => { setRemaining(challenge.minutes * 60); setRunning(false); }} className="rounded-full w-14 h-14 bg-black/40 border-white/10 hover:bg-white/10 text-white">
                     <RotateCcw size={20} />
                   </Button>
-                  <Button variant="ghost" onClick={generate} disabled={isCompleting} className="rounded-full w-14 h-14 text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-50">
+                  <Button variant="ghost" onClick={generate} className="rounded-full w-14 h-14 text-slate-400 hover:text-white hover:bg-white/10">
                     <SkipForward size={20} />
                   </Button>
                 </div>
 
                 <Button 
                   onClick={complete}
-                  disabled={isCompleting} 
                   className={cn(
-                    "w-full h-14 rounded-2xl font-bold text-lg text-black transition-all shadow-xl relative overflow-hidden", 
-                    rarityTheme ? rarityTheme.bg.replace('/10', '/90') : "bg-white/90",
-                    isCompleting ? "scale-95 opacity-90" : "active:scale-95"
+                    "w-full h-14 rounded-2xl font-bold text-lg text-black transition-all shadow-xl active:scale-95", 
+                    rarityTheme ? rarityTheme.bg.replace('/10', '/90') : "bg-white/90"
                   )}
                   style={{ backgroundColor: challenge.color }}
                 >
-                  {isCompleting ? (
-                    <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity }} className="flex items-center">
-                      <Zap className="mr-2 h-5 w-5 animate-pulse" /> ACCUMULATING XP...
-                    </motion.div>
-                  ) : (
-                    <span className="flex items-center"><CheckCircle2 className="mr-2 h-5 w-5" /> COMPLETE (+{challenge.xp} XP)</span>
-                  )}
+                  <span className="flex items-center"><CheckCircle2 className="mr-2 h-5 w-5" /> COMPLETE (+{challenge.xp} XP)</span>
                 </Button>
-              </div>
+              </motion.div>
+
+              {/* THE PILL REVEAL (Only shows during Phase 1 and 2) */}
+              {completionStage > 0 && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="absolute inset-0 flex items-center justify-center font-black text-3xl tracking-tighter"
+                  style={{ color: challenge.color || "#ffffff", textShadow: "0px 0px 20px rgba(255,255,255,0.5)" }}
+                >
+                  +{challenge.xp} XP
+                </motion.div>
+              )}
+
             </motion.div>
           ) : null}
         </AnimatePresence>
       </div>
     </div>
   );
-}
+                  }
+                                                                              
