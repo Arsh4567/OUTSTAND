@@ -34,13 +34,17 @@ export function AppShell() {
   return <ShellWithChrome />;
 }
 
+// Replace with this updated code:
 function ShellWithChrome() {
-  const { xp, bestStreak } = useAppState();
+  // Pull the level directly from your app's main state instead of recalculating it
+  const { xp, bestStreak, level = 1, progressToNextLevel = 0 } = useAppState();
   const { user, profile } = useAuth();
   
-  // Uses your existing leveling logic
-  const { level, into, need } = levelFromXP(xp);
+  // Use a fallback just in case the profile uses a different percentage system
+  const { level: fallbackLevel, into, need } = levelFromXP(xp);
+  const displayLevel = Math.max(level, fallbackLevel);
   const pct = Math.min(100, Math.round((into / need) * 100));
+  
   
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
