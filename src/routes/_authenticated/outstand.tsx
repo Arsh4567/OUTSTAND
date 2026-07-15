@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, Pause, Play, RotateCcw, Zap, SkipForward, Star } from "lucide-react";
+import { CheckCircle2, Pause, Play, RotateCcw, Zap, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CHALLENGES, randomChallenge, getRarityStyle, type OutstandChallenge } from "@/lib/challenges";
 import { useAppState } from "@/hooks/use-app-state";
@@ -69,6 +69,11 @@ function OutstandPage() {
   const complete = () => {
     if (!challenge || completionStage !== 0) return;
     
+    // 1. Capture the exact challenge data BEFORE it gets deleted
+    const xpEarned = challenge.xp;
+    const challengeEmoji = challenge.emoji;
+    const challengeColor = challenge.color;
+    
     setRunning(false);
     setCompletionStage(1); 
     
@@ -76,19 +81,42 @@ function OutstandPage() {
       navigator.vibrate([20, 100, 30, 80, 50, 50, 100]); 
     }
     
-    // SLOWED DOWN: Wait 1.5 seconds (1500ms) before shooting off, giving user time to see the XP pill
     setTimeout(() => {
       setCompletionStage(2);
     }, 1500);
 
-    // SLOWED DOWN: Wait 2.8 seconds total before clearing the screen
     setTimeout(() => {
+      // 2. Database calls (We will upgrade this logic next)
       recordOutstand(challenge.title);
       addPositive("outstand");
-      toast.success("Mission Accomplished", { 
-        description: `+${challenge.xp} XP added to your baseline.`,
-        icon: <Star className="text-yellow-400" fill="currentColor" />
-      });
+      
+      // 3. THE PREMIUM CUSTOM TOAST
+      toast.custom((t) => (
+        <div 
+          className="relative overflow-hidden w-full max-w-[360px] mx-auto rounded-2xl border border-white/10 bg-slate-950 p-4 flex items-center gap-4"
+          // Creates a massive, soft glowing shadow using the specific color of the challenge
+          style={{ boxShadow: `0 20px 40px -10px ${challengeColor || '#4f46e5'}60` }}
+        >
+          {/* Glassmorphism background effect */}
+          <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-50" />
+          
+          {/* Custom Emoji Icon Box */}
+          <div className="relative flex-shrink-0 w-14 h-14 flex items-center justify-center text-3xl bg-black/50 rounded-xl border border-white/10 shadow-inner z-10">
+            {challengeEmoji}
+          </div>
+          
+          {/* Text and XP UI */}
+          <div className="relative flex-1 z-10">
+            <h3 className="text-white font-black text-xs tracking-[0.2em] uppercase opacity-70">Mission Cleared</h3>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-white font-black font-mono text-2xl leading-none">
+                +{xpEarned} <span className="text-sm opacity-50">XP</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      ), { duration: 4000 });
+
       setChallenge(null);
       setCompletionStage(0);
     }, 2800);
@@ -158,7 +186,7 @@ function OutstandPage() {
                 completionStage === 1 ? { 
                   scale: 0.4, 
                   y: 0,
-                  rotateZ: [0, -1, 1, -1, 1, 0], // Made the vibration slightly more subtle
+                  rotateZ: [0, -1, 1, -1, 1, 0], 
                   borderRadius: "100px", 
                 } : completionStage === 2 ? {
                   scale: [0.4, 0.2, 0], 
@@ -169,14 +197,12 @@ function OutstandPage() {
                 }
               }
               transition={
-                // SLOWED DOWN: Implosion takes 1.2 seconds, Rocket launch takes 1 full second
                 completionStage === 1 ? { duration: 1.2, ease: "backInOut" } 
                 : completionStage === 2 ? { duration: 1.0, ease: [0.87, 0, 0.13, 1] } 
                 : { type: "spring", bounce: 0.4, duration: 0.6 }
               }
               className={cn(
                 "relative flex flex-col items-center justify-center overflow-visible p-8 backdrop-blur-xl border-2 shadow-2xl transition-colors mx-auto",
-                // SLOWED DOWN color transition
                 "duration-1000",
                 rarityTheme.bg,
                 rarityTheme.border,
@@ -205,7 +231,6 @@ function OutstandPage() {
                           x: Math.cos((i * 30 * Math.PI) / 180) * 300,
                           y: Math.sin((i * 30 * Math.PI) / 180) * 300,
                         }}
-                        // SLOWED DOWN: Particles travel slower (1.2s)
                         transition={{ duration: 1.2, ease: "easeOut" }}
                         className="absolute w-4 h-4 rounded-full shadow-[0_0_20px_rgba(255,255,255,1)]"
                         style={{ backgroundColor: challenge.color || "#fff" }}
@@ -221,7 +246,6 @@ function OutstandPage() {
                           x: Math.cos((i * 45 * Math.PI) / 180) * 400,
                           y: Math.sin((i * 45 * Math.PI) / 180) * 400,
                         }}
-                        // SLOWED DOWN: Lasers travel slower (0.9s)
                         transition={{ duration: 0.9, ease: "easeOut" }}
                         className="absolute w-8 h-1 rounded-full origin-left shadow-[0_0_15px_rgba(255,255,255,0.8)]"
                         style={{ backgroundColor: "#ffffff" }}
@@ -296,5 +320,5 @@ function OutstandPage() {
       </div>
     </div>
   );
-                  }
-                          
+      }
+             
