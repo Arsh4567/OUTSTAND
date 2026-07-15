@@ -34,17 +34,14 @@ export function AppShell() {
   return <ShellWithChrome />;
 }
 
-// Replace with this updated code:
 function ShellWithChrome() {
-  // Pull the level directly from your app's main state instead of recalculating it
-  const { xp, bestStreak, level = 1, progressToNextLevel = 0 } = useAppState();
+  // 1. Only pull the raw XP and Streak from the Brain
+  const { xp, bestStreak } = useAppState(); 
   const { user, profile } = useAuth();
   
-  // Use a fallback just in case the profile uses a different percentage system
-  const { level: fallbackLevel, into, need } = levelFromXP(xp);
-  const displayLevel = Math.max(level, fallbackLevel);
+  // 2. PERFECT SYNC: Use your official leveling logic so it matches the Profile perfectly
+  const { level, into, need } = levelFromXP(xp);
   const pct = Math.min(100, Math.round((into / need) * 100));
-  
   
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -62,10 +59,9 @@ function ShellWithChrome() {
   };
 
   return (
-    // Added pb-24 on mobile to make room for the new floating nav
     <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col pb-24 md:pb-0 overflow-x-hidden">
       
-      {/* 1. PREMIUM HEADER */}
+      {/* PREMIUM HEADER */}
       <header className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl shadow-sm">
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 md:px-6">
           <Link to="/" className="flex min-w-0 items-center gap-3">
@@ -86,7 +82,7 @@ function ShellWithChrome() {
             </div>
           </Link>
 
-          {/* Desktop Nav - With Magic Layout Indicator */}
+          {/* Desktop Nav */}
           <nav className="ml-8 hidden flex-1 items-center gap-2 lg:flex">
             {NAV.map((item) => {
               const isActive = pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to));
@@ -124,7 +120,7 @@ function ShellWithChrome() {
               <span className="text-xs font-medium text-orange-500/70 uppercase tracking-wider">Streak</span>
             </div>
 
-            {/* LEVEL & XP RING - Now Animated on Change! */}
+            {/* LEVEL & XP RING - Now Perfectly Synced */}
             <div className="flex items-center gap-3 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 shadow-inner">
               <div className="relative h-7 w-7">
                 <svg viewBox="0 0 36 36" className="h-7 w-7 -rotate-90">
@@ -143,7 +139,7 @@ function ShellWithChrome() {
                     </linearGradient>
                   </defs>
                 </svg>
-                {/* Level Number Pops when it changes */}
+                {/* Synced Level Number */}
                 <motion.span 
                   key={`lvl-${level}`}
                   initial={{ scale: 1.5, opacity: 0 }}
@@ -155,7 +151,6 @@ function ShellWithChrome() {
               </div>
               
               <div className="hidden text-xs sm:block">
-                {/* XP Text Flashes Green when XP increases */}
                 <motion.div 
                   key={`xp-${xp}`}
                   initial={{ color: "#4ade80", scale: 1.1 }}
@@ -198,7 +193,7 @@ function ShellWithChrome() {
         </div>
       </header>
 
-      {/* 2. MAIN CONTENT WITH PAGE TRANSITIONS */}
+      {/* MAIN CONTENT WITH PAGE TRANSITIONS */}
       <AnimatePresence mode="wait">
         <motion.main 
           key={pathname}
@@ -216,7 +211,7 @@ function ShellWithChrome() {
         Built to help you Outstand. <span className="text-slate-400">Stay quiet. Stay consistent.</span>
       </footer>
 
-      {/* 3. PREMIUM FLOATING BOTTOM NAV (Mobile Only) */}
+      {/* PREMIUM FLOATING BOTTOM NAV (Mobile Only) */}
       <div className="fixed bottom-6 left-0 right-0 z-50 flex justify-center px-4 lg:hidden pointer-events-none">
         <nav className="flex items-center gap-1 rounded-[2rem] border border-white/10 bg-slate-950/80 p-2 backdrop-blur-xl shadow-2xl pointer-events-auto">
           {NAV.map((item) => {
@@ -256,5 +251,5 @@ function ShellWithChrome() {
       {isClient && user && <ChatAssistant />}
     </div>
   );
-            }
-                  
+                                 }
+      
