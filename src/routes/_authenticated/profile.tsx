@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState, useRef } from "react";
+import React, { Component, useMemo, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Flame, Target, Timer, Trophy, Zap, Activity, TrendingUp, 
@@ -15,6 +15,33 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+// 🔥 THE SELF-DIAGNOSING ERROR BOUNDARY 🔥
+class ProfileErrorBoundary extends Component<any, any> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+  static getDerivedStateFromError(error: any) { return { hasError: true, error }; }
+  componentDidCatch(error: any, errorInfo: any) { this.setState({ errorInfo }); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-6 m-4 mt-24 border-2 border-rose-500 bg-rose-500/10 rounded-2xl text-white backdrop-blur-xl shadow-2xl">
+          <h2 className="text-2xl font-black text-rose-500 mb-4">CRASH DETECTED!</h2>
+          <p className="mb-4 text-sm text-slate-300 font-medium">Please screenshot this red box and send it to me so we can see exactly what is missing:</p>
+          <div className="bg-black/80 p-4 rounded-xl text-xs font-mono text-rose-300 overflow-auto whitespace-pre-wrap border border-rose-500/30">
+            {this.state.error && this.state.error.toString()}
+          </div>
+          <div className="bg-black/80 p-4 rounded-xl text-[10px] font-mono text-rose-400 mt-3 overflow-auto h-48 whitespace-pre-wrap border border-rose-500/30">
+            {this.state.errorInfo && this.state.errorInfo.componentStack}
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
     meta: [
@@ -22,14 +49,16 @@ export const Route = createFileRoute("/_authenticated/profile")({
       { name: "description", content: "Your XP, level, streaks, focus, challenges, and progress." },
     ],
   }),
-  component: ProfilePage,
+  component: () => (
+    <ProfileErrorBoundary>
+      <ProfilePage />
+    </ProfileErrorBoundary>
+  ),
 });
 
-// Premium Apple-like easing curve for ultra-smooth animations
 const smoothEase = [0.22, 1, 0.36, 1];
 
 function ProfilePage() {
-  // 1. STRICT FALLBACKS (Zero-Crash Guarantee)
   const appState = useAppState() || {};
   const habits = appState.habits || [];
   const sessions = appState.sessions || [];
@@ -49,20 +78,16 @@ function ProfilePage() {
   
   const navigate = useNavigate();
 
-  // 2. UI STATE
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 3. BASIC MATH
   const { level = 1, into = 0, need = 100 } = levelFromXP(xp) || {};
   const pct = need > 0 ? Math.min(100, Math.round((into / need) * 100)) : 0;
   const name = user ? displayNameOf(user, profile) : "Loading...";
 
-  // 4. PERFORMANCE OPTIMIZATION: Memoize all heavy array calculations!
-  // This prevents the app from lagging when typing your name or hovering buttons.
   const stats = useMemo(() => {
     const today = todayISO();
     const days = lastNDays(30);
@@ -107,7 +132,6 @@ function ProfilePage() {
     return { dayStats, totalCompletions, focusCompleted, focusMinutes, avg, best, worst, longest, focusMinToday, habitPct, focusHoursWeek, productivity };
   }, [habits, sessions, logs, monthLogs]);
 
-  // --- ACTIONS ---
   const signOut = async () => {
     await supabase.auth.signOut();
     toast("Signed out");
@@ -162,7 +186,6 @@ function ProfilePage() {
     }
   };
 
-  // 5. ANIMATION VARIANTS
   const containerVariants = {
     hidden: { opacity: 0 },
     show: { opacity: 1, transition: { staggerChildren: 0.1, ease: smoothEase } }
@@ -174,19 +197,9 @@ function ProfilePage() {
   };
 
   return (
-    <motion.div 
-      variants={containerVariants}
-      initial="hidden"
-      animate="show"
-      className="space-y-6 md:space-y-8 pb-24"
-    >
-      {/* HEADER SECTION */}
-      <motion.header 
-        variants={itemVariants}
-        className="relative overflow-hidden p-6 md:p-8 rounded-[2rem] border border-white/5 bg-slate-900/40 shadow-2xl backdrop-blur-2xl group transition-all duration-500 hover:border-white/10 hover:bg-slate-900/60"
-      >
+    <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-6 md:space-y-8 pb-24">
+      <motion.header variants={itemVariants} className="relative overflow-hidden p-6 md:p-8 rounded-[2rem] border border-white/5 bg-slate-900/40 shadow-2xl backdrop-blur-2xl group transition-all duration-500 hover:border-white/10 hover:bg-slate-900/60">
         <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-indigo-500 opacity-10 blur-[100px] transition-opacity duration-700 group-hover:opacity-30" />
-        
         <div className="relative flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
           
           <div className="relative group/avatar cursor-pointer" onClick={() => fileInputRef.current?.click()}>
@@ -206,10 +219,7 @@ function ProfilePage() {
           </div>
 
           <div className="min-w-0 flex-1 space-y-3">
-            <motion.div 
-              whileHover={{ scale: 1.02 }}
-              className="inline-flex items-center gap-2 rounded-full border border-white/5 bg-white/5 px-3 py-1.5 text-[11px] font-medium tracking-wide text-slate-300 transition-colors hover:bg-white/10 hover:text-white cursor-default"
-            >
+            <motion.div whileHover={{ scale: 1.02 }} className="inline-flex items-center gap-2 rounded-full border border-white/5 bg-white/5 px-3 py-1.5 text-[11px] font-medium tracking-wide text-slate-300 transition-colors hover:bg-white/10 hover:text-white cursor-default">
               <User className="h-3.5 w-3.5 text-indigo-400" /> ID: {(user?.id || "unknown").split('-')[0]}...
               <button onClick={handleCopyId} className="ml-1 hover:text-indigo-400 transition-colors">
                 {copiedId ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
@@ -220,23 +230,14 @@ function ProfilePage() {
               <AnimatePresence mode="wait">
                 {isEditingName ? (
                   <motion.div key="editing" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      className="bg-black/40 border border-indigo-500/50 rounded-xl px-4 py-1.5 text-2xl font-black text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-[0_0_20px_rgba(99,102,241,0.2)] w-full max-w-[200px]"
-                      autoFocus
-                      onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
-                    />
+                    <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} className="bg-black/40 border border-indigo-500/50 rounded-xl px-4 py-1.5 text-2xl font-black text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-[0_0_20px_rgba(99,102,241,0.2)] w-full max-w-[200px]" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleSaveName()} />
                     <Button size="icon" variant="ghost" onClick={handleSaveName} className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/20 rounded-xl transition-all h-10 w-10">
                       <Check className="h-5 w-5" />
                     </Button>
                   </motion.div>
                 ) : (
                   <motion.div key="display" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-3 group/name cursor-pointer" onClick={() => { setNewName(name); setIsEditingName(true); }}>
-                    <h1 className="font-display text-3xl font-black text-white md:text-4xl tracking-tight transition-colors group-hover/name:text-indigo-200">
-                      {name}
-                    </h1>
+                    <h1 className="font-display text-3xl font-black text-white md:text-4xl tracking-tight transition-colors group-hover/name:text-indigo-200">{name}</h1>
                     <button className="opacity-0 -translate-x-2 group-hover/name:opacity-100 group-hover/name:translate-x-0 transition-all duration-300 text-slate-400 hover:text-indigo-400">
                       <Edit2 className="h-4 w-4" />
                     </button>
@@ -247,21 +248,12 @@ function ProfilePage() {
             <div className="truncate text-sm font-medium text-slate-500">{user?.email || ""}</div>
           </div>
 
-          <Button 
-            variant="outline" 
-            className="gap-2 border-rose-500/20 bg-rose-500/5 text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 rounded-xl transition-all duration-300 hover:shadow-[0_0_20px_rgba(244,63,94,0.3)] active:scale-95" 
-            onClick={signOut}
-          >
+          <Button variant="outline" className="gap-2 border-rose-500/20 bg-rose-500/5 text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 rounded-xl transition-all duration-300 hover:shadow-[0_0_20px_rgba(244,63,94,0.3)] active:scale-95" onClick={signOut}>
             <LogOut className="h-4 w-4" /> Sign out
           </Button>
         </div>
       </motion.header>
-
-      {/* XP PROGRESS BAR */}
-      <motion.section 
-        variants={itemVariants}
-        className="p-6 md:p-8 rounded-[2rem] border border-white/5 bg-slate-900/40 shadow-xl backdrop-blur-xl relative overflow-hidden"
-      >
+            <motion.section variants={itemVariants} className="p-6 md:p-8 rounded-[2rem] border border-white/5 bg-slate-900/40 shadow-xl backdrop-blur-xl relative overflow-hidden">
         <div className="flex items-center justify-between mb-5 relative z-10">
           <div>
             <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-400 mb-1">Current Rank</div>
@@ -273,25 +265,19 @@ function ProfilePage() {
           </div>
         </div>
         <div className="h-5 overflow-hidden rounded-full bg-slate-950 border border-white/10 p-1 relative z-10 shadow-inner">
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${pct}%` }}
-            transition={{ duration: 1.5, ease: smoothEase, delay: 0.2 }}
-            className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-400 shadow-[0_0_20px_rgba(99,102,241,0.6)] relative overflow-hidden"
-          >
+          <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 1.5, ease: smoothEase, delay: 0.2 }} className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-400 shadow-[0_0_20px_rgba(99,102,241,0.6)] relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
           </motion.div>
         </div>
       </motion.section>
 
-      {/* TOP STATS */}
       <motion.section variants={itemVariants} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <BigStat icon={<Zap />} label="Total XP" value={String(xp)} color="text-yellow-400" bg="bg-yellow-500/5" border="border-yellow-500/10" glowColor="rgba(234,179,8,0.4)" />
         <BigStat icon={<Trophy />} label="Level" value={String(level)} color="text-indigo-400" bg="bg-indigo-500/5" border="border-indigo-500/10" glowColor="rgba(99,102,241,0.4)" />
         <BigStat icon={<Flame />} label="Best streak" value={`${bestStreak}d`} color="text-orange-400" bg="bg-orange-500/5" border="border-orange-500/10" glowColor="rgba(249,115,22,0.4)" />
         <BigStat icon={<Target />} label="Completions" value={String(stats.totalCompletions)} color="text-emerald-400" bg="bg-emerald-500/5" border="border-emerald-500/10" glowColor="rgba(16,185,129,0.4)" />
       </motion.section>
-              {/* TRENDING STATS */}
+
       <motion.section variants={itemVariants} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MiniCard icon={<Activity />} label="Avg dopamine" value={String(stats.avg)} sub="last 7 days" />
         <MiniCard icon={<TrendingUp />} label="Best day" value={String(stats.best?.score ?? 0)} sub={stats.best?.log_date ?? "—"} />
@@ -299,7 +285,6 @@ function ProfilePage() {
         <MiniCard icon={<Flame className="text-orange-400" />} label="Recovery Run" value={`${stats.longest}d`} sub="Consecutive ≥ 70" />
       </motion.section>
 
-      {/* CHART */}
       <motion.section variants={itemVariants} className="p-6 md:p-8 rounded-[2rem] border border-white/5 bg-slate-900/40 hover:bg-slate-900/60 transition-all duration-500 backdrop-blur-xl group">
         <h2 className="font-display text-xl font-bold text-white group-hover:text-indigo-100 transition-colors">Dopamine trend</h2>
         <p className="text-xs font-medium text-slate-500">Last 7 days momentum</p>
@@ -314,19 +299,12 @@ function ProfilePage() {
         <MiniCard label="Habits today" value={`${stats.habitPct}%`} sub={`${habits.length} total`} />
       </motion.section>
 
-      {/* HABIT MAP */}
       <motion.section variants={itemVariants} className="p-6 md:p-8 rounded-[2rem] border border-white/5 bg-slate-900/40 hover:bg-slate-900/60 transition-all duration-500 backdrop-blur-xl group">
         <h2 className="font-display text-xl font-bold text-white group-hover:text-indigo-100 transition-colors">Consistency Map</h2>
         <p className="text-xs font-medium text-slate-500">Last 30 days completion rate</p>
         <div className="mt-8 flex items-end gap-1.5 h-24">
           {stats.dayStats.map((s, i) => (
-            <motion.div 
-              key={s.d} 
-              initial={{ height: 0 }}
-              animate={{ height: "100%" }}
-              transition={{ delay: i * 0.015, duration: 0.8, ease: smoothEase }}
-              className="group/bar relative flex-1 flex flex-col justify-end"
-            >
+            <motion.div key={s.d} initial={{ height: 0 }} animate={{ height: "100%" }} transition={{ delay: i * 0.015, duration: 0.8, ease: smoothEase }} className="group/bar relative flex-1 flex flex-col justify-end">
               <div
                 className={cn(
                   "w-full rounded-md transition-all duration-300 cursor-crosshair",
@@ -346,7 +324,6 @@ function ProfilePage() {
         </div>
       </motion.section>
 
-      {/* BOTTOM LISTS */}
       <motion.section variants={itemVariants} className="grid gap-4 lg:grid-cols-2">
         <div className="p-6 md:p-8 rounded-[2rem] border border-white/5 bg-slate-900/40 backdrop-blur-xl">
           <h2 className="font-display text-xl font-bold text-white">Active Streaks</h2>
@@ -355,14 +332,7 @@ function ProfilePage() {
             {habits.map((h, i) => {
               const streakVal = streaks.find((s) => s?.id === h?.id)?.streak ?? 0;
               return (
-                <motion.li 
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.1, duration: 0.5, ease: smoothEase }}
-                  whileHover={{ scale: 1.02, x: 5, backgroundColor: "rgba(255,255,255,0.06)" }}
-                  key={h.id} 
-                  className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-white/[0.02] border border-white/5 transition-all cursor-default group"
-                >
+                <motion.li initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1, duration: 0.5, ease: smoothEase }} whileHover={{ scale: 1.02, x: 5, backgroundColor: "rgba(255,255,255,0.06)" }} key={h.id} className="flex items-center justify-between gap-3 p-4 rounded-2xl bg-white/[0.02] border border-white/5 transition-all cursor-default group">
                   <span className="flex min-w-0 items-center gap-4">
                     <span className="text-3xl drop-shadow-md group-hover:scale-110 transition-transform duration-300">{h.emoji}</span>
                     <span className="truncate font-semibold text-slate-200 group-hover:text-white transition-colors">{h.name}</span>
@@ -395,18 +365,8 @@ function ProfilePage() {
 
 function BigStat({ icon, label, value, color, bg, border, glowColor }: any) {
   return (
-    <motion.div 
-      whileHover={{ scale: 1.03, y: -4 }}
-      whileTap={{ scale: 0.97 }}
-      className={cn(
-        "p-6 rounded-[1.5rem] border backdrop-blur-xl relative overflow-hidden group transition-all duration-500", 
-        bg, border
-      )}
-    >
-      <div 
-        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" 
-        style={{ background: `radial-gradient(circle 150px at center, ${glowColor}, transparent)` }} 
-      />
+    <motion.div whileHover={{ scale: 1.03, y: -4 }} whileTap={{ scale: 0.97 }} className={cn("p-6 rounded-[1.5rem] border backdrop-blur-xl relative overflow-hidden group transition-all duration-500", bg, border)}>
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" style={{ background: `radial-gradient(circle 150px at center, ${glowColor}, transparent)` }} />
       <div className={cn("flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] relative z-10", color)}>
         <span className="p-1.5 rounded-xl bg-black/40 backdrop-blur-sm group-hover:scale-110 transition-transform duration-500">{icon}</span>
         {label}
@@ -418,10 +378,7 @@ function BigStat({ icon, label, value, color, bg, border, glowColor }: any) {
 
 function MiniCard({ icon, label, value, sub }: any) {
   return (
-    <motion.div 
-      whileHover={{ scale: 1.02, backgroundColor: "rgba(255,255,255,0.04)", y: -2 }}
-      className="p-5 rounded-[1.5rem] border border-white/5 bg-white/[0.02] backdrop-blur-xl transition-all duration-300 cursor-default"
-    >
+    <motion.div whileHover={{ scale: 1.02, backgroundColor: "rgba(255,255,255,0.04)", y: -2 }} className="p-5 rounded-[1.5rem] border border-white/5 bg-white/[0.02] backdrop-blur-xl transition-all duration-300 cursor-default">
       <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
         {icon && <span className="text-slate-300">{icon}</span>}
         {label}
@@ -434,10 +391,7 @@ function MiniCard({ icon, label, value, sub }: any) {
 
 function SmallStat({ icon, label, value }: any) {
   return (
-    <motion.div 
-      whileHover={{ scale: 1.03, backgroundColor: "rgba(0,0,0,0.4)" }}
-      className="rounded-[1.5rem] border border-white/5 bg-black/20 p-5 transition-all duration-300 cursor-default"
-    >
+    <motion.div whileHover={{ scale: 1.03, backgroundColor: "rgba(0,0,0,0.4)" }} className="rounded-[1.5rem] border border-white/5 bg-black/20 p-5 transition-all duration-300 cursor-default">
       <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
         {icon}
         {label}
@@ -447,7 +401,6 @@ function SmallStat({ icon, label, value }: any) {
   );
 }
 
-// CRASH-PROOF & OPTIMIZED TREND CHART
 function TrendChart({ logs }: { logs: { log_date: string; score: number }[] }) {
   if (!logs || !Array.isArray(logs) || logs.length === 0) {
     return (
@@ -456,11 +409,8 @@ function TrendChart({ logs }: { logs: { log_date: string; score: number }[] }) {
       </div>
     );
   }
-  
-  const w = 700;
-  const h = 200;
+  const w = 700; const h = 200;
   const step = w / Math.max(1, logs.length - 1);
-  
   const points = logs.map((l, i) => [i * step, h - ((l?.score || 0) / 100) * h]);
   const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${p[0]},${p[1]}`).join(" ");
   const area = `${path} L${(logs.length - 1) * step},${h} L0,${h} Z`;
@@ -473,67 +423,23 @@ function TrendChart({ logs }: { logs: { log_date: string; score: number }[] }) {
           <stop offset="100%" stopColor="rgba(99, 102, 241, 0)" />
         </linearGradient>
       </defs>
-      
       {[0, 40, 70, 100].map((v) => (
-        <line
-          key={v}
-          x1={0}
-          x2={w}
-          y1={h - (v / 100) * h}
-          y2={h - (v / 100) * h}
-          stroke="rgba(255,255,255,0.06)"
-          strokeDasharray="4 6"
-        />
+        <line key={v} x1={0} x2={w} y1={h - (v / 100) * h} y2={h - (v / 100) * h} stroke="rgba(255,255,255,0.06)" strokeDasharray="4 6" />
       ))}
-      
-      <motion.path 
-        initial={{ opacity: 0, d: `M0,${h} L${w},${h} Z` }}
-        animate={{ opacity: 1, d: area }}
-        transition={{ duration: 1.2, ease: smoothEase }}
-        fill="url(#trendFill)" 
-      />
-      
-      <motion.path 
-        initial={{ pathLength: 0, opacity: 0 }}
-        animate={{ pathLength: 1, opacity: 1 }}
-        transition={{ duration: 2, ease: "easeInOut" }}
-        d={path} 
-        fill="none" 
-        stroke="rgba(99,102,241,1)" 
-        strokeWidth={4} 
-        strokeLinecap="round" 
-        strokeLinejoin="round" 
-        style={{ filter: 'drop-shadow(0 0 12px rgba(99,102,241,0.6))' }} 
-      />
-      
+      <motion.path initial={{ opacity: 0, d: `M0,${h} L${w},${h} Z` }} animate={{ opacity: 1, d: area }} transition={{ duration: 1.2, ease: smoothEase }} fill="url(#trendFill)" />
+      <motion.path initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 1 }} transition={{ duration: 2, ease: "easeInOut" }} d={path} fill="none" stroke="rgba(99,102,241,1)" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 12px rgba(99,102,241,0.6))' }} />
       {points.map((p, i) => {
         let hex = "#818cf8";
         try {
           const l = logs[i];
           const c = scoreColor(l?.score || 0);
           hex = (c as any)?.hex || c || "#818cf8";
-        } catch (e) {
-          // Fallback if scoreColor fails
-        }
-        
+        } catch (e) {}
         return (
-          <motion.circle
-            key={i}
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 1 + (i * 0.05), type: "spring", stiffness: 300 }}
-            cx={p[0]}
-            cy={p[1]}
-            r={6}
-            fill={hex as string}
-            stroke="#0f172a"
-            strokeWidth={3}
-            className="hover:r-[9px] transition-all duration-300 cursor-pointer"
-            style={{ filter: `drop-shadow(0 0 10px ${hex})` }}
-          />
+          <motion.circle key={i} initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 1 + (i * 0.05), type: "spring", stiffness: 300 }} cx={p[0]} cy={p[1]} r={6} fill={hex as string} stroke="#0f172a" strokeWidth={3} className="hover:r-[9px] transition-all duration-300 cursor-pointer" style={{ filter: `drop-shadow(0 0 10px ${hex})` }} />
         );
       })}
     </svg>
   );
-      }
+        }
       
