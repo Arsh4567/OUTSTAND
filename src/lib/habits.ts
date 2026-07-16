@@ -29,8 +29,11 @@ export const todayISO = () => {
 };
 
 export const lastNDays = (n: number) => {
+  // Defensive guard: Ensure n is a valid positive number
+  const safeN = (typeof n === 'number' && n > 0 && Number.isFinite(n)) ? n : 7;
+  
   const arr: string[] = [];
-  for (let i = n - 1; i >= 0; i--) {
+  for (let i = safeN - 1; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const y = d.getFullYear();
@@ -41,45 +44,78 @@ export const lastNDays = (n: number) => {
   return arr;
 };
 
-export function computeStreak(history: string[]): number {
-  if (history.length === 0) return 0;
-  const set = new Set(history);
-  let streak = 0;
-  const d = new Date();
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    const key = `${y}-${m}-${day}`;
-    if (set.has(key)) {
-      streak += 1;
-      d.setDate(d.getDate() - 1);
-    } else {
-      // allow today to be missing without breaking streak
-      if (streak === 0 && key === todayISO()) {
-        d.setDate(d.getDate() - 1);
-        continue;
-      }
-      break;
-    }
+// CRASH-PROOFED
+export function computeStreak(history?: string[]): number {
+  // Defensive guard: If history is missing, null, or not an array, streak is 0
+  if (!history || !Array.isArray(history) || history.length === 0) {
+    return 0;
   }
-  return streak;
+  
+  try {
+    const set = new Set(history);
+    let streak = 0;
+    const d = new Date();
+    
+    // Safety break loop limit (prevents infinite loop if dates glitch)
+    let safetyCounter = 0; 
+    
+    while (safetyCounter < 10000) {
+      safetyCounter++;
+      
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      const key = `${y}-${m}-${day}`;
+      
+      if (set.has(key)) {
+        streak += 1;
+        d.setDate(d.getDate() - 1);
+      } else {
+        // allow today to be missing without breaking streak
+        if (streak === 0 && key === todayISO()) {
+          d.setDate(d.getDate() - 1);
+          continue;
+        }
+        break;
+      }
+    }
+    return streak;
+  } catch (error) {
+    console.error("Error computing streak:", error);
+    return 0; // Fallback so app doesn't crash
+  }
 }
 
 export const XP_PER_HABIT = 10;
 export const XP_PER_FOCUS = 25;
 export const XP_PER_OUTSTAND = 20;
 
-export const levelFromXP = (xp: number) => {
-  // Level n requires 100 * n xp accumulated to reach n+1
+// CRASH-PROOFED
+export const levelFromXP = (xp?: number) => {
+  // Defensive guard: Catch NaN, undefined, negative numbers, or non-numbers
+  if (xp === undefined || xp === null || typeof xp !== "number" || isNaN(xp) || xp < 0) {
+    return { level: 1, into: 0, need: 100 };
+  }
+  
+  // Defensive guard: Prevent "Maximum Call Stack / Infinite Loop" tab freezes
+  if (!Number.isFinite(xp)) {
+    return { level: 99, into: 0, need: 100 }; 
+  }
+
   let level = 1;
   let remain = xp;
   let need = 100;
-  while (remain >= need) {
+  
+  // Safety break loop limit (prevents infinite loop)
+  let safetyCounter = 0;
+
+  while (remain >= need && safetyCounter < 10000) {
+    safetyCounter++;
     remain -= need;
     level += 1;
     need = 100 + (level - 1) * 50;
   }
-  return { level, into: remain, need };
+  
+  return { level, into: Math.max(0, remain), need };
 };
+  
