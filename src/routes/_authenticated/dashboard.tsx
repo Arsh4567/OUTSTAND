@@ -1,135 +1,180 @@
- 
-import { useMemo } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Plus, Sparkles, TrendingUp, Timer, Zap, Brain, ArrowRight, Play, RefreshCcw, User } from "lucide-react";
+import { useMemo, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Plus, Play, Zap, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
 
 // Components
 import { AddHabitDialog, HabitCard } from "@/components/habit-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 // Hooks & Libs
 import { useAppState } from "@/hooks/use-app-state";
 import { useAuth, displayNameOf } from "@/hooks/use-auth";
 import { useDailyLog } from "@/hooks/use-dopamine";
-import { QUOTES, quoteOfTheDay } from "@/lib/quotes";
 import { todayISO } from "@/lib/habits";
 import { dailyChallenge } from "@/lib/challenges";
 import { scoreColor } from "@/lib/dopamine";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  
   component: Dashboard,
 });
 
+// Premium easing curve
+const smoothEase = [0.22, 1, 0.36, 1];
+
 function Dashboard() {
-  const { habits, toggleToday, addHabit, updateHabit, deleteHabit, xp, bestStreak } = useAppState();
-  const { user, profile } = useAuth();
-  const { log } = useDailyLog();
+  const { habits = [], toggleToday, addHabit, updateHabit, deleteHabit, xp = 0, bestStreak = 0 } = useAppState() ?? {};
+  const { user, profile } = useAuth() ?? {};
+  const { log } = useDailyLog() ?? {};
   const navigate = useNavigate();
 
-  const today = todayISO();
-  const name = displayNameOf(user, profile);
+  const [showAllHabits, setShowAllHabits] = useState(false);
 
-  // Memoized calculations to prevent unnecessary re-renders
+  const today = todayISO();
+  const name = user ? displayNameOf(user, profile) : "Hustler";
+
+  // Memoized stats
   const stats = useMemo(() => {
-    const completed = habits.filter((h) => h.history.includes(today)).length;
+    const completed = habits.filter((h) => h?.history?.includes(today)).length;
     const total = habits.length;
     return { completed, total, pct: total ? Math.round((completed / total) * 100) : 0 };
   }, [habits, today]);
 
   const score = log?.score ?? 50;
   const color = scoreColor(score);
-  const challenge = dailyChallenge(today);
+  const challenge = dailyChallenge(today) ?? { title: "Stay Consistent", description: "Complete all your daily tasks." };
+
+  const displayedHabits = showAllHabits ? habits : habits.slice(0, 3);
+
+  // Animation Variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.1, ease: smoothEase } }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.8, ease: smoothEase } }
+  };
 
   return (
-    <div className="mx-auto max-w-7xl animate-in fade-in duration-500 space-y-10 pb-20">
+    <motion.div 
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+      className="mx-auto max-w-7xl space-y-10 pb-20 pt-4"
+    >
       {/* Header Section */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <motion.header variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight text-white">
+          <h1 className="text-4xl font-display font-black tracking-tight text-white">
             Welcome back, <span className="text-indigo-400">{name}.</span>
           </h1>
-          <p className="text-slate-400 mt-2 text-lg">
-  {stats.pct >= 80 
-    ? "You're on a roll! Keep that momentum going." 
-    : "Let's turn your intentions into action today."}
-</p>
-          
+          <p className="text-slate-400 mt-2 font-medium">
+            {stats.pct >= 80 
+              ? "You're on a roll! Keep that momentum going." 
+              : "Let's turn your intentions into action today."}
+          </p>
         </div>
         <div className="flex gap-3">
-           <Button variant="secondary" onClick={() => navigate({ to: "/dopamine" })}>Log Dopamine</Button>
-           <Button className="bg-indigo-600 hover:bg-indigo-500" onClick={() => navigate({ to: "/focus" })}>
-             <Play className="mr-2 h-4 w-4" /> Start Focus
+           <Button variant="secondary" className="rounded-xl transition-transform active:scale-95" onClick={() => navigate({ to: "/dopamine" })}>
+             Log Dopamine
+           </Button>
+           <Button className="bg-indigo-600 hover:bg-indigo-500 rounded-xl shadow-[0_0_20px_rgba(79,70,229,0.3)] transition-all active:scale-95" onClick={() => navigate({ to: "/focus" })}>
+             <Play className="mr-2 h-4 w-4 fill-current" /> Start Focus
            </Button>
         </div>
-      </header>
+      </motion.header>
 
       {/* Hero Stats Grid */}
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <motion.section variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Today" value={`${stats.completed}/${stats.total}`} sub={`${stats.pct}% Complete`} />
         <StatCard label="Streak" value={String(bestStreak)} sub="Best active" />
         <StatCard label="Total XP" value={String(xp)} sub="Lifetime growth" />
-        <StatCard label="Dopamine" value={String(score)} sub={color.label} accent={color.hex} />
-      </section>
+        <StatCard label="Dopamine" value={String(score)} sub={(color as any)?.label || "Balanced"} accent={(color as any)?.hex || "#818cf8"} />
+      </motion.section>
 
       {/* Main Content Area */}
       <div className="grid lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
+        <motion.div variants={itemVariants} className="lg:col-span-2 space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-white">Today's Habits</h2>
+            <h2 className="text-xl font-display font-bold text-white">Today's Habits</h2>
             <AddHabitDialog
               onAdd={(d) => { addHabit(d); toast.success("Habit created"); }}
-              trigger={<Button variant="outline" size="sm"><Plus className="mr-2 h-4 w-4" /> Add Habit</Button>}
+              trigger={<Button variant="outline" size="sm" className="rounded-lg hover:text-indigo-400 transition-colors"><Plus className="mr-2 h-4 w-4" /> Add Habit</Button>}
             />
           </div>
           
           <div className="grid sm:grid-cols-2 gap-3">
-          {/* Only show the first 3 habits, or add a "View All" link if there are more */}
-{habits.slice(0, 3).map((h) => (
-  <HabitCard 
-    key={h.id} 
-    habit={h} 
-    onToggle={() => toggleToday(h.id)} 
-    onEdit={(d) => updateHabit(h.id, d)} 
-    onDelete={() => deleteHabit(h.id)} 
-  />
-))}
-
-{habits.length > 3 && (
-  <Button variant="ghost" className="w-full text-slate-400" onClick={() => navigate({ to: "/habits" })}>
-    View all {habits.length} habits →
-  </Button>
-)}
-          
+            <AnimatePresence mode="popLayout">
+              {displayedHabits.map((h, i) => (
+                <motion.div
+                  key={h.id}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ delay: i * 0.05, duration: 0.4, ease: smoothEase }}
+                >
+                  <HabitCard 
+                    habit={h} 
+                    onToggle={() => toggleToday(h.id)} 
+                    onEdit={(d) => updateHabit(h.id, d)} 
+                    onDelete={() => deleteHabit(h.id)} 
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
-        </div>
+
+          {habits.length > 3 && (
+            <Button 
+              variant="ghost" 
+              className="w-full text-slate-400 hover:text-white rounded-xl transition-colors" 
+              onClick={() => setShowAllHabits(!showAllHabits)}
+            >
+              {showAllHabits ? (
+                <><ChevronUp className="mr-2 h-4 w-4" /> Show less</>
+              ) : (
+                <><ChevronDown className="mr-2 h-4 w-4" /> View all {habits.length} habits</>
+              )}
+            </Button>
+          )}
+        </motion.div>
 
         {/* Sidebar */}
-        <aside className="space-y-6">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-6 shadow-xl">
-             <div className="flex items-center gap-2 text-indigo-400 text-xs font-bold uppercase tracking-widest mb-4">
+        <motion.aside variants={itemVariants} className="space-y-6">
+          <div className="rounded-[2rem] border border-white/5 bg-slate-900/40 p-6 md:p-8 shadow-xl backdrop-blur-xl group hover:bg-slate-900/60 transition-colors">
+             <div className="flex items-center gap-2 text-indigo-400 text-[10px] font-bold uppercase tracking-[0.2em] mb-4">
                 <Zap className="h-4 w-4" /> Daily Challenge
              </div>
-             <h3 className="text-lg font-bold">{challenge.title}</h3>
-             <p className="text-sm text-slate-400 my-3">{challenge.description}</p>
-             <Button className="w-full" variant="secondary" onClick={() => navigate({ to: "/outstand" })}>View Challenge</Button>
+             <h3 className="text-xl font-display font-bold text-white group-hover:text-indigo-100 transition-colors">{challenge.title}</h3>
+             <p className="text-sm font-medium text-slate-500 my-4 leading-relaxed">{challenge.description}</p>
+             <Button className="w-full rounded-xl active:scale-95 transition-transform bg-white/5 hover:bg-white/10 text-white" variant="ghost" onClick={() => navigate({ to: "/outstand" })}>
+               View Challenge
+             </Button>
           </div>
-        </aside>
+        </motion.aside>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
 function StatCard({ label, value, sub, accent }: { label: string; value: string; sub: string; accent?: string }) {
   return (
-    <Card className="bg-slate-900/50 border-white/5 hover:border-white/10 transition-colors">
-      <CardContent className="p-5">
-        <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">{label}</div>
-        <div className="text-2xl font-bold mt-1" style={{ color: accent }}>{value}</div>
-        <div className="text-xs text-slate-400">{sub}</div>
-      </CardContent>
-    </Card>
+    <motion.div 
+      whileHover={{ y: -4, backgroundColor: "rgba(255,255,255,0.04)" }}
+      className="rounded-[1.5rem] border border-white/5 bg-slate-900/40 p-5 backdrop-blur-xl transition-all duration-300 relative overflow-hidden group"
+    >
+      <div 
+        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" 
+        style={{ background: `radial-gradient(circle 100px at center, ${accent ? accent + '20' : 'rgba(255,255,255,0.05)'}, transparent)` }} 
+      />
+      <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold relative z-10">{label}</div>
+      <div className="font-display text-3xl font-black tracking-tight mt-2 relative z-10" style={{ color: accent || 'white' }}>{value}</div>
+      <div className="text-xs font-medium text-slate-500 mt-1 relative z-10">{sub}</div>
+    </motion.div>
   );
 }
