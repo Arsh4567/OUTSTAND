@@ -10,7 +10,6 @@ import {
   type OutstandCompletion,
 } from "@/lib/habits";
 
-// This is the part that was missing!
 const seedHabits: Habit[] = [
   {
     id: "h1",
@@ -47,39 +46,52 @@ const seedHabits: Habit[] = [
 ];
 
 export function useAppState() {
-  const [habits, setHabits] = useLocalStorage<Habit[]>("ht.habits.v1", seedHabits);
-  const [sessions, setSessions] = useLocalStorage<FocusSession[]>("ht.sessions.v1", []);
-  const [outstand, setOutstand] = useLocalStorage<OutstandCompletion[]>("ht.outstand.v1", []);
+  // 1. Fetch raw data from local storage
+  const [rawHabits, setHabits] = useLocalStorage<Habit[]>("ht.habits.v1", seedHabits);
+  const [rawSessions, setSessions] = useLocalStorage<FocusSession[]>("ht.sessions.v1", []);
+  const [rawOutstand, setOutstand] = useLocalStorage<OutstandCompletion[]>("ht.outstand.v1", []);
+
+  // 2. SANITIZATION: Guarantee these are ALWAYS arrays to prevent .reduce() and .filter() crashes
+  const habits = Array.isArray(rawHabits) ? rawHabits : seedHabits;
+  const sessions = Array.isArray(rawSessions) ? rawSessions : [];
+  const outstand = Array.isArray(rawOutstand) ? rawOutstand : [];
 
   const xp = useMemo(() => {
-    const habitCompletions = habits.reduce((sum, h) => sum + h.history.length, 0);
-    const focus = sessions.filter((s) => s.completed).length;
-    const outstandXp = outstand.reduce((sum, o) => sum + (o.xp || 0), 0);
-    return habitCompletions * XP_PER_HABIT + focus * XP_PER_FOCUS + outstandXp;
+    // 3. SAFE MATH: Use optional chaining (?.) and fallbacks (|| 0)
+    const habitCompletions = habits.reduce((sum, h) => sum + (h?.history?.length || 0), 0);
+    const focus = sessions.filter((s) => s?.completed).length;
+    const outstandXp = outstand.reduce((sum, o) => sum + (o?.xp || 0), 0);
+    
+    return (habitCompletions * XP_PER_HABIT) + (focus * XP_PER_FOCUS) + outstandXp;
   }, [habits, sessions, outstand]);
 
   const level = Math.floor(xp / 500) + 1;
   const progressToNextLevel = (xp % 500) / 5; 
 
   const recordOutstand = (title: string, xp: number) => {
-    setOutstand((prev) => [
-      { id: crypto.randomUUID(), title, xp, completedAt: new Date().toISOString() },
-      ...prev,
-    ].slice(0, 200));
+    setOutstand((prev) => {
+      const safePrev = Array.isArray(prev) ? prev : [];
+      return [
+        { id: crypto.randomUUID(), title, xp, completedAt: new Date().toISOString() },
+        ...safePrev,
+      ].slice(0, 200);
+    });
   };
 
   const toggleToday = (id: string) => {
     const today = todayISO();
-    setHabits((prev) =>
-      prev.map((h) => {
+    setHabits((prev) => {
+      const safePrev = Array.isArray(prev) ? prev : [];
+      return safePrev.map((h) => {
         if (h.id !== id) return h;
-        const has = h.history.includes(today);
+        const history = Array.isArray(h.history) ? h.history : [];
+        const has = history.includes(today);
         return {
           ...h,
-          history: has ? h.history.filter((d) => d !== today) : [...h.history, today],
+          history: has ? history.filter((d) => d !== today) : [...history, today],
         };
-      }),
-    );
+      });
+    });
   };
 
   const addHabit = (data: { name: string; emoji: string; color: string }) => {
@@ -91,15 +103,21 @@ export function useAppState() {
       createdAt: new Date().toISOString(),
       history: [],
     };
-    setHabits((prev) => [...prev, habit]);
+    setHabits((prev) => [...(Array.isArray(prev) ? prev : []), habit]);
   };
 
   const updateHabit = (id: string, data: Partial<Pick<Habit, "name" | "emoji" | "color">>) => {
-    setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, ...data } : h)));
+    setHabits((prev) => {
+      const safePrev = Array.isArray(prev) ? prev : [];
+      return safePrev.map((h) => (h.id === id ? { ...h, ...data } : h));
+    });
   };
 
   const deleteHabit = (id: string) => {
-    setHabits((prev) => prev.filter((h) => h.id !== id));
+    setHabits((prev) => {
+      const safePrev = Array.isArray(prev) ? prev : [];
+      return safePrev.filter((h) => h.id !== id);
+    });
   };
 
   const recordSession = (durationMin: number, completed: boolean) => {
@@ -109,11 +127,18 @@ export function useAppState() {
       durationMin,
       completed,
     };
-    setSessions((prev) => [s, ...prev].slice(0, 500));
+    setSessions((prev) => [s, ...(Array.isArray(prev) ? prev : [])].slice(0, 500));
   };
 
-  const streaks = useMemo(() => habits.map((h) => ({ id: h.id, streak: computeStreak(h.history) })), [habits]);
-  const bestStreak = streaks.reduce((a, b) => (b.streak > a ? b.streak : a), 0);
+  // 4. SAFE STREAK CALCULATION: Ensure computeStreak always receives an array
+  const streaks = useMemo(() => {
+    return habits.map((h) => ({ 
+      id: h?.id, 
+      streak: computeStreak(Array.isArray(h?.history) ? h.history : []) 
+    }));
+  }, [habits]);
+
+  const bestStreak = streaks.reduce((a, b) => ((b?.streak || 0) > a ? (b?.streak || 0) : a), 0);
 
   return {
     habits,
@@ -131,5 +156,4 @@ export function useAppState() {
     recordSession,
     recordOutstand,
   };
-  }
-    
+}
