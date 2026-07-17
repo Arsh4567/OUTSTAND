@@ -1,21 +1,24 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 export function useLocalStorage<T>(key: string, initialValue: T) {
-  // 1. Read from the browser's storage
+  // 1. TRAP THE INITIAL VALUE: This prevents the infinite loop if arrays/objects are passed
+  const initialValueRef = useRef<T>(initialValue);
+
+  // 2. Read from the browser's storage
   const readValue = useCallback((): T => {
-    if (typeof window === "undefined") return initialValue;
+    if (typeof window === "undefined") return initialValueRef.current;
     try {
       const item = window.localStorage.getItem(key);
-      return item ? (JSON.parse(item) as T) : initialValue;
+      return item ? (JSON.parse(item) as T) : initialValueRef.current;
     } catch (error) {
       console.warn(`Error reading localStorage key “${key}”:`, error);
-      return initialValue;
+      return initialValueRef.current;
     }
-  }, [initialValue, key]);
+  }, [key]); // We removed initialValue from here!
 
   const [storedValue, setStoredValue] = useState<T>(readValue);
 
-  // 2. Write to storage AND broadcast a live signal to the rest of the app
+  // 3. Write to storage AND broadcast a live signal to the rest of the app
   const setValue = (value: T | ((val: T) => T)) => {
     try {
       const valueToStore = value instanceof Function ? value(storedValue) : value;
@@ -23,7 +26,7 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
       if (typeof window !== "undefined") {
         window.localStorage.setItem(key, JSON.stringify(valueToStore));
         
-        // THIS IS THE MAGIC LINE! It tells the Header to update instantly without refreshing.
+        // Broadcast custom event for other components
         window.dispatchEvent(new CustomEvent("local-storage-sync", { detail: { key } }));
       }
     } catch (error) {
@@ -31,7 +34,7 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
     }
   };
 
-  // 3. Listen for the live signal
+  // 4. Listen for the live signal
   useEffect(() => {
     setStoredValue(readValue());
 
