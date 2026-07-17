@@ -1,8 +1,18 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { ArrowRight, Zap, Target, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
+  beforeLoad: async () => {
+    // Instantly check local storage for an active session
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    // If they are logged in, intercept the page load and bounce them to the dashboard
+    if (session) {
+      throw redirect({ to: "/dashboard" });
+    }
+  },
   component: LandingPage,
 });
 
@@ -16,7 +26,6 @@ function LandingPage() {
           Outstand
         </div>
         <Button asChild variant="secondary" className="rounded-full px-6">
-          {/* Change "/auth" to wherever your login page actually is */}
           <Link to="/auth">Sign In</Link> 
         </Button>
       </nav>
