@@ -13,9 +13,9 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: "Outstand | Build Momentum" },
       { property: "og:description", content: "The ultimate platform for reclaiming attention and building unbreakable momentum." },
       { property: "og:type", content: "website" },
-      { property: "og:image", content: "/Outstand-logo.png" },
+      { property: "og:image", content: "/outstand-logo.png" }, // FIXED TO LOWERCASE
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:image", content: "/Outstand-logo.png" },
+      { name: "twitter:image", content: "/outstand-logo.png" }, // FIXED TO LOWERCASE
     ],
   }),
   beforeLoad: async () => {
@@ -51,8 +51,9 @@ function LandingPage() {
       <nav className="sticky top-0 z-50 border-b border-white/5 bg-[#030712]/70 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between p-4 md:px-8">
           <Link to="/" className="flex items-center gap-3 active:scale-98 transition-transform group">
+            {/* FIXED LOGO PATH */}
             <img 
-              src="/Outstand-logo.png" 
+              src="/outstand-logo.png" 
               alt="Outstand Logo" 
               className="h-9 w-9 rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.4)] group-hover:shadow-[0_0_25px_rgba(59,130,246,0.6)] transition-all duration-300"
             />
@@ -127,9 +128,9 @@ function LandingPage() {
           <div className="absolute inset-0 rounded-3xl bg-gradient-to-tr from-blue-500/10 via-transparent to-indigo-500/10 opacity-30 group-hover:opacity-60 transition-opacity duration-700" />
           <div className="overflow-hidden rounded-2xl bg-[#090d16] border border-white/5 aspect-[16/9] flex items-center justify-center relative">
             
-            {/* Ambient Logo Centerpiece inside mockup */}
+            {/* FIXED LOGO PATH */}
             <motion.img 
-              src="/Outstand-logo.png" 
+              src="/outstand-logo.png" 
               alt="Outstand Premium Core" 
               animate={{ scale: [1, 1.03, 1] }}
               transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
