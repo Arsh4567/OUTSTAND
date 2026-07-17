@@ -2,10 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat, type UIMessage } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
-import { Bot, Trash2, X } from "lucide-react";
+import { Bot, Trash2, X, PlusCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import { motion } from "framer-motion"; // <-- Added for the floating effect
+import { motion, AnimatePresence } from "framer-motion";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAppState } from "@/hooks/use-app-state";
@@ -64,54 +63,52 @@ type ChatPanelProps = {
 
 function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelProps) {
   const [input, setInput] = useState("");
+  const { addHabit } = useAppState(); // Pulled in to allow AI to take actions
+  
   const appContextRef = useRef(appContext);
-  appContextRef.current = appContext;
+  useEffect(() => {
+    appContextRef.current = appContext;
+  }, [appContext]);
 
-  const transport = useMemo(
-    () =>
-      new DefaultChatTransport({
-        api: "/api/chat",
-        prepareSendMessagesRequest: async ({ messages }) => {
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-          const headers: Record<string, string> = {};
-          if (session?.access_token) {
-            headers.Authorization = `Bearer ${session.access_token}`;
-          }
-          return {
-            body: { messages, appContext: appContextRef.current },
-            headers,
-          };
-        },
-      }),
-    [],
-  );
-
-  const { messages, status, sendMessage, stop, error } = useChat({
+  // UPGRADED: Modern, crash-proof useChat implementation for Vercel AI SDK
+  const { messages, isLoading, append, stop, error } = useChat({
     id: "outstand-assistant",
-    messages: initialMessages,
-    transport,
-  });
+    api: "/api/chat",
+    initialMessages,
+    fetch: async (url, options) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers = new Headers(options?.headers);
+      
+      if (session?.access_token) {
+        headers.set("Authorization", `Bearer ${session.access_token}`);
+      }
+      
+      const reqBody = options?.body ? JSON.parse(options.body as string) : {};
+      reqBody.appContext = appContextRef.current;
 
-  const isLoading = status === "submitted" || status === "streaming";
+      return fetch(url, {
+        ...options,
+        headers,
+        body: JSON.stringify(reqBody),
+      });
+    },
+  });
 
   useEffect(() => {
     if (error) {
-      toast.error("Assistant failed to respond. Please try again.");
+      toast.error("Assistant disconnected. Please try again.");
     }
   }, [error]);
 
-  const handleSubmit = async ({ text }: { text: string }) => {
-    if (!text.trim() || isLoading) return;
+  const handleSubmit = async () => {
+    if (!input.trim() || isLoading) return;
+    const userText = input.trim();
     setInput("");
-    await sendMessage({ text: text.trim() });
+    await append({ role: "user", content: userText });
   };
 
   const handleClear = async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
     const res = await fetch("/api/chat", {
@@ -121,80 +118,124 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
 
     if (res.ok) {
       onClear();
-      toast.success("Chat history cleared");
+      toast.success("Memory wiped. Fresh start.");
     } else {
-      toast.error("Failed to clear chat history");
+      toast.error("Failed to clear chat history.");
     }
   };
 
   return (
     <div className="flex h-full flex-col">
-      <DrawerHeader className="flex shrink-0 items-start justify-between border-b border-white/10 pb-4">
+      <DrawerHeader className="flex shrink-0 items-start justify-between border-b border-white/5 pb-4 bg-slate-950/80">
         <div className="text-left">
           <DrawerTitle className="flex items-center gap-2 text-base text-white">
-            <div className="grid h-6 w-6 place-items-center rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 shadow-lg">
+            <div className="grid h-6 w-6 place-items-center rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 shadow-[0_0_15px_rgba(99,102,241,0.5)]">
               <Bot className="h-3.5 w-3.5 text-white" />
             </div>
-            Outstand Assistant
+            Outstand Intelligence
           </DrawerTitle>
-          <DrawerDescription className="text-xs text-slate-400">
-            Ask for focus tips, habit coaching, or a daily reset.
+          <DrawerDescription className="text-xs text-slate-400 mt-1">
+            Real-time focus coaching and habit optimization.
           </DrawerDescription>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon-sm" onClick={handleClear} title="Clear chat" className="text-slate-400 hover:text-white">
+          <Button variant="ghost" size="icon-sm" onClick={handleClear} className="text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors">
             <Trash2 className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon-sm" onClick={onClose} title="Close" className="text-slate-400 hover:text-white">
+          <Button variant="ghost" size="icon-sm" onClick={onClose} className="text-slate-500 hover:text-white hover:bg-white/10 transition-colors">
             <X className="h-4 w-4" />
           </Button>
         </div>
       </DrawerHeader>
 
-      <Conversation className="flex-1 px-4 py-3">
+      <Conversation className="flex-1 px-4 py-6 bg-slate-950/50">
         <ConversationContent>
           {messages.length === 0 ? (
             <ConversationEmptyState
-              icon={<Bot className="h-8 w-8 text-indigo-400" />}
-              title="Your Outstand coach is here"
-              description="Ask how to improve your streak, what to focus on today, or how to boost your dopamine score."
+              icon={<Bot className="h-10 w-10 text-indigo-400 drop-shadow-[0_0_15px_rgba(129,140,248,0.5)]" />}
+              title="Systems Online"
+              description="I'm analyzing your dopamine baseline. Ask me to design a new habit for you, or how to recover from a focus slump."
             />
           ) : (
             messages.map((message) => (
               <Message key={message.id} from={message.role}>
                 <MessageContent>
-                  {message.role === "assistant" ? (
-                    <MessageResponse>
-                      {message.parts
-                        .filter((p) => p.type === "text")
-                        .map((p) => p.text)
-                        .join("")}
-                    </MessageResponse>
-                  ) : (
-                    <div className="whitespace-pre-wrap">
-                      {message.parts
-                        .filter((p) => p.type === "text")
-                        .map((p) => p.text)
-                        .join("")}
+                  {/* Handle Standard Text */}
+                  {message.content && (
+                    <div className={cn(
+                      "whitespace-pre-wrap leading-relaxed",
+                      message.role === "assistant" ? "text-slate-200" : "text-white"
+                    )}>
+                      {message.content}
                     </div>
                   )}
+
+                  {/* NEXT LEVEL: GENERATIVE UI WIDGETS */}
+                  {message.toolInvocations?.map((tool) => {
+                    if (tool.toolName === "createHabit") {
+                      return (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          key={tool.toolCallId} 
+                          className="mt-4 mb-2 overflow-hidden rounded-2xl border border-indigo-500/40 bg-gradient-to-br from-indigo-900/40 to-slate-900/80 p-5 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-xl relative group"
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                          
+                          <div className="relative z-10">
+                            <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-indigo-400">
+                              <Bot className="h-3 w-3" /> Recommended Protocol
+                            </div>
+                            
+                            <div className="mb-3 flex items-center gap-4">
+                              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-500/20 text-2xl shadow-inner border border-indigo-500/30">
+                                {tool.args.emoji}
+                              </div>
+                              <div>
+                                <h4 className="text-lg font-black text-white tracking-tight">
+                                  {tool.args.name}
+                                </h4>
+                                <p className="text-xs text-slate-400 line-clamp-2 mt-0.5">
+                                  {tool.args.reason || "Strategic baseline adjustment."}
+                                </p>
+                              </div>
+                            </div>
+
+                            <Button 
+                              onClick={() => {
+                                addHabit({
+                                  name: tool.args.name,
+                                  emoji: tool.args.emoji,
+                                  color: tool.args.color || "primary",
+                                });
+                                toast.success(`${tool.args.name} loaded into your dashboard.`, {
+                                  icon: <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                                });
+                              }}
+                              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_30px_rgba(79,70,229,0.5)] transition-all duration-300 group-hover:-translate-y-0.5"
+                            >
+                              <PlusCircle className="mr-2 h-4 w-4" /> Integrate Habit
+                            </Button>
+                          </div>
+                        </motion.div>
+                      );
+                    }
+                    return null;
+                  })}
                 </MessageContent>
-                {message.role === "assistant" && (
+                
+                {message.role === "assistant" && !message.toolInvocations && (
                   <MessageToolbar>
                     <MessageActions>
                       <MessageAction
                         tooltip="Copy response"
                         label="Copy"
                         onClick={() => {
-                          const text = message.parts
-                            .filter((p) => p.type === "text")
-                            .map((p) => p.text)
-                            .join("");
-                          navigator.clipboard.writeText(text);
+                          navigator.clipboard.writeText(message.content);
                           toast.success("Copied to clipboard");
                         }}
                       >
-                        <span className="text-xs">Copy</span>
+                        <span className="text-xs text-slate-500 hover:text-white transition-colors">Copy</span>
                       </MessageAction>
                     </MessageActions>
                   </MessageToolbar>
@@ -202,44 +243,57 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
               </Message>
             ))
           )}
-          {isLoading && (
-            <Message from="assistant">
-              <MessageContent>
-                <Shimmer className="text-sm text-indigo-400">Thinking...</Shimmer>
-              </MessageContent>
-            </Message>
-          )}
+          
+          <AnimatePresence>
+            {isLoading && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <Message from="assistant">
+                  <MessageContent>
+                    <Shimmer className="text-sm font-medium text-indigo-400 drop-shadow-[0_0_8px_rgba(129,140,248,0.5)]">
+                      Synthesizing response...
+                    </Shimmer>
+                  </MessageContent>
+                </Message>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="shrink-0 border-t border-white/10 p-4 bg-slate-950">
+      <div className="shrink-0 border-t border-white/5 p-4 bg-slate-950">
         <PromptInput onSubmit={handleSubmit}>
           <PromptInputTextarea
-            placeholder="Ask your coach anything..."
+            placeholder="Initialize command..."
             value={input}
             onChange={(e) => setInput(e.currentTarget.value)}
             disabled={isLoading}
-            className="bg-slate-900 border-white/10 text-white placeholder:text-slate-500"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
+            className="bg-slate-900/50 border-white/10 text-white placeholder:text-slate-600 focus:border-indigo-500/50 transition-colors resize-none"
           />
           <PromptInputFooter className="justify-end pt-2">
             <PromptInputSubmit
-              status={status}
+              status={isLoading ? "streaming" : "idle"}
               onStop={stop}
-              disabled={(!input.trim() && !isLoading) || false}
+              disabled={(!input.trim() && !isLoading)}
             />
           </PromptInputFooter>
         </PromptInput>
       </div>
     </div>
   );
-}
-
-export function ChatAssistant() {
+                    }
+   export function ChatAssistant() {
   const [open, setOpen] = useState(false);
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyKey, setHistoryKey] = useState(0);
+  
   const { user, profile } = useAuth();
   const { habits, sessions, outstand, xp, bestStreak } = useAppState();
   const { log } = useDailyLog();
@@ -264,32 +318,37 @@ export function ChatAssistant() {
 
     setLoadingHistory(true);
     const load = async () => {
-      const { data: conversation } = await supabase
-        .from("chat_conversations")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      try {
+        const { data: conversation } = await supabase
+          .from("chat_conversations")
+          .select("id")
+          .eq("user_id", user.id)
+          .maybeSingle();
 
-      if (conversation?.id) {
-        const { data: messages } = await supabase
-          .from("chat_messages")
-          .select("role, content, created_at")
-          .eq("conversation_id", conversation.id)
-          .order("created_at", { ascending: true });
+        if (conversation?.id) {
+          const { data: messages } = await supabase
+            .from("chat_messages")
+            .select("role, content, created_at")
+            .eq("conversation_id", conversation.id)
+            .order("created_at", { ascending: true });
 
-        const uiMessages: UIMessage[] = (messages ?? [])
-          .filter((m) => m.role === "user" || m.role === "assistant")
-          .map((m) => ({
-            id: crypto.randomUUID(),
-            role: m.role as "user" | "assistant",
-            content: m.content,
-            parts: [{ type: "text" as const, text: m.content }],
-          }));
-        setInitialMessages(uiMessages);
-      } else {
+          const uiMessages: UIMessage[] = (messages ?? [])
+            .filter((m) => m.role === "user" || m.role === "assistant")
+            .map((m) => ({
+              id: crypto.randomUUID(),
+              role: m.role as "user" | "assistant",
+              content: m.content,
+            }));
+          setInitialMessages(uiMessages);
+        } else {
+          setInitialMessages([]);
+        }
+      } catch (err) {
+        console.error("Failed to load chat history", err);
         setInitialMessages([]);
+      } finally {
+        setLoadingHistory(false);
       }
-      setLoadingHistory(false);
     };
 
     load();
@@ -301,35 +360,43 @@ export function ChatAssistant() {
 
   return (
     <>
-      {/* THE NEW FLOATING, GLOWING AI BUTTON */}
+      {/* THE NEXT-LEVEL FLOATING ORB */}
       <motion.div
-        // Positioned perfectly to avoid the new nav bar
-        className="fixed bottom-28 right-4 md:bottom-8 md:right-8 z-50"
-        // Continuous, gentle floating animation
-        animate={{ y: [0, -10, 0] }}
-        transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+        className="fixed bottom-24 right-4 md:bottom-8 md:right-8 z-50"
+        animate={{ y: [0, -8, 0] }}
+        transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
       >
         <Button
           onClick={() => setOpen(true)}
           className={cn(
-            "relative h-14 w-14 rounded-full p-0 border border-indigo-400/30",
-            "bg-gradient-to-br from-indigo-500 to-blue-600",
-            // The massive, soft premium glow
-            "shadow-[0_0_30px_rgba(99,102,241,0.5)] hover:shadow-[0_0_40px_rgba(99,102,241,0.8)]",
-            "transition-all duration-300 hover:scale-110 active:scale-95"
+            "relative h-14 w-14 rounded-full p-0 border border-indigo-400/50",
+            "bg-slate-950 before:absolute before:inset-0 before:rounded-full before:bg-gradient-to-br before:from-indigo-500 before:to-purple-600 before:opacity-80",
+            "shadow-[0_0_30px_rgba(99,102,241,0.5)] hover:shadow-[0_0_50px_rgba(168,85,247,0.7)] hover:border-purple-400/80",
+            "transition-all duration-500 hover:scale-110 active:scale-95 group overflow-hidden"
           )}
-          aria-label="Open AI assistant"
+          aria-label="Initialize Intelligence"
         >
-          <Bot className="h-6 w-6 text-white drop-shadow-md" />
+          {/* Internal rotating glow effect */}
+          <div className="absolute inset-[-50%] bg-[conic-gradient(from_0deg,transparent_0_340deg,rgba(255,255,255,0.8)_360deg)] animate-[spin_3s_linear_infinite] opacity-50" />
+          <div className="absolute inset-[2px] rounded-full bg-slate-950 z-10 flex items-center justify-center">
+            <Bot className="h-6 w-6 text-indigo-400 group-hover:text-purple-300 transition-colors drop-shadow-[0_0_10px_rgba(129,140,248,0.8)]" />
+          </div>
         </Button>
       </motion.div>
 
       <Drawer open={open} onOpenChange={setOpen} direction="bottom">
-        <DrawerContent className="h-[88dvh] rounded-t-2xl border-white/10 bg-slate-950/95 backdrop-blur-xl">
+        <DrawerContent className="h-[90dvh] md:h-[85dvh] rounded-t-3xl border-t border-white/10 bg-slate-950/95 backdrop-blur-2xl shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
           {loadingHistory ? (
-            <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-              <Bot className="h-8 w-8 animate-pulse text-indigo-500" />
-              <p className="text-sm text-slate-400">Loading your conversation...</p>
+            <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
+              <div className="relative">
+                <Bot className="h-10 w-10 text-indigo-500 drop-shadow-[0_0_15px_rgba(99,102,241,0.5)]" />
+                <motion.div 
+                  className="absolute inset-0 border-2 border-indigo-500 rounded-full"
+                  animate={{ scale: [1, 1.5, 2], opacity: [1, 0.5, 0] }}
+                  transition={{ repeat: Infinity, duration: 1.5 }}
+                />
+              </div>
+              <p className="text-sm font-medium tracking-widest text-slate-400 uppercase">Decrypting Archives...</p>
             </div>
           ) : (
             <ChatPanel
@@ -344,5 +411,4 @@ export function ChatAssistant() {
       </Drawer>
     </>
   );
-         }
-      
+   }
