@@ -1,5 +1,5 @@
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Activity, Flame, LogOut, Timer, Zap, Brain, User, Settings, Share, History, SlidersHorizontal, X, Smartphone, Moon, Sun, Trash2, Edit3 } from "lucide-react";
+import { Activity, Flame, LogOut, Timer, Zap, Brain, User, Settings, Share, History, SlidersHorizontal, X, Smartphone, Moon, Sun, Trash2, Edit3, Bell } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAppState } from "@/hooks/use-app-state";
 import { useAuth, displayNameOf } from "@/hooks/use-auth";
@@ -17,6 +17,7 @@ import {
 import { ChatAssistant } from "@/components/chat-assistant";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import { requestNotificationPermission } from "@/lib/notifications";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: Activity },
@@ -58,8 +59,9 @@ function ShellWithChrome() {
   // App Preferences State
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [haptics, setHaptics] = useState(true);
+  const [isNotificationsGranted, setIsNotificationsGranted] = useState(false);
 
-  // Initialize Client & Theme
+  // Initialize Client, Theme, & Notifications
   useEffect(() => {
     setIsClient(true);
     const savedTheme = localStorage.getItem("outstand-theme") as "dark" | "light" | null;
@@ -69,6 +71,11 @@ function ShellWithChrome() {
     const savedHaptics = localStorage.getItem("outstand-haptics");
     if (savedHaptics !== null) {
       setHaptics(savedHaptics === "true");
+    }
+    
+    // Check initial notification status
+    if (typeof window !== "undefined" && "Notification" in window) {
+      setIsNotificationsGranted(Notification.permission === "granted");
     }
   }, []);
 
@@ -88,6 +95,15 @@ function ShellWithChrome() {
   }, [haptics]);
 
   // --- FUNCTIONAL ACTIONS ---
+
+  const handleNotificationToggle = async () => {
+    if (!isNotificationsGranted) {
+      const success = await requestNotificationPermission();
+      setIsNotificationsGranted(success);
+    } else {
+      alert("To disable notifications, please change your browser or device settings.");
+    }
+  };
 
   const handleShare = async () => {
     const shareText = `I'm crushing goals on Outstand! Level ${level} with a ${bestStreak} day streak 🔥`;
@@ -227,14 +243,14 @@ function ShellWithChrome() {
           </div>
         </div>
       </header>
-
-      {/* MAIN CONTENT */}
+            {/* MAIN CONTENT */}
       <AnimatePresence mode="wait">
         <motion.main key={pathname} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.3, ease: "easeOut" }} className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 md:px-6 md:py-10">
           <Outlet />
         </motion.main>
       </AnimatePresence>
-           {/* MOBILE NAV */}
+      
+      {/* MOBILE NAV */}
       <div className="fixed bottom-6 left-0 right-0 z-50 flex justify-center px-4 lg:hidden pointer-events-none">
         <nav className="flex items-center gap-1 rounded-[2rem] border border-white/10 bg-slate-950/80 p-2 backdrop-blur-xl shadow-2xl pointer-events-auto">
           {NAV.map((item) => {
@@ -273,6 +289,25 @@ function ShellWithChrome() {
                   <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Preferences</h3>
                   <div className="space-y-2">
                     
+                    {/* Push Notifications Toggle */}
+                    <div className="flex items-center justify-between rounded-2xl bg-white/5 p-4">
+                      <div className="flex items-center gap-4">
+                        <div className="grid h-10 w-10 place-items-center rounded-full bg-green-500/20">
+                          <Bell className="h-5 w-5 text-green-400" />
+                        </div>
+                        <div>
+                          <div className="font-semibold text-slate-200">Push Notifications</div>
+                          <div className="text-xs text-slate-400">Daily reminders</div>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={handleNotificationToggle} 
+                        className={cn("h-7 w-12 cursor-pointer rounded-full p-1 transition-colors duration-300", isNotificationsGranted ? "bg-green-500" : "bg-slate-700")}
+                      >
+                        <motion.div layout className="h-5 w-5 rounded-full bg-white shadow-sm" animate={{ x: isNotificationsGranted ? 20 : 0 }} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
+                      </button>
+                    </div>
+
                     {/* Haptics Toggle */}
                     <div className="flex items-center justify-between rounded-2xl bg-white/5 p-4">
                       <div className="flex items-center gap-4">
