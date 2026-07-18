@@ -4,10 +4,11 @@ import { createClient } from '@supabase/supabase-js';
 
 // 1. Configure Web Push with your keys
 webpush.setVapidDetails(
-  'mailto:admin@outstand.app', 
-  "e7JAVjlsLoW_WLi6rXJWmsvdZqMPT21twT0RKY4H5ie", 
+  'mailto:your-email@example.com', 
+  process.env.VITE_VAPID_PUBLIC_KEY as string, 
   process.env.VAPID_PRIVATE_KEY as string
 );
+
 
 // 2. Initialize Supabase
 const supabase = createClient(
