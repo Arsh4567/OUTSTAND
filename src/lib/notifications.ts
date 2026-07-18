@@ -1,5 +1,6 @@
 // src/lib/notifications.ts
-import { supabase } from './supabase'; // Ensure this points to your actual supabase client file
+import { supabase } from '../integrations/supabase/client';
+// Ensure this points to your actual supabase client file
 
 // Utility function to convert your VAPID public key for the browser
 function urlBase64ToUint8Array(base64String: string) {
