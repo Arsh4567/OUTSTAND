@@ -42,46 +42,90 @@
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
+/* =========================================
+   LIGHT THEME (Default / :root)
+   ========================================= */
 :root {
   --radius: 0.875rem;
 
-  /* Deep navy / near-black theme */
+  --background: oklch(0.98 0.01 250);
+  --foreground: oklch(0.14 0.03 258);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.14 0.03 258);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.14 0.03 258);
+  
+  --primary: oklch(0.55 0.2 260); 
+  --primary-foreground: oklch(0.98 0.01 250);
+  --primary-glow: oklch(0.65 0.2 260);
+  
+  --secondary: oklch(0.95 0.02 250);
+  --secondary-foreground: oklch(0.2 0.03 258);
+  --muted: oklch(0.95 0.02 250);
+  --muted-foreground: oklch(0.5 0.03 258);
+  --accent: oklch(0.65 0.2 285);
+  --accent-foreground: oklch(0.98 0.01 250);
+  
+  --destructive: oklch(0.6 0.2 25);
+  --destructive-foreground: oklch(0.98 0.01 250);
+  --success: oklch(0.6 0.17 155);
+  --success-foreground: oklch(0.98 0.01 250);
+  --warning: oklch(0.75 0.16 80);
+  --warning-foreground: oklch(0.14 0.03 258);
+  
+  --border: oklch(0.9 0.02 250);
+  --input: oklch(0.9 0.02 250);
+  --ring: oklch(0.55 0.2 260);
+
+  /* Light Gradients & Shadows */
+  --gradient-primary: linear-gradient(135deg, oklch(0.55 0.2 260), oklch(0.65 0.2 285));
+  --gradient-hero: radial-gradient(1200px 600px at 20% -10%, oklch(0.85 0.1 265 / 0.4), transparent 60%),
+    radial-gradient(900px 500px at 90% 10%, oklch(0.85 0.1 300 / 0.3), transparent 60%),
+    linear-gradient(180deg, oklch(0.98 0.01 250), oklch(0.95 0.02 250));
+  --gradient-card: linear-gradient(160deg, oklch(1 0 0 / 0.8), oklch(0.98 0.01 250 / 0.5));
+  --gradient-outstand: linear-gradient(135deg, oklch(0.5 0.22 285), oklch(0.6 0.2 245), oklch(0.65 0.18 200));
+
+  --shadow-elegant: 0 20px 50px -20px oklch(0.1 0.05 260 / 0.15);
+  --shadow-glow: 0 0 40px oklch(0.55 0.2 260 / 0.2);
+  --shadow-soft: 0 8px 30px -10px oklch(0.1 0.02 258 / 0.08);
+}
+
+/* =========================================
+   DARK THEME (.dark)
+   ========================================= */
+.dark {
+  color-scheme: dark;
+
   --background: oklch(0.16 0.03 258);
   --foreground: oklch(0.97 0.01 250);
-
   --card: oklch(0.21 0.035 258);
   --card-foreground: oklch(0.97 0.01 250);
-
   --popover: oklch(0.19 0.035 258);
   --popover-foreground: oklch(0.97 0.01 250);
-
+  
   --primary: oklch(0.72 0.16 245);
   --primary-foreground: oklch(0.14 0.03 258);
   --primary-glow: oklch(0.82 0.14 235);
-
+  
   --secondary: oklch(0.28 0.04 258);
   --secondary-foreground: oklch(0.97 0.01 250);
-
   --muted: oklch(0.25 0.03 258);
   --muted-foreground: oklch(0.72 0.02 255);
-
   --accent: oklch(0.72 0.18 285);
   --accent-foreground: oklch(0.14 0.03 258);
-
+  
   --destructive: oklch(0.65 0.22 25);
   --destructive-foreground: oklch(0.98 0.01 250);
-
   --success: oklch(0.74 0.17 155);
   --success-foreground: oklch(0.14 0.03 258);
-
   --warning: oklch(0.82 0.16 80);
   --warning-foreground: oklch(0.14 0.03 258);
-
+  
   --border: oklch(0.3 0.03 258 / 0.6);
   --input: oklch(0.28 0.03 258);
   --ring: oklch(0.72 0.16 245);
 
-  /* Gradients & shadows */
+  /* Dark Gradients & Shadows */
   --gradient-primary: linear-gradient(135deg, oklch(0.72 0.16 245), oklch(0.62 0.2 285));
   --gradient-hero: radial-gradient(1200px 600px at 20% -10%, oklch(0.35 0.15 265 / 0.55), transparent 60%),
     radial-gradient(900px 500px at 90% 10%, oklch(0.35 0.15 300 / 0.4), transparent 60%),
@@ -94,16 +138,18 @@
   --shadow-soft: 0 8px 30px -10px oklch(0.1 0.02 258 / 0.6);
 }
 
-.dark {
-  color-scheme: dark;
-}
-
 @layer base {
   * {
     border-color: var(--color-border);
+    transition: border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
+  
   html,
   body {
+    /* Optimized: Hardware accelerated transitions strictly bound to necessary properties */
+    transition: background-color 0.6s cubic-bezier(0.4, 0, 0.2, 1), 
+                color 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    
     background: var(--gradient-hero);
     background-attachment: fixed;
     color: var(--color-foreground);
@@ -111,18 +157,17 @@
     -webkit-font-smoothing: antialiased;
     scroll-behavior: smooth;
   }
+  
   h1, h2, h3, h4 {
     font-family: var(--font-display);
     letter-spacing: -0.02em;
   }
 
-  /* Premium text selection highlight */
   ::selection {
     background: oklch(0.72 0.16 245 / 0.3);
-    color: oklch(0.97 0.01 250);
+    color: var(--color-foreground);
   }
 
-  /* Premium Minimalist Scrollbar */
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -131,16 +176,16 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: oklch(0.3 0.03 258 / 0.5);
+    background: oklch(0.5 0.05 258 / 0.3);
     border-radius: 10px;
+    transition: background-color 0.3s ease;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: oklch(0.4 0.05 258 / 0.8);
+    background: oklch(0.5 0.05 258 / 0.6);
   }
 }
-
 /* =========================================
-   NEXT-LEVEL KEYFRAMES
+   ACCELERATED KEYFRAMES
    ========================================= */
 
 @keyframes pulse-ring {
@@ -150,13 +195,13 @@
 }
 
 @keyframes float-up {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(8px) translateZ(0); }
+  to { opacity: 1; transform: translateY(0) translateZ(0); }
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-12px); }
+  0%, 100% { transform: translateY(0px) translateZ(0); }
+  50% { transform: translateY(-12px) translateZ(0); }
 }
 
 @keyframes neon-breathe {
@@ -173,14 +218,19 @@
 @keyframes cinematic-enter {
   0% { 
     opacity: 0; 
-    transform: translateY(30px) scale(0.95); 
+    transform: translateY(30px) scale(0.95) translateZ(0); 
     filter: blur(8px);
   }
   100% { 
     opacity: 1; 
-    transform: translateY(0) scale(1); 
+    transform: translateY(0) scale(1) translateZ(0); 
     filter: blur(0px);
   }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 /* =========================================
@@ -190,17 +240,25 @@
 @utility glass-card {
   background: var(--gradient-card);
   backdrop-filter: blur(14px);
-  border: 1px solid oklch(1 0 0 / 0.06);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--color-border);
   box-shadow: var(--shadow-soft);
   border-radius: var(--radius-2xl);
-  /* Upgraded: Buttery smooth bezier curve transition */
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); 
   
-  /* Upgraded & Fixed: Proper v4 Hover Nesting */
+  /* 
+    Optimized: Replaced "transition: all" to prevent layout trashing. 
+    Split layout/paint properties from transform for GPU acceleration. 
+  */
+  transition: border-color 0.4s ease, 
+              background 0.6s ease, 
+              box-shadow 0.4s ease, 
+              transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, border-color;
+  
   &:hover {
-    border-color: oklch(0.72 0.16 245 / 0.3);
+    border-color: oklch(0.72 0.16 245 / 0.4);
     box-shadow: var(--shadow-elegant);
-    transform: translateY(-4px);
+    transform: translateY(-4px) translateZ(0);
   }
 }
 
@@ -215,13 +273,17 @@
   background: var(--gradient-primary);
   color: var(--color-primary-foreground);
   box-shadow: var(--shadow-glow);
-  transition: transform 200ms ease, box-shadow 200ms ease, filter 200ms ease;
+  transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1), 
+              box-shadow 200ms ease, 
+              filter 200ms ease;
+  will-change: transform;
+  
   &:hover {
-    transform: translateY(-1px);
-    filter: brightness(1.05);
+    transform: translateY(-2px) scale(1.02) translateZ(0);
+    filter: brightness(1.1);
   }
   &:active {
-    transform: translateY(0);
+    transform: translateY(0) scale(0.98) translateZ(0);
   }
 }
 
@@ -229,11 +291,28 @@
   background: var(--gradient-outstand);
   color: oklch(0.14 0.03 258);
   box-shadow: 0 0 80px oklch(0.68 0.22 285 / 0.5);
-  transition: transform 250ms ease, box-shadow 250ms ease;
+  transition: transform 250ms cubic-bezier(0.34, 1.56, 0.64, 1), 
+              box-shadow 250ms ease;
+  will-change: transform;
+  
   &:hover {
-    transform: translateY(-2px) scale(1.01);
+    transform: translateY(-3px) scale(1.02) translateZ(0);
     box-shadow: 0 0 100px oklch(0.72 0.22 260 / 0.65);
   }
+  &:active {
+    transform: translateY(0) scale(0.98) translateZ(0);
+  }
+}
+
+@utility animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 3s infinite linear;
 }
 
 @utility pulse-ring {
@@ -242,16 +321,20 @@
 
 @utility fade-up {
   animation: float-up 500ms ease both;
+  will-change: transform, opacity;
 }
 
 @utility animate-float {
   animation: float 6s ease-in-out infinite;
+  will-change: transform;
 }
 
 @utility animate-neon-breathe {
   animation: neon-breathe 3s ease-in-out infinite;
+  will-change: box-shadow, border-color;
 }
 
 @utility cinematic-enter {
   animation: cinematic-enter 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity, filter;
 }
