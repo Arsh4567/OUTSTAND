@@ -15,6 +15,8 @@
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.7",
     "@ai-sdk/react": "^4.0.23",
+    "@copilotkit/react-core": "^1.4.0",
+    "@copilotkit/react-ui": "^1.4.0",
     "@hookform/resolvers": "^5.2.2",
     "@lovable.dev/cloud-auth-js": "^1.1.2",
     "@radix-ui/react-accordion": "^1.2.12",
@@ -80,6 +82,7 @@
     "use-stick-to-bottom": "^1.1.6",
     "vaul": "^1.1.2",
     "vite-tsconfig-paths": "^6.0.2",
+    "web-push": "^3.6.7",
     "zod": "^3.24.2"
   },
   "devDependencies": {
@@ -89,6 +92,8 @@
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "@types/web-push": "^3.6.4",
+    "@vercel/node": "^3.0.2",
     "@vitejs/plugin-react": "^5.2.0",
     "eslint": "^9.32.0",
     "eslint-config-prettier": "^10.1.1",
