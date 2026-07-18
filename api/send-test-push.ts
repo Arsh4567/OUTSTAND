@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 // 1. Configure Web Push with your keys
 webpush.setVapidDetails(
   'mailto:admin@outstand.app', 
-  "BLBCg8c31mQtaOrO9XBGDqNBResAN4tlKQLuLP3wsKr7kVX0eNTWbIeZLlkWoHRluur-3jt5IoCbPknDFTpwLRI", 
+  "e7JAVjlsLoW_WLi6rXJWmsvdZqMPT21twT0RKY4H5ie", 
   process.env.VAPID_PRIVATE_KEY as string
 );
 
