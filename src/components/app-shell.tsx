@@ -38,15 +38,21 @@ function ShellWithChrome() {
   const { xp, bestStreak } = useAppState(); 
   const { user, profile } = useAuth();
   
-  const { level, into, need } = levelFromXP(xp);
-  const pct = Math.min(100, Math.round((into / need) * 100));
+  // SAFEGUARDS: Prevent math crashes if state is temporarily missing during navigation
+  const safeXp = xp || 0;
+  const { level, into, need } = levelFromXP(safeXp);
+  const safeNeed = need > 0 ? need : 1; 
+  const pct = Math.max(0, Math.min(100, Math.round((into / safeNeed) * 100)));
   
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const name = displayNameOf(user, profile);
+  
+  // SAFEGUARDS: Prevent charAt(0) crash if name is temporarily undefined
+  const rawName = displayNameOf(user, profile);
+  const safeName = rawName || "User";
   
   const [isClient, setIsClient] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false); // Controls the slide-up sheet
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
@@ -110,18 +116,18 @@ function ShellWithChrome() {
             })}
           </nav>
 
-          {/* 🔥 DYNAMIC TOP-RIGHT ACTIONS 🔥 */}
+          {/* DYNAMIC TOP-RIGHT ACTIONS */}
           <div className="ml-auto flex shrink-0 items-center gap-3 sm:gap-4">
-            <AnimatePresence mode="popLayout">
+            {/* FIX: Changed to mode="wait" to prevent Framer Motion crashes */}
+            <AnimatePresence mode="wait">
               
-              {/* STATE 1: PROFILE PAGE */}
               {pathname === "/profile" ? (
                 <motion.div
                   key="profile-actions"
-                  initial={{ opacity: 0, scale: 0.8, filter: "blur(4px)" }}
-                  animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, scale: 0.8, filter: "blur(4px)" }}
-                  transition={{ type: "spring", bounce: 0.3, duration: 0.5 }}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
                   className="flex items-center gap-2 sm:gap-3"
                 >
                   <button className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-slate-900/50 text-slate-400 transition-all hover:bg-white/10 hover:text-white">
@@ -136,14 +142,13 @@ function ShellWithChrome() {
                 </motion.div>
               ) : 
               
-              /* STATE 2: FOCUS PAGE */
               pathname === "/focus" ? (
                 <motion.div
                   key="focus-actions"
-                  initial={{ opacity: 0, scale: 0.8, filter: "blur(4px)" }}
-                  animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, scale: 0.8, filter: "blur(4px)" }}
-                  transition={{ type: "spring", bounce: 0.3, duration: 0.5 }}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
                 >
                   <button className="flex items-center gap-2 rounded-full border border-white/10 bg-slate-900/50 px-4 py-2 text-sm font-medium text-slate-400 transition-all hover:bg-white/10 hover:text-white">
                     <SlidersHorizontal className="h-4 w-4" />
@@ -152,31 +157,29 @@ function ShellWithChrome() {
                 </motion.div>
               ) : 
               
-              /* STATE 3: DOPAMINE PAGE */
               pathname === "/dopamine" ? (
                 <motion.div
                   key="dopamine-actions"
-                  initial={{ opacity: 0, scale: 0.8, filter: "blur(4px)" }}
-                  animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, scale: 0.8, filter: "blur(4px)" }}
-                  transition={{ type: "spring", bounce: 0.3, duration: 0.5 }}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
                   className="flex items-center gap-3 sm:gap-4"
                 >
-                  <XpBadge xp={xp} level={level} pct={pct} />
+                  <XpBadge xp={safeXp} level={level} pct={pct} variantId="dopamine" />
                   <button className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-slate-900/50 text-slate-400 transition-all hover:bg-indigo-500/20 hover:text-indigo-400">
                     <History className="h-4 w-4" />
                   </button>
                 </motion.div>
               ) : 
               
-              /* STATE 4: DEFAULT (Dashboard, etc.) */
               (
                 <motion.div
                   key="default-actions"
-                  initial={{ opacity: 0, scale: 0.8, filter: "blur(4px)" }}
-                  animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, scale: 0.8, filter: "blur(4px)" }}
-                  transition={{ type: "spring", bounce: 0.3, duration: 0.5 }}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
                   className="flex items-center gap-3 sm:gap-4"
                 >
                   <div className="hidden items-center gap-2 rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1.5 sm:flex">
@@ -185,19 +188,19 @@ function ShellWithChrome() {
                     <span className="text-xs font-medium text-orange-500/70 uppercase tracking-wider">Streak</span>
                   </div>
                   
-                  <XpBadge xp={xp} level={level} pct={pct} />
+                  <XpBadge xp={safeXp} level={level} pct={pct} variantId="default" />
                   
                   <DropdownMenu>
                     <DropdownMenuTrigger className="grid h-10 w-10 place-items-center rounded-full border-2 border-slate-700 bg-slate-800 text-sm font-bold text-white transition-all hover:border-indigo-500 hover:shadow-[0_0_15px_rgba(99,102,241,0.4)] focus:outline-none">
                       {profile?.avatar_url ? (
                         <img src={profile.avatar_url} alt="" className="h-full w-full rounded-full object-cover" />
                       ) : (
-                        name.charAt(0).toUpperCase()
+                        safeName.charAt(0).toUpperCase()
                       )}
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56 bg-slate-900 border-white/10 text-slate-100">
                       <DropdownMenuLabel>
-                        <div className="font-bold text-base">{name}</div>
+                        <div className="font-bold text-base">{safeName}</div>
                         <div className="truncate text-xs font-medium text-slate-400">{user?.email}</div>
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator className="bg-white/10" />
@@ -216,7 +219,7 @@ function ShellWithChrome() {
         </div>
       </header>
 
-      {/* MAIN CONTENT WITH PAGE TRANSITIONS */}
+      {/* MAIN CONTENT */}
       <AnimatePresence mode="wait">
         <motion.main 
           key={pathname}
@@ -230,7 +233,7 @@ function ShellWithChrome() {
         </motion.main>
       </AnimatePresence>
 
-      {/* PREMIUM FLOATING BOTTOM NAV (Mobile Only) */}
+      {/* MOBILE NAV */}
       <div className="fixed bottom-6 left-0 right-0 z-50 flex justify-center px-4 lg:hidden pointer-events-none">
         <nav className="flex items-center gap-1 rounded-[2rem] border border-white/10 bg-slate-950/80 p-2 backdrop-blur-xl shadow-2xl pointer-events-auto">
           {NAV.map((item) => {
@@ -264,7 +267,7 @@ function ShellWithChrome() {
         </nav>
       </div>
 
-      {/* ⚙️ SLIDE-UP SETTINGS BOTTOM SHEET ⚙️ */}
+      {/* SETTINGS BOTTOM SHEET */}
       <AnimatePresence>
         {isSettingsOpen && (
           <>
@@ -296,7 +299,6 @@ function ShellWithChrome() {
               </div>
               
               <div className="space-y-6">
-                {/* Preferences Section */}
                 <div>
                   <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Preferences</h3>
                   <div className="space-y-2">
@@ -311,22 +313,9 @@ function ShellWithChrome() {
                         <div className="h-5 w-5 translate-x-5 rounded-full bg-white shadow-sm" />
                       </div>
                     </div>
-
-                    <div className="flex items-center justify-between rounded-2xl bg-white/5 p-4">
-                      <div className="flex items-center gap-4">
-                        <div className="grid h-10 w-10 place-items-center rounded-full bg-indigo-500/20">
-                          <Moon className="h-5 w-5 text-indigo-400" />
-                        </div>
-                        <span className="font-semibold text-slate-200">Dark Mode</span>
-                      </div>
-                      <div className="h-7 w-12 cursor-pointer rounded-full bg-indigo-500 p-1 transition-colors">
-                        <div className="h-5 w-5 translate-x-5 rounded-full bg-white shadow-sm" />
-                      </div>
-                    </div>
                   </div>
                 </div>
                 
-                {/* Account Section */}
                 <div>
                   <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Account</h3>
                   <button 
@@ -353,16 +342,18 @@ function ShellWithChrome() {
   );
 }
 
-// ----------------------------------------------------------------------
-// EXTRACTED COMPONENT TO KEEP CODE CLEAN & REUSABLE
-// ----------------------------------------------------------------------
+// FIX: Added variantId to enforce unique Framer Motion keys and prevent SVG gradient collision.
+function XpBadge({ xp, level, pct, variantId }: { xp: number, level: number, pct: number, variantId: string }) {
+  const safeLevel = level || 1;
+  const safeXp = xp || 0;
+  const safePct = pct || 0;
+  const gradientId = `lvl-grad-${variantId}`;
 
-function XpBadge({ xp, level, pct }: { xp: number, level: number, pct: number }) {
   return (
     <div className="flex items-center gap-3 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 shadow-inner">
       <div className="relative h-7 w-7 flex items-center justify-center">
         <motion.div
-           key={`shockwave-${level}`}
+           key={`shockwave-${variantId}-${safeLevel}`}
            initial={{ scale: 0.8, opacity: 1, borderWidth: "4px" }}
            animate={{ scale: 2.5, opacity: 0, borderWidth: "0px" }}
            transition={{ duration: 1, ease: "easeOut" }}
@@ -372,46 +363,46 @@ function XpBadge({ xp, level, pct }: { xp: number, level: number, pct: number })
           <circle cx="18" cy="18" r="15" fill="none" className="stroke-slate-800" strokeWidth="4" />
           <motion.circle
             cx="18" cy="18" r="15" fill="none"
-            stroke="url(#lvl)" strokeWidth="4" strokeLinecap="round"
+            stroke={`url(#${gradientId})`} strokeWidth="4" strokeLinecap="round"
             initial={{ strokeDasharray: "0 94.25", filter: "drop-shadow(0px 0px 0px rgba(99,102,241,0))" }}
             animate={{ 
-              strokeDasharray: `${(pct / 100) * 94.25} 94.25`,
+              strokeDasharray: `${(safePct / 100) * 94.25} 94.25`,
               filter: "drop-shadow(0px 0px 6px rgba(99,102,241,0.8))"
             }}
             transition={{ type: "spring", bounce: 0.4, duration: 1.5 }}
           />
           <defs>
-            <linearGradient id="lvl" x1="0" x2="1" y1="0" y2="1">
+            <linearGradient id={gradientId} x1="0" x2="1" y1="0" y2="1">
               <stop offset="0%" stopColor="#818cf8" />
               <stop offset="100%" stopColor="#4f46e5" />
             </linearGradient>
           </defs>
         </svg>
         <motion.span 
-          key={`lvl-${level}`}
+          key={`lvl-${variantId}-${safeLevel}`}
           initial={{ scale: 1.8, opacity: 0, rotate: -15 }}
           animate={{ scale: 1, opacity: 1, rotate: 0 }}
           transition={{ type: "spring", bounce: 0.6, duration: 0.8 }}
           className="absolute inset-0 grid place-items-center text-[11px] font-black text-indigo-100 z-20"
         >
-          {level}
+          {safeLevel}
         </motion.span>
       </div>
       
       <div className="hidden text-xs sm:block">
         <motion.div 
-          key={`xp-${xp}`}
+          key={`xp-${variantId}-${safeXp}`}
           initial={{ color: "#4ade80", scale: 1.3, textShadow: "0px 0px 20px rgba(74,222,128,1)" }}
           animate={{ color: "#ffffff", scale: 1, textShadow: "0px 0px 0px rgba(74,222,128,0)" }}
           transition={{ type: "spring", stiffness: 300, damping: 15 }}
           className="font-black tabular-nums tracking-tight origin-left"
         >
-          {xp} XP
+          {safeXp} XP
         </motion.div>
         <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">
-          Lv {level}
+          Lv {safeLevel}
         </div>
       </div>
     </div>
   );
-                         }
+}
