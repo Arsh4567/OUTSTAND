@@ -14,7 +14,6 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppShell } from "@/components/app-shell";
 import { Toaster } from "@/components/ui/sonner";
 
-
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -79,7 +78,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      // Updated Viewport: Disables zooming (user-scalable=0) and stretches to edges (viewport-fit=cover) for native feel
+      { name: "viewport", content: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" },
+      
+      // --- PWA FULLSCREEN & NATIVE APP META TAGS ---
+      { name: "theme-color", content: "#050508" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-title", content: "Outstand" },
+      { name: "application-name", content: "Outstand" },
+      { name: "format-detection", content: "telephone=no" }, // Prevents iOS from auto-styling numbers as ugly blue links
       
       // 1. Core SEO (Tells Google exactly who you are)
       { title: "Outstand by Arsh | Focus & Momentum Tracker" },
@@ -89,7 +98,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       // 2. Open Graph (The "Social Billboard" for WhatsApp, Discord, LinkedIn)
       { property: "og:site_name", content: "Outstand by Arsh" },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://outstand-by-arsh.vercel.app" }, // Update this if you get a custom domain!
+      { property: "og:url", content: "https://outstand-by-arsh.vercel.app" },
       { property: "og:title", content: "Outstand by Arsh | Focus & Momentum Tracker" },
       { property: "og:description", content: "Outstand by Arsh is a premium habit tracker for students. Build streaks, master your focus, and take on daily challenges." },
       { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/MbFMKUuM2TWHnUX1cvLR8J9s9Jf1/social-images/social-1783582818919-1000035610.webp" },
@@ -104,6 +113,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
+      
+      // --- PWA ASSETS ---
+      { rel: "manifest", href: "/manifest.json" },
+      { rel: "apple-touch-icon", href: "/outstand-logo.png" },
+      
       { rel: "icon", type: "image/png", href: "/outstand-logo.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
@@ -142,4 +156,4 @@ function RootComponent() {
       <Toaster />
     </QueryClientProvider>
   );
-    }
+}
