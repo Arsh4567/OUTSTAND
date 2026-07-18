@@ -1,6 +1,5 @@
 // src/lib/notifications.ts
 import { supabase } from '../integrations/supabase/client';
-// Ensure this points to your actual supabase client file
 
 // Utility function to convert your VAPID public key for the browser
 function urlBase64ToUint8Array(base64String: string) {
@@ -61,8 +60,8 @@ async function registerAndSubscribe(userId: string) {
         throw new Error('Invalid subscription object generated');
       }
 
-      // 5. Save to Supabase
-      const { error } = await supabase
+      // 5. Save to Supabase (Using 'as any' to bypass strict type checking for the new table)
+      const { error } = await (supabase as any)
         .from('push_subscriptions')
         .upsert({
           user_id: userId,
