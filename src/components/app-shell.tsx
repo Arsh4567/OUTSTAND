@@ -60,6 +60,7 @@ function ShellWithChrome() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [haptics, setHaptics] = useState(true);
   const [isNotificationsGranted, setIsNotificationsGranted] = useState(false);
+  const [isTestingPush, setIsTestingPush] = useState(false);
 
   // Initialize Client, Theme, & Notifications
   useEffect(() => {
@@ -105,6 +106,34 @@ function ShellWithChrome() {
     }
   };
 
+  const handleTestPush = async () => {
+    if (!user?.id) {
+      toast.error("You must be logged in to test push notifications.");
+      return;
+    }
+
+    setIsTestingPush(true);
+    try {
+      const response = await fetch('/api/send-test-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      });
+      
+      if (response.ok) {
+        toast.success("Test notification triggered! Check your device. 🎉");
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        toast.error(errData.error || "Failed to send test push notification.");
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error("Network error while trying to send test push.");
+    } finally {
+      setIsTestingPush(false);
+    }
+  };
+
   const handleShare = async () => {
     const shareText = `I'm crushing goals on Outstand! Level ${level} with a ${bestStreak} day streak 🔥`;
     const url = window.location.origin;
@@ -136,8 +165,7 @@ function ShellWithChrome() {
     toast.success("Signed out successfully");
     navigate({ to: "/auth", replace: true });
   };
-
-  return (
+    return (
     <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col pb-24 md:pb-0 overflow-x-hidden transition-colors duration-300 dark:bg-slate-950 light:bg-slate-50">
       
       <header className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl shadow-sm">
@@ -308,6 +336,32 @@ function ShellWithChrome() {
                       </button>
                     </div>
 
+                    {/* Test Push Trigger (Only shows if notifications are granted) */}
+                    {isNotificationsGranted && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        className="flex items-center justify-between rounded-2xl bg-white/5 p-4 mt-2"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="grid h-10 w-10 place-items-center rounded-full bg-indigo-500/20">
+                            <Zap className="h-5 w-5 text-indigo-400" />
+                          </div>
+                          <div>
+                            <div className="font-semibold text-slate-200">Test Connection</div>
+                            <div className="text-xs text-slate-400">Send a live ping to this screen</div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={handleTestPush}
+                          disabled={isTestingPush}
+                          className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition-all hover:bg-indigo-500 active:scale-95 disabled:opacity-50"
+                        >
+                          {isTestingPush ? "Testing..." : "Test Push"}
+                        </button>
+                      </motion.div>
+                    )}
+
                     {/* Haptics Toggle */}
                     <div className="flex items-center justify-between rounded-2xl bg-white/5 p-4">
                       <div className="flex items-center gap-4">
@@ -400,7 +454,7 @@ function ShellWithChrome() {
                 </button>
               </div>
               <div className="rounded-2xl border border-white/5 bg-white/5 p-8 text-center">
-                <Timer className="mx-auto mb-3 h-8 w-8 text-slate-500" />
+              <Timer className="mx-auto mb-3 h-8 w-8 text-slate-500" />
                 <p className="text-sm text-slate-400">Connect this menu to your Pomodoro timer state variables in the future (e.g., 25m vs 50m logic).</p>
               </div>
             </motion.div>
@@ -449,4 +503,4 @@ function XpBadge({ xp, level, pct, variantId }: { xp: number, level: number, pct
       </div>
     </div>
   );
-}
+}  
