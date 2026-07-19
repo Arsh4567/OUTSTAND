@@ -13,7 +13,8 @@ webpush.setVapidDetails(
 // 2. Initialize Supabase
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL as string,
-  process.env.VITE_SUPABASE_ANON_KEY as string
+  process.env.VITE_SUPABASE_PUBLISHABLE_KEY as string
+  
 );
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
