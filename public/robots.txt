@@ -1,2 +1,33 @@
+# ==============================================
+# OUTSTAND PRODUCTION ROBOTS.TXT
+# ==============================================
+
+# 1. Allow standard web search engines (Google, Bing, DuckDuckGo)
 User-agent: *
 Allow: /
+
+# Block sensitive user states, app drawers, and API endpoints from public web crawlers
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /auth
+
+# 2. Configure AI Search & Answer Engines (Explicitly allowed for visibility)
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+# 3. Optional: Control AI Training Crawlers 
+# (Uncomment below if you want to block models from training on your app code/data)
+# User-agent: GPTBot
+# Disallow: /
+#
+# User-agent: Google-Extended
+# Disallow: /
+
+# 4. Point crawlers directly to your sitemap
+Sitemap: https://outstand-by-arsh.vercel.app/sitemap.xml
