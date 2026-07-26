@@ -86,7 +86,12 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
         headers.set("Authorization", `Bearer ${session.access_token}`);
       }
       
-      const reqBody = options?.body ? JSON.parse(options.body as string) : {};
+      let reqBody: Record<string, any> = {};
+      try {
+        reqBody = options?.body ? JSON.parse(options.body as string) : {};
+      } catch (e) {
+        reqBody = {};
+      }
       reqBody.appContext = appContextRef.current;
 
       return fetch(url, {
@@ -166,7 +171,7 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
                     </div>
                   )}
 
-                  {message.toolInvocations?.map((tool) => {
+                  {message.toolInvocations?.map((tool: any) => {
                     if (tool.toolName === "createHabit") {
                       return (
                         <motion.div 
@@ -385,6 +390,12 @@ export function ChatAssistant() {
 
       <Drawer open={open} onOpenChange={setOpen} direction="bottom">
         <DrawerContent className="h-[90dvh] md:h-[85dvh] rounded-t-3xl border-t border-white/10 bg-slate-950/95 backdrop-blur-2xl shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
+          {/* Radix accessibility requirement compliance wrapper */}
+          <div className="sr-only">
+            <DrawerTitle>Outstand Intelligence Assistant</DrawerTitle>
+            <DrawerDescription>Real-time coaching chat interface</DrawerDescription>
+          </div>
+
           {loadingHistory ? (
             <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
               <div className="relative">
