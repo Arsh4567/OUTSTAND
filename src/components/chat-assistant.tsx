@@ -105,13 +105,21 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
     },
   });
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent | React.MouseEvent | React.KeyboardEvent | any) => {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
     
     if (!input.trim() || isLoading) return;
     const userText = input.trim();
     setInput("");
-    await append({ role: "user", content: userText });
+    
+    try {
+      await append({ role: "user", content: userText });
+    } catch (err) {
+      console.error("AI SDK append error:", err);
+      toast.error("Failed to send message.");
+    }
   };
 
   const handleClear = async () => {
@@ -279,10 +287,11 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
             value={input}
             onChange={(e) => setInput(e.currentTarget.value)}
             disabled={isLoading}
+            onSubmit={handleSubmit}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                handleSubmit();
+                handleSubmit(e);
               }
             }}
             className="bg-slate-900/50 border-white/10 text-white placeholder:text-slate-600 focus:border-indigo-500/50 transition-colors resize-none"
@@ -291,6 +300,11 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
             <PromptInputSubmit
               status={isLoading ? "streaming" : "idle"}
               onStop={stop}
+              onClick={(e: any) => {
+                if (!isLoading) {
+                  handleSubmit(e);
+                }
+              }}
               disabled={(!input.trim() && !isLoading)}
             />
           </PromptInputFooter>
@@ -298,8 +312,8 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
       </div>
     </div>
   );
-}
-export function ChatAssistant() {
+          }
+       export function ChatAssistant() {
   const [open, setOpen] = useState(false);
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -395,7 +409,6 @@ export function ChatAssistant() {
 
       <Drawer open={open} onOpenChange={setOpen} direction="bottom">
         <DrawerContent className="h-[90dvh] md:h-[85dvh] rounded-t-3xl border-t border-white/10 bg-slate-950/95 backdrop-blur-2xl shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
-          {/* Radix accessibility requirement compliance wrapper */}
           <div className="sr-only">
             <DrawerTitle>Outstand Intelligence Assistant</DrawerTitle>
             <DrawerDescription>Real-time coaching chat interface</DrawerDescription>
@@ -426,4 +439,5 @@ export function ChatAssistant() {
       </Drawer>
     </>
   );
-}
+       }
+      
