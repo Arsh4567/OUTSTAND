@@ -5,39 +5,42 @@ export function getRarityStyle(rarity: OutstandChallenge["rarity"]) {
   switch (rarity) {
     case "Legendary":
       return {
-        border: "border-yellow-500/80 hover:border-yellow-300 transition-colors duration-500",
-        shadow: "shadow-[0_0_50px_rgba(234,179,8,0.6)] hover:shadow-[0_0_100px_rgba(253,224,71,1)] animate-pulse",
-        text: "text-yellow-400 drop-shadow-[0_0_15px_rgba(253,224,71,0.9)] font-bold",
-        bg: "bg-gradient-to-br from-yellow-500/20 to-black/80 hover:from-yellow-400/30 transform hover:scale-105 hover:-translate-y-2 transition-all duration-500 ease-out",
+        border: "border-amber-400/40 hover:border-amber-300/80 transition-colors duration-700",
+        shadow: "shadow-[0_0_40px_-10px_rgba(251,191,36,0.25)] hover:shadow-[0_0_80px_-15px_rgba(251,191,36,0.6)]",
+        // Shimmering gold gradient text
+        text: "text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-600 font-extrabold drop-shadow-[0_2px_10px_rgba(251,191,36,0.3)]",
+        // Rich, deep glassmorphism
+        bg: "bg-gradient-to-br from-amber-500/10 via-black/40 to-black/80 backdrop-blur-xl hover:from-amber-400/20 transform hover:-translate-y-1.5 hover:scale-[1.01] transition-all duration-500 ease-out",
       };
     case "Epic":
       return {
-        border: "border-purple-500/70 hover:border-purple-300 transition-colors duration-500",
-        shadow: "shadow-[0_0_35px_rgba(168,85,247,0.4)] hover:shadow-[0_0_70px_rgba(216,180,254,0.9)]",
-        text: "text-purple-400 drop-shadow-[0_0_10px_rgba(216,180,254,0.8)]",
-        bg: "bg-gradient-to-br from-purple-600/20 to-black/80 hover:from-purple-500/30 transform hover:scale-[1.03] hover:-translate-y-1 transition-all duration-500 ease-out",
+        border: "border-fuchsia-500/40 hover:border-fuchsia-400/70 transition-colors duration-700",
+        shadow: "shadow-[0_0_30px_-10px_rgba(217,70,239,0.2)] hover:shadow-[0_0_60px_-15px_rgba(217,70,239,0.5)]",
+        // Liquid purple gradient text
+        text: "text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-300 to-purple-500 font-bold drop-shadow-[0_2px_10px_rgba(217,70,239,0.4)]",
+        bg: "bg-gradient-to-br from-fuchsia-500/10 via-black/40 to-black/80 backdrop-blur-xl hover:from-fuchsia-400/20 transform hover:-translate-y-1 hover:scale-[1.01] transition-all duration-500 ease-out",
       };
     case "Rare":
       return {
-        border: "border-blue-500/60 hover:border-blue-400 transition-colors duration-500",
-        shadow: "shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_45px_rgba(96,165,250,0.7)]",
-        text: "text-blue-400 drop-shadow-[0_0_5px_rgba(96,165,250,0.5)]",
-        bg: "bg-blue-500/10 hover:bg-blue-400/20 transform hover:scale-[1.02] transition-all duration-300 ease-out",
+        border: "border-cyan-500/30 hover:border-cyan-400/60 transition-colors duration-500",
+        shadow: "shadow-[0_0_20px_-10px_rgba(6,182,212,0.15)] hover:shadow-[0_0_40px_-15px_rgba(6,182,212,0.4)]",
+        text: "text-cyan-300 font-semibold drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]",
+        bg: "bg-gradient-to-br from-cyan-500/10 to-black/60 backdrop-blur-lg hover:from-cyan-400/15 transform hover:-translate-y-0.5 transition-all duration-500 ease-out",
       };
     case "Uncommon":
       return {
-        border: "border-emerald-500/50 hover:border-emerald-400 transition-colors duration-300",
-        shadow: "shadow-[0_0_15px_rgba(16,185,129,0.2)] hover:shadow-[0_0_30px_rgba(52,211,153,0.5)]",
-        text: "text-emerald-400",
-        bg: "bg-emerald-500/10 hover:bg-emerald-400/15 transform hover:scale-[1.01] transition-all duration-300",
+        border: "border-emerald-500/20 hover:border-emerald-400/50 transition-colors duration-500",
+        shadow: "shadow-[0_0_15px_-10px_rgba(16,185,129,0.1)] hover:shadow-[0_0_30px_-15px_rgba(16,185,129,0.3)]",
+        text: "text-emerald-400 font-medium",
+        bg: "bg-emerald-500/5 hover:bg-emerald-400/10 backdrop-blur-md transition-all duration-500",
       };
     case "Common":
     default:
       return {
-        border: "border-white/10 hover:border-white/30 transition-colors duration-300",
-        shadow: "shadow-none hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]",
-        text: "text-slate-300",
-        bg: "bg-white/5 hover:bg-white/10 transition-all duration-300",
+        border: "border-white/5 hover:border-white/20 transition-colors duration-500",
+        shadow: "shadow-none hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)]",
+        text: "text-zinc-400 font-medium",
+        bg: "bg-white/[0.02] hover:bg-white/[0.04] backdrop-blur-sm transition-all duration-500",
       };
   }
 }
