@@ -1,13 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
+import { google } from "@ai-sdk/google";
 import { z } from "zod";
-
-import {
-  createLovableAiGatewayProvider,
-  getLovableAiGatewayRunId,
-  getLovableAiGatewayResponseHeaders,
-} from "@/lib/ai-gateway.server";
 
 const ChatRequestSchema = z.object({
   messages: z.array(z.any()),
@@ -132,27 +127,22 @@ export const Route = createFileRoute("/api/chat")({
           }
         }
 
-        const key = process.env.LOVABLE_API_KEY;
-        if (!key) {
-          return new Response("Missing AI configuration", { status: 500 });
+        const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+        if (!apiKey) {
+          return new Response("Missing Gemini API configuration", { status: 500 });
         }
 
-        const initialRunId = getLovableAiGatewayRunId(request);
-        const gateway = createLovableAiGatewayProvider(key, initialRunId);
-        const model = gateway("openai/gpt-5.5");
+        const model = google("gemini-2.5-flash", { apiKey });
         const modelMessages = await convertToModelMessages(messages as UIMessage[]);
 
         const result = streamText({
           model,
-          instructions: buildSystemPrompt(appContext),
+          system: buildSystemPrompt(appContext),
           messages: modelMessages,
         });
 
         return result.toUIMessageStreamResponse({
           originalMessages: messages as UIMessage[],
-          headers: getLovableAiGatewayResponseHeaders(undefined, {
-            ...(initialRunId ? { "X-Lovable-AIG-Run-ID": initialRunId } : {}),
-          }),
           onFinish: async ({ responseMessage }) => {
             const text = responseMessage.parts
               .filter((p: any) => p.type === "text")
@@ -212,3 +202,4 @@ export const Route = createFileRoute("/api/chat")({
     },
   },
 });
+              
