@@ -43,6 +43,14 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 
+// BULLETPROOF ID GENERATOR: Prevents Android/WebView crashes when crypto.randomUUID is unsupported
+const generateSafeId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `id-${Math.random().toString(36).substring(2, 15)}-${Date.now().toString(36)}`;
+};
+
 type AppContext = {
   name: string;
   habits: { id: string; name: string; emoji: string }[];
@@ -74,6 +82,7 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
     id: "outstand-assistant",
     api: "/api/chat",
     initialMessages,
+    generateId: generateSafeId, // FIX: Overrides SDK's buggy internal ID generator
     onError: (err) => {
       console.error("AI SDK Error:", err);
       toast.error(`Error: ${err.message}`);
@@ -105,20 +114,22 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
     },
   });
 
-  const handleSubmit = async (e?: React.FormEvent | React.MouseEvent | React.KeyboardEvent | any) => {
+  const handleSubmit = async (e?: any) => {
+    // Safely attempt to prevent default behavior without crashing
     if (e && typeof e.preventDefault === 'function') {
-      e.preventDefault();
+      try { e.preventDefault(); } catch (err) {}
     }
     
-    if (!input.trim() || isLoading) return;
     const userText = input.trim();
+    if (!userText || isLoading) return;
+    
     setInput("");
     
     try {
       await append({ role: "user", content: userText });
-    } catch (err) {
+    } catch (err: any) {
       console.error("AI SDK append error:", err);
-      toast.error("Failed to send message.");
+      toast.error(`Send failed: ${err.message || "Could not process request."}`);
     }
   };
 
@@ -281,17 +292,20 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
           </div>
         )}
         
-        <PromptInput onSubmit={handleSubmit}>
+        {/* FIX: Form wrappers stripped of events to prevent propagation crashes */}
+        <PromptInput onSubmit={(e: any) => {
+          if (e?.preventDefault) e.preventDefault();
+          handleSubmit();
+        }}>
           <PromptInputTextarea
             placeholder="Initialize command..."
             value={input}
             onChange={(e) => setInput(e.currentTarget.value)}
             disabled={isLoading}
-            onSubmit={handleSubmit}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                handleSubmit(e);
+                handleSubmit(); // Safe execution with no event parameter
               }
             }}
             className="bg-slate-900/50 border-white/10 text-white placeholder:text-slate-600 focus:border-indigo-500/50 transition-colors resize-none"
@@ -299,11 +313,10 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
           <PromptInputFooter className="justify-end pt-2">
             <PromptInputSubmit
               status={isLoading ? "streaming" : "idle"}
-              onStop={stop}
+              onStop={() => { if (stop) stop(); }}
               onClick={(e: any) => {
-                if (!isLoading) {
-                  handleSubmit(e);
-                }
+                if (e?.preventDefault) e.preventDefault();
+                if (!isLoading) handleSubmit(); // Safe execution with no event parameter
               }}
               disabled={(!input.trim() && !isLoading)}
             />
@@ -312,8 +325,8 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
       </div>
     </div>
   );
-          }
-       export function ChatAssistant() {
+}
+export function ChatAssistant() {
   const [open, setOpen] = useState(false);
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -360,7 +373,7 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
           const uiMessages: UIMessage[] = (messages ?? [])
             .filter((m) => m.role === "user" || m.role === "assistant")
             .map((m) => ({
-              id: crypto.randomUUID(),
+              id: generateSafeId(), // FIX: Replaced native UUID generator to prevent mobile crashes
               role: m.role as "user" | "assistant",
               content: m.content,
             }));
@@ -439,5 +452,4 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
       </Drawer>
     </>
   );
-       }
-      
+}
