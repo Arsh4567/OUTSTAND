@@ -63,18 +63,21 @@ type ChatPanelProps = {
 
 function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelProps) {
   const [input, setInput] = useState("");
-  const { addHabit } = useAppState(); // Pulled in to allow AI to take actions
+  const { addHabit } = useAppState(); 
   
   const appContextRef = useRef(appContext);
   useEffect(() => {
     appContextRef.current = appContext;
   }, [appContext]);
 
-  // UPGRADED: Modern, crash-proof useChat implementation for Vercel AI SDK
   const { messages, isLoading, append, stop, error } = useChat({
     id: "outstand-assistant",
     api: "/api/chat",
     initialMessages,
+    onError: (err) => {
+      console.error("AI SDK Error:", err);
+      toast.error(`Error: ${err.message}`);
+    },
     fetch: async (url, options) => {
       const { data: { session } } = await supabase.auth.getSession();
       const headers = new Headers(options?.headers);
@@ -93,12 +96,6 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
       });
     },
   });
-
-  useEffect(() => {
-    if (error) {
-      toast.error("Assistant disconnected. Please try again.");
-    }
-  }, [error]);
 
   const handleSubmit = async () => {
     if (!input.trim() || isLoading) return;
@@ -160,7 +157,6 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
             messages.map((message) => (
               <Message key={message.id} from={message.role}>
                 <MessageContent>
-                  {/* Handle Standard Text */}
                   {message.content && (
                     <div className={cn(
                       "whitespace-pre-wrap leading-relaxed",
@@ -170,7 +166,6 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
                     </div>
                   )}
 
-                  {/* NEXT LEVEL: GENERATIVE UI WIDGETS */}
                   {message.toolInvocations?.map((tool) => {
                     if (tool.toolName === "createHabit") {
                       return (
@@ -261,7 +256,13 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="shrink-0 border-t border-white/5 p-4 bg-slate-950">
+      <div className="shrink-0 border-t border-white/5 p-4 bg-slate-950 flex flex-col gap-2">
+        {error && (
+          <div className="rounded-lg border border-rose-500/50 bg-rose-500/10 p-3 text-sm text-rose-400">
+            <strong>Connection Failed:</strong> {error.message}
+          </div>
+        )}
+        
         <PromptInput onSubmit={handleSubmit}>
           <PromptInputTextarea
             placeholder="Initialize command..."
@@ -287,8 +288,8 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
       </div>
     </div>
   );
-                    }
-   export function ChatAssistant() {
+}
+export function ChatAssistant() {
   const [open, setOpen] = useState(false);
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -360,7 +361,6 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
 
   return (
     <>
-      {/* THE NEXT-LEVEL FLOATING ORB */}
       <motion.div
         className="fixed bottom-24 right-4 md:bottom-8 md:right-8 z-50"
         animate={{ y: [0, -8, 0] }}
@@ -376,7 +376,6 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
           )}
           aria-label="Initialize Intelligence"
         >
-          {/* Internal rotating glow effect */}
           <div className="absolute inset-[-50%] bg-[conic-gradient(from_0deg,transparent_0_340deg,rgba(255,255,255,0.8)_360deg)] animate-[spin_3s_linear_infinite] opacity-50" />
           <div className="absolute inset-[2px] rounded-full bg-slate-950 z-10 flex items-center justify-center">
             <Bot className="h-6 w-6 text-indigo-400 group-hover:text-purple-300 transition-colors drop-shadow-[0_0_10px_rgba(129,140,248,0.8)]" />
@@ -411,4 +410,4 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
       </Drawer>
     </>
   );
-   }
+}
