@@ -1,0 +1,2 @@
+# Outstand
+Outstand is a productivity, habit-tracking, and focus-coaching web application designed to help users manage habits, maintain streaks, and track dopamine baselines.
