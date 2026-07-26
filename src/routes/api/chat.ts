@@ -6,7 +6,7 @@ import { z } from "zod";
 
 const ChatRequestSchema = z.object({
   messages: z.array(z.any()),
-  appContext: z.any(),
+  appContext: z.any().optional(),
 });
 
 function buildSystemPrompt(appContext: unknown): string {
@@ -54,44 +54,55 @@ export const Route = createFileRoute("/api/chat")({
         try {
           const authHeader = request.headers.get("Authorization");
           if (!authHeader) {
-            return new Response("Error: Unauthorized access. Please log in.", { status: 401 });
+            return new Response(JSON.stringify({ error: "Unauthorized access. Please log in." }), { 
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
           }
 
-          const supabase = createClient(
-            process.env.SUPABASE_URL!,
-            process.env.SUPABASE_PUBLISHABLE_KEY!,
-            {
-              auth: { persistSession: false, autoRefreshToken: false },
-              global: { headers: { Authorization: authHeader } },
-            },
-          );
+          const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+          const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
+          if (!supabaseUrl || !supabaseKey) {
+            return new Response(JSON.stringify({ error: "Server configuration error: Missing Supabase keys." }), { 
+              status: 500,
+              headers: { "Content-Type": "application/json" }
+            });
+          }
+
+          const supabase = createClient(supabaseUrl, supabaseKey, {
+            auth: { persistSession: false, autoRefreshToken: false },
+            global: { headers: { Authorization: authHeader } },
+          });
 
           const { data: userData, error: userError } = await supabase.auth.getUser();
           if (userError || !userData.user) {
-            return new Response("Error: Authentication failed. Session may be expired.", { status: 401 });
+            return new Response(JSON.stringify({ error: "Authentication failed. Session may be expired." }), { 
+              status: 401,
+              headers: { "Content-Type": "application/json" }
+            });
           }
           const userId = userData.user.id;
 
           let body: z.infer<typeof ChatRequestSchema>;
           try {
-            body = ChatRequestSchema.parse(await request.json());
+            const rawBody = await request.json();
+            body = ChatRequestSchema.parse(rawBody);
           } catch (zodError: any) {
-            return new Response(`Error: Invalid request data - ${zodError?.message || "Check format"}`, { status: 400 });
+            return new Response(JSON.stringify({ error: `Invalid request data: ${zodError?.message || "Check format"}` }), { 
+              status: 400,
+              headers: { "Content-Type": "application/json" }
+            });
           }
 
           const { messages, appContext } = body;
 
-          // Load or create the user's single conversation.
-          const { data: existingConversation, error: conversationError } = await supabase
+          // Load or create conversation safely
+          let { data: existingConversation } = await supabase
             .from("chat_conversations")
             .select("id")
             .eq("user_id", userId)
             .maybeSingle();
-
-          if (conversationError) {
-            console.error("Failed to load conversation:", conversationError);
-            return new Response("Error: Failed to load your conversation history.", { status: 500 });
-          }
 
           let conversationId = existingConversation?.id;
           if (!conversationId) {
@@ -102,13 +113,15 @@ export const Route = createFileRoute("/api/chat")({
               .single();
 
             if (createError || !newConversation) {
-              console.error("Failed to create conversation:", createError);
-              return new Response("Error: Failed to initialize a new conversation.", { status: 500 });
+              return new Response(JSON.stringify({ error: "Failed to initialize conversation." }), { 
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+              });
             }
             conversationId = newConversation.id;
           }
 
-          // Persist the latest user message.
+          // Persist user message
           const userMessage = messages[messages.length - 1];
           if (userMessage?.role === "user") {
             const text = userMessage.parts
@@ -117,27 +130,29 @@ export const Route = createFileRoute("/api/chat")({
               .join("") || userMessage.content;
 
             if (text) {
-              const { error: insertError } = await supabase.from("chat_messages").insert({
+              await supabase.from("chat_messages").insert({
                 conversation_id: conversationId,
                 user_id: userId,
                 role: "user",
                 content: text,
               });
-              
-              if (insertError) {
-                 console.error("Failed to save user message:", insertError);
-                 // We don't necessarily block the AI response here, but you could.
-              }
             }
           }
 
+          // Setup Gemini API Key explicitly for Google AI Provider
           const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
           if (!apiKey) {
-            return new Response("Error: Missing AI API configuration. Please check Vercel settings.", { status: 500 });
+            return new Response(JSON.stringify({ error: "Missing Gemini API Key in Vercel settings." }), { 
+              status: 500,
+              headers: { "Content-Type": "application/json" }
+            });
           }
 
+          // Pass API key via environment injection so the Google provider picks it up reliably
+          process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
+
           const result = streamText({
-            model: google("gemini-1.5-flash", { apiKey }),
+            model: google("gemini-1.5-flash"),
             system: buildSystemPrompt(appContext),
             messages: messages as UIMessage[],
           });
@@ -153,14 +168,17 @@ export const Route = createFileRoute("/api/chat")({
                     content: text,
                   });
                 } catch (dbError) {
-                  console.error("Failed to save AI response:", dbError);
+                  console.error("Failed to save assistant message:", dbError);
                 }
               }
             },
           });
         } catch (error: any) {
           console.error("Critical Chat API POST Error:", error);
-          return new Response(`Error: ${error?.message || "An unexpected server error occurred."}`, { status: 500 });
+          return new Response(JSON.stringify({ error: error?.message || "An unexpected server error occurred." }), { 
+            status: 500,
+            headers: { "Content-Type": "application/json" }
+          });
         }
       },
 
@@ -168,21 +186,20 @@ export const Route = createFileRoute("/api/chat")({
         try {
           const authHeader = request.headers.get("Authorization");
           if (!authHeader) {
-            return new Response("Error: Unauthorized access.", { status: 401 });
+            return new Response(JSON.stringify({ error: "Unauthorized access." }), { status: 401 });
           }
 
-          const supabase = createClient(
-            process.env.SUPABASE_URL!,
-            process.env.SUPABASE_PUBLISHABLE_KEY!,
-            {
-              auth: { persistSession: false, autoRefreshToken: false },
-              global: { headers: { Authorization: authHeader } },
-            },
-          );
+          const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+          const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
+          const supabase = createClient(supabaseUrl!, supabaseKey!, {
+            auth: { persistSession: false, autoRefreshToken: false },
+            global: { headers: { Authorization: authHeader } },
+          });
 
           const { data: userData, error: userError } = await supabase.auth.getUser();
           if (userError || !userData.user) {
-            return new Response("Error: Authentication failed.", { status: 401 });
+            return new Response(JSON.stringify({ error: "Authentication failed." }), { status: 401 });
           }
 
           const { data: conversation } = await supabase
@@ -192,16 +209,12 @@ export const Route = createFileRoute("/api/chat")({
             .maybeSingle();
 
           if (conversation?.id) {
-            const { error: deleteError } = await supabase.from("chat_messages").delete().eq("conversation_id", conversation.id);
-            if (deleteError) {
-               return new Response("Error: Failed to delete messages from the database.", { status: 500 });
-            }
+            await supabase.from("chat_messages").delete().eq("conversation_id", conversation.id);
           }
 
           return new Response(null, { status: 204 });
         } catch (error: any) {
-          console.error("Critical Chat API DELETE Error:", error);
-          return new Response(`Error: ${error?.message || "An unexpected error occurred while clearing the chat."}`, { status: 500 });
+          return new Response(JSON.stringify({ error: error?.message || "Error clearing chat." }), { status: 500 });
         }
       },
     },
