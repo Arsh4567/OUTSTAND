@@ -87,11 +87,14 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
       }
       
       let reqBody: Record<string, any> = {};
-      try {
-        reqBody = options?.body ? JSON.parse(options.body as string) : {};
-      } catch (e) {
-        reqBody = {};
+      if (typeof options?.body === "string") {
+        try {
+          reqBody = JSON.parse(options.body);
+        } catch (e) {
+          reqBody = {};
+        }
       }
+      
       reqBody.appContext = appContextRef.current;
 
       return fetch(url, {
@@ -102,7 +105,9 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
     },
   });
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    
     if (!input.trim() || isLoading) return;
     const userText = input.trim();
     setInput("");
