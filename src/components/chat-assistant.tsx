@@ -43,7 +43,7 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 
-// BULLETPROOF ID GENERATOR: Prevents Android/WebView crashes when crypto.randomUUID is unsupported
+// BULLETPROOF ID GENERATOR: 100% Math-based fallback to prevent WebView crashes
 const generateSafeId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -82,7 +82,7 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
     id: "outstand-assistant",
     api: "/api/chat",
     initialMessages,
-    generateId: generateSafeId, // FIX: Overrides SDK's buggy internal ID generator
+    generateId: generateSafeId,
     onError: (err) => {
       console.error("AI SDK Error:", err);
       toast.error(`Error: ${err.message}`);
@@ -114,19 +114,19 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
     },
   });
 
-  const handleSubmit = async (e?: any) => {
-    // Safely attempt to prevent default behavior without crashing
-    if (e && typeof e.preventDefault === 'function') {
-      try { e.preventDefault(); } catch (err) {}
-    }
-    
+  const handleSubmit = async () => {
     const userText = input.trim();
     if (!userText || isLoading) return;
     
     setInput("");
     
     try {
-      await append({ role: "user", content: userText });
+      // FIX: Explicitly providing the ID bypasses the SDK's broken internal generator
+      await append({ 
+        id: generateSafeId(),
+        role: "user", 
+        content: userText 
+      });
     } catch (err: any) {
       console.error("AI SDK append error:", err);
       toast.error(`Send failed: ${err.message || "Could not process request."}`);
@@ -292,11 +292,8 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
           </div>
         )}
         
-        {/* FIX: Form wrappers stripped of events to prevent propagation crashes */}
-        <PromptInput onSubmit={(e: any) => {
-          if (e?.preventDefault) e.preventDefault();
-          handleSubmit();
-        }}>
+        {/* FIX: Handlers simplified. The UI component handles event.preventDefault() internally */}
+        <PromptInput onSubmit={handleSubmit}>
           <PromptInputTextarea
             placeholder="Initialize command..."
             value={input}
@@ -305,7 +302,7 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                handleSubmit(); // Safe execution with no event parameter
+                handleSubmit();
               }
             }}
             className="bg-slate-900/50 border-white/10 text-white placeholder:text-slate-600 focus:border-indigo-500/50 transition-colors resize-none"
@@ -314,10 +311,6 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
             <PromptInputSubmit
               status={isLoading ? "streaming" : "idle"}
               onStop={() => { if (stop) stop(); }}
-              onClick={(e: any) => {
-                if (e?.preventDefault) e.preventDefault();
-                if (!isLoading) handleSubmit(); // Safe execution with no event parameter
-              }}
               disabled={(!input.trim() && !isLoading)}
             />
           </PromptInputFooter>
@@ -373,7 +366,7 @@ export function ChatAssistant() {
           const uiMessages: UIMessage[] = (messages ?? [])
             .filter((m) => m.role === "user" || m.role === "assistant")
             .map((m) => ({
-              id: generateSafeId(), // FIX: Replaced native UUID generator to prevent mobile crashes
+              id: generateSafeId(),
               role: m.role as "user" | "assistant",
               content: m.content,
             }));
@@ -452,4 +445,4 @@ export function ChatAssistant() {
       </Drawer>
     </>
   );
-}
+    }
