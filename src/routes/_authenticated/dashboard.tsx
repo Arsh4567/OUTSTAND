@@ -15,7 +15,7 @@ import { useAppState } from "@/hooks/use-app-state";
 import { useAuth, displayNameOf } from "@/hooks/use-auth";
 import { useDailyLog } from "@/hooks/use-dopamine";
 import { todayISO } from "@/lib/habits";
-import { dailyChallenge } from "@/lib/challenges";
+import { dailyChallenge } from "@/lib/Index";
 import { scoreColor } from "@/lib/dopamine";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
