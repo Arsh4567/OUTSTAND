@@ -1,5 +1,20 @@
+import { useEffect } from "react";
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+
+// A wrapper component to safely inject Eruda on the client side
+function AuthenticatedLayout() {
+  useEffect(() => {
+    // Only initialize Eruda in the browser environment
+    if (typeof window !== "undefined") {
+      import("eruda").then((eruda) => {
+        eruda.default.init();
+      }).catch(err => console.error("Failed to load Eruda:", err));
+    }
+  }, []);
+
+  return <Outlet />;
+}
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
@@ -38,5 +53,5 @@ export const Route = createFileRoute("/_authenticated")({
       </div>
     </div>
   ),
-  component: () => <Outlet />,
+  component: AuthenticatedLayout,
 });
