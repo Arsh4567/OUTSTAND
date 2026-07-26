@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, Pause, Play, RotateCcw, Zap, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
-// 👇 FIX: Explicitly pointing to the index file here
-import { CHALLENGES, randomChallenge, getRarityStyle, type OutstandChallenge } from "@/lib/challenges/index";
+// 👇 FIX: Pointing exactly to the capital-I Index.ts file directly in the lib folder
+import { CHALLENGES, randomChallenge, getRarityStyle, type OutstandChallenge } from "@/lib/Index";
 import { useAppState } from "@/hooks/use-app-state";
 import { useDailyLog } from "@/hooks/use-dopamine";
 import { toast } from "sonner";
@@ -322,4 +322,5 @@ function OutstandPage() {
       </div>
     </div>
   );
-}                                                                }
+                         }
+            
