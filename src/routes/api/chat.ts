@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
-import { convertToModelMessages, streamText, type UIMessage } from "ai";
+import { streamText, type UIMessage } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 
@@ -113,52 +113,38 @@ export const Route = createFileRoute("/api/chat")({
           const text = userMessage.parts
             ?.filter((p: any) => p.type === "text")
             .map((p: any) => p.text)
-            .join("");
+            .join("") || userMessage.content;
 
-          const { error: insertError } = await supabase.from("chat_messages").insert({
-            conversation_id: conversationId,
-            user_id: userId,
-            role: "user",
-            content: text || "",
-          });
-
-          if (insertError) {
-            console.error("Failed to persist user message:", insertError);
+          if (text) {
+            await supabase.from("chat_messages").insert({
+              conversation_id: conversationId,
+              user_id: userId,
+              role: "user",
+              content: text,
+            });
           }
         }
 
-        // Use Google Gemini API Key
         const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
         if (!apiKey) {
           return new Response("Missing Gemini API configuration", { status: 500 });
         }
 
-        const model = google("gemini-2.5-flash", { apiKey });
-        const modelMessages = await convertToModelMessages(messages as UIMessage[]);
-
         const result = streamText({
-          model,
+          model: google("gemini-1.5-flash", { apiKey }),
           system: buildSystemPrompt(appContext),
-          messages: modelMessages,
+          messages: messages as UIMessage[],
         });
 
-        return result.toUIMessageStreamResponse({
-          originalMessages: messages as UIMessage[],
-          onFinish: async ({ responseMessage }) => {
-            const text = responseMessage.parts
-              .filter((p: any) => p.type === "text")
-              .map((p: any) => p.text)
-              .join("");
-
-            const { error: assistantInsertError } = await supabase.from("chat_messages").insert({
-              conversation_id: conversationId,
-              user_id: userId,
-              role: "assistant",
-              content: text,
-            });
-
-            if (assistantInsertError) {
-              console.error("Failed to persist assistant message:", assistantInsertError);
+        return result.toDataStreamResponse({
+          onFinish: async ({ text }) => {
+            if (text) {
+              await supabase.from("chat_messages").insert({
+                conversation_id: conversationId,
+                user_id: userId,
+                role: "assistant",
+                content: text,
+              });
             }
           },
         });
@@ -191,11 +177,7 @@ export const Route = createFileRoute("/api/chat")({
           .maybeSingle();
 
         if (conversation?.id) {
-          const { error } = await supabase.from("chat_messages").delete().eq("conversation_id", conversation.id);
-          if (error) {
-            console.error("Failed to clear chat messages:", error);
-            return new Response("Failed to clear chat", { status: 500 });
-          }
+          await supabase.from("chat_messages").delete().eq("conversation_id", conversation.id);
         }
 
         return new Response(null, { status: 204 });
@@ -203,4 +185,3 @@ export const Route = createFileRoute("/api/chat")({
     },
   },
 });
-    
