@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Plus, Play, Zap, ChevronDown, ChevronUp, Droplets, BookOpen, Brain, Activity, Flame, Trophy, Target } from "lucide-react";
+import { Plus, Play, Zap, ChevronDown, ChevronUp, Droplets, BookOpen, Brain, Activity, Flame, Trophy, Target, Quote } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -16,6 +16,7 @@ import { useDailyLog } from "@/hooks/use-dopamine";
 import { todayISO } from "@/lib/habits";
 import { dailyChallenge } from "@/lib/Index";
 import { scoreColor } from "@/lib/dopamine";
+import { QUOTES } from "@/lib/quotes"; // Imported our new matrix
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -42,6 +43,13 @@ function Dashboard() {
     const total = habits.length;
     return { completed, total, pct: total ? Math.round((completed / total) * 100) : 0 };
   }, [habits, today]);
+
+  // Determine today's quote based on a simple date hash so it stays consistent all day
+  const dailyQuote = useMemo(() => {
+    if (!QUOTES || QUOTES.length === 0) return null;
+    const hash = today.split('-').reduce((acc, part) => acc + parseInt(part, 10), 0);
+    return QUOTES[hash % QUOTES.length];
+  }, [today]);
 
   const score = log?.score ?? 50;
   const color = scoreColor(score);
@@ -201,8 +209,36 @@ function Dashboard() {
           {/* SIDEBAR BENTO (Spans 4 columns on large screens) */}
           <motion.div variants={itemVariants} className="md:col-span-12 lg:col-span-4 flex flex-col gap-6">
             
+            {/* Quote of the Day Card */}
+            {dailyQuote && (
+              <div className="rounded-[2rem] border border-white/5 bg-slate-900/40 p-6 sm:p-7 shadow-2xl backdrop-blur-xl relative overflow-hidden group">
+                {/* Large Background Quote Icon */}
+                <div className="absolute -top-6 -right-6 text-white/[0.02] group-hover:text-white/[0.04] transition-colors duration-500 pointer-events-none">
+                  <Quote className="w-32 h-32 rotate-12" />
+                </div>
+                
+                <div className="relative z-10 flex flex-col h-full">
+                  <div className="flex items-center gap-2 text-slate-400 text-[10px] font-bold uppercase tracking-[0.25em] mb-4">
+                    <Quote className="h-3 w-3" /> Daily Insight
+                  </div>
+                  
+                  <blockquote className="text-[1.05rem] font-medium text-slate-200 leading-relaxed mb-6 flex-grow">
+                    "{dailyQuote.quote}"
+                  </blockquote>
+                  
+                  <div className="flex flex-col border-t border-white/10 pt-4 mt-auto">
+                    <span className="text-sm font-bold text-white tracking-tight">{dailyQuote.author}</span>
+                    <span className="text-xs text-slate-400 mt-1 line-clamp-2">
+                      <span className="font-semibold text-indigo-400">Action: </span> 
+                      {dailyQuote.application}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Daily Challenge Card */}
-            <div className="rounded-[2rem] border border-indigo-500/20 bg-indigo-950/20 p-8 shadow-2xl backdrop-blur-3xl group transition-all h-full relative overflow-hidden flex flex-col justify-between">
+            <div className="rounded-[2rem] border border-indigo-500/20 bg-indigo-950/20 p-6 sm:p-7 shadow-2xl backdrop-blur-3xl group transition-all relative overflow-hidden flex flex-col">
                {/* Decorative Gradient */}
                <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-indigo-500/10 to-transparent pointer-events-none" />
                <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-indigo-600/20 blur-[60px] rounded-full pointer-events-none group-hover:bg-indigo-500/30 transition-colors duration-700" />
@@ -218,12 +254,12 @@ function Dashboard() {
                  <h3 className="text-2xl font-display font-bold text-white group-hover:text-indigo-100 transition-colors leading-tight">
                    {challenge.title}
                  </h3>
-                 <p className="text-sm font-medium text-indigo-200/60 mt-4 leading-relaxed line-clamp-4">
+                 <p className="text-sm font-medium text-indigo-200/60 mt-3 leading-relaxed line-clamp-3">
                    {challenge.description}
                  </p>
                </div>
 
-               <div className="relative z-10 mt-8">
+               <div className="relative z-10 mt-6 pt-2">
                  <Button 
                     className="w-full h-12 rounded-xl transition-all bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_15px_rgba(79,70,229,0.3)] active:scale-95 border border-indigo-400/30" 
                     onClick={() => navigate({ to: "/outstand" })}
@@ -328,5 +364,4 @@ function StatCard({ icon, label, value, sub, accent }: { icon: React.ReactNode; 
       </div>
     </motion.div>
   );
-      }
-          
+}                                                                                                 }
