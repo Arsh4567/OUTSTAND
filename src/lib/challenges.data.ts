@@ -660,22 +660,4 @@ export const CHALLENGES: OutstandChallenge[] = [
     theme: THEMES.Sunset,
     audio: { onComplete: "chime" }
   },
-  {
-    id: "rare_no_tabs",
-    title: "Tab Zero",
-    description: "Close every single browser tab on your computer right now except the one you need to do your work. Bookmark if you must.",
-    emoji: "❌",
-    durationMinutes: 2,
-    category: "Productivity",
-    difficulty: "Easy",
-    rarity: "Rare",
-    timeWindow: "Morning",
-    actionType: "Toggle",
-    xpReward: 300,
-    coinsReward: 40,
-    dopamineYield: "Low",
-    flavorText: "Mental bandwidth is finite. Stop leaving it open.",
-    theme: THEMES.Neon,
-    audio: { onComplete: "digital_boot" }
-  }
 ];
