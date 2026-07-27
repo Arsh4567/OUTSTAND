@@ -31,8 +31,14 @@ export function useOutstand() {
       if (ticks > 12) {
         clearInterval(shuffleInterval);
         const next = randomChallenge(challenge?.title);
+        
         setChallenge(next);
-        setRemaining(next.minutes * 60);
+        
+        // BUG FIXED: Migrated from next.minutes to next.durationMinutes
+        // Providing a fallback of 10 minutes (600 seconds) just in case a malformed challenge slips through
+        const duration = next.durationMinutes ? next.durationMinutes * 60 : 600;
+        setRemaining(duration);
+        
         setRunning(false);
         setIsShuffling(false);
       }
@@ -59,9 +65,12 @@ export function useOutstand() {
   const complete = () => {
     if (!challenge || completionStage !== 0) return;
     
-    const xpEarned = challenge.xp;
+    const xpEarned = challenge.xp || 50; // Fallback added for safety
     const challengeEmoji = challenge.emoji;
-    const challengeColor = challenge.color;
+    
+    // Safely mapping the old color schema to the new dynamic themes if required
+    // Defaulting to the Outstand Indigo hex if the color prop is missing
+    const challengeColor = challenge.color || '#4f46e5'; 
     
     setRunning(false);
     setCompletionStage(1); 
@@ -75,13 +84,13 @@ export function useOutstand() {
     }, 1500);
 
     setTimeout(() => {
-      recordOutstand(challenge.title, challenge.xp);
+      recordOutstand(challenge.title, xpEarned);
       addPositive("outstand");
       
       toast.custom((t) => (
         <div 
           className="relative overflow-hidden w-full max-w-[360px] mx-auto rounded-2xl border border-white/10 bg-slate-950 p-4 flex items-center gap-4"
-          style={{ boxShadow: `0 20px 40px -10px ${challengeColor || '#4f46e5'}60` }}
+          style={{ boxShadow: `0 20px 40px -10px ${challengeColor}60` }}
         >
           <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-50" />
           <div className="relative flex-shrink-0 w-14 h-14 flex items-center justify-center text-3xl bg-black/50 rounded-xl border border-white/10 shadow-inner z-10">
@@ -117,5 +126,4 @@ export function useOutstand() {
     mins: Math.floor(remaining / 60),
     secs: remaining % 60,
   };
-               }
-    
+                }
