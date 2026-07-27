@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Coffee, Pause, Play, RotateCcw, Timer } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Coffee, Pause, Play, RotateCcw, Timer, Flame, Zap, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAppState } from "@/hooks/use-app-state";
 import { useDailyLog } from "@/hooks/use-dopamine";
@@ -12,8 +13,6 @@ export const Route = createFileRoute("/_authenticated/focus")({
     meta: [
       { title: "Focus — Pomodoro sessions" },
       { name: "description", content: "Run focused 25-minute Pomodoro sessions with break tracking." },
-      { property: "og:title", content: "Focus — Pomodoro sessions" },
-      { property: "og:description", content: "Run focused 25-minute Pomodoro sessions." },
     ],
   }),
   component: FocusPage,
@@ -21,7 +20,32 @@ export const Route = createFileRoute("/_authenticated/focus")({
 
 type Mode = "focus" | "short" | "long";
 const DURATIONS: Record<Mode, number> = { focus: 25 * 60, short: 5 * 60, long: 15 * 60 };
-const LABELS: Record<Mode, string> = { focus: "Focus", short: "Short break", long: "Long break" };
+const LABELS: Record<Mode, string> = { focus: "Deep Focus", short: "Short Break", long: "Deep Rest" };
+
+// Theme engine for the Pomodoro timer
+const THEMES: Record<Mode, { color: string; bg: string; border: string; glow: string; icon: React.ReactNode }> = {
+  focus: {
+    color: "text-amber-400",
+    bg: "bg-amber-500/10",
+    border: "border-amber-500/30",
+    glow: "shadow-[0_0_40px_rgba(251,191,36,0.15)]",
+    icon: <Flame size={14} className="text-amber-400" />
+  },
+  short: {
+    color: "text-cyan-400",
+    bg: "bg-cyan-500/10",
+    border: "border-cyan-500/30",
+    glow: "shadow-[0_0_40px_rgba(6,182,212,0.15)]",
+    icon: <Zap size={14} className="text-cyan-400" />
+  },
+  long: {
+    color: "text-indigo-400",
+    bg: "bg-indigo-500/10",
+    border: "border-indigo-500/30",
+    glow: "shadow-[0_0_40px_rgba(99,102,241,0.15)]",
+    icon: <Moon size={14} className="text-indigo-400" />
+  }
+};
 
 function FocusPage() {
   const { sessions, recordSession } = useAppState();
@@ -32,6 +56,9 @@ function FocusPage() {
   const intervalRef = useRef<number | null>(null);
   const startedAtRef = useRef<number | null>(null);
 
+  const activeTheme = THEMES[mode];
+
+  // 1. The Core Timer Engine
   useEffect(() => {
     if (!running) return;
     intervalRef.current = window.setInterval(() => {
@@ -57,8 +84,11 @@ function FocusPage() {
   }, [running, mode, recordSession, addPositive]);
 
   const switchMode = (m: Mode) => {
+    if (running) {
+      toast.error("Pause the timer first", { description: "You must pause before switching modes." });
+      return;
+    }
     setMode(m);
-    setRunning(false);
     setRemaining(DURATIONS[m]);
     startedAtRef.current = null;
   };
@@ -87,104 +117,174 @@ function FocusPage() {
   const totalMinutes = sessions.filter((s) => s.completed).reduce((a, b) => a + b.durationMin, 0);
 
   return (
-    <div className="space-y-8">
-      <div className="text-center">
-        <h1 className="font-display text-3xl font-bold md:text-4xl">Focus</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Work in deep 25-minute sprints. Rest in between.</p>
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-8 pb-20 max-w-5xl mx-auto px-4 sm:px-6"
+    >
+      {/* Header */}
+      <div className="text-center pt-8">
+        <h1 className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-br from-white to-zinc-500 tracking-tight">
+          Pomodoro
+        </h1>
+        <p className="mt-2 text-sm md:text-base text-zinc-400">Master your attention. Conquer your tasks.</p>
       </div>
 
-      <div className="glass-card mx-auto max-w-xl p-8">
-        <div className="flex justify-center gap-2">
+      {/* Main Timer Glass Card */}
+      <div className={cn(
+        "relative mx-auto max-w-xl p-8 rounded-3xl backdrop-blur-2xl border transition-all duration-700",
+        "bg-zinc-900/50", 
+        activeTheme.border,
+        activeTheme.glow
+      )}>
+        {/* Mode Switcher */}
+        <div className="flex justify-center gap-2 p-1.5 bg-black/40 rounded-full border border-white/5 w-fit mx-auto">
           {(["focus", "short", "long"] as Mode[]).map((m) => (
             <button
               key={m}
               onClick={() => switchMode(m)}
-              className={cn(
-                "rounded-full px-4 py-1.5 text-xs font-medium transition-colors",
-                mode === m ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground",
-              )}
+              className="relative px-5 py-2 text-xs font-bold uppercase tracking-widest rounded-full transition-colors z-10"
             >
-              {LABELS[m]}
+              {mode === m && (
+                <motion.div
+                  layoutId="active-mode"
+                  className={cn("absolute inset-0 rounded-full", THEMES[m].bg)}
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+              <span className={cn("relative z-20 flex items-center gap-2", mode === m ? THEMES[m].color : "text-zinc-500 hover:text-zinc-300")}>
+                {mode === m && THEMES[m].icon}
+                {LABELS[m]}
+              </span>
             </button>
           ))}
         </div>
 
-        <div className="relative mx-auto mt-8 grid h-64 w-64 place-items-center md:h-72 md:w-72">
-          <svg viewBox="0 0 100 100" className="absolute inset-0 -rotate-90">
-            <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" className="text-secondary" strokeWidth="6" />
+        {/* Circular Timer Display */}
+        <div className="relative mx-auto mt-12 grid h-72 w-72 md:h-80 md:w-80 place-items-center">
+          <svg viewBox="0 0 100 100" className="absolute inset-0 -rotate-90 drop-shadow-2xl">
+            {/* Background Track */}
+            <circle cx="50" cy="50" r="46" fill="none" className="stroke-white/5" strokeWidth="2" />
+            {/* Progress Track */}
             <circle
-              cx="50" cy="50" r="45" fill="none"
-              stroke="url(#focusGrad)" strokeWidth="6" strokeLinecap="round"
-              strokeDasharray={`${progress * 282.7} 282.7`}
-              style={{ transition: "stroke-dasharray 700ms linear" }}
+              cx="50" cy="50" r="46" fill="none"
+              stroke={`url(#${mode}Grad)`} strokeWidth="4" strokeLinecap="round"
+              strokeDasharray={`${progress * 289} 289`}
+              style={{ transition: "stroke-dasharray 1s linear" }}
             />
             <defs>
               <linearGradient id="focusGrad" x1="0" x2="1" y1="0" y2="1">
-                <stop offset="0%" stopColor="oklch(0.82 0.14 235)" />
-                <stop offset="100%" stopColor="oklch(0.72 0.18 285)" />
+                <stop offset="0%" stopColor="#f59e0b" />
+                <stop offset="100%" stopColor="#ea580c" />
+              </linearGradient>
+              <linearGradient id="shortGrad" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0%" stopColor="#2dd4bf" />
+                <stop offset="100%" stopColor="#0891b2" />
+              </linearGradient>
+              <linearGradient id="longGrad" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0%" stopColor="#818cf8" />
+                <stop offset="100%" stopColor="#4f46e5" />
               </linearGradient>
             </defs>
           </svg>
-          <div className={cn("z-10 grid h-40 w-40 place-items-center rounded-full bg-secondary/40 backdrop-blur", running && "pulse-ring")}>
+
+          {/* Time Text */}
+          <motion.div 
+            animate={running ? { scale: [1, 1.02, 1] } : { scale: 1 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            className={cn(
+              "z-10 grid h-56 w-56 place-items-center rounded-full border border-white/5 bg-black/40 backdrop-blur-md shadow-inner",
+              running && activeTheme.glow
+            )}
+          >
             <div className="text-center">
-              <div className="font-mono text-4xl font-bold md:text-5xl">
+              <div className={cn("font-mono text-6xl md:text-7xl font-black tabular-nums tracking-tighter drop-shadow-lg", activeTheme.color)}>
                 {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
               </div>
-              <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{LABELS[mode]}</div>
+              <div className="mt-2 text-xs font-bold uppercase tracking-[0.3em] text-zinc-500">{LABELS[mode]}</div>
             </div>
-          </div>
+          </motion.div>
         </div>
 
-        <div className="mt-6 flex items-center justify-center gap-3">
-          <Button onClick={toggle} className="btn-primary min-w-32 gap-2">
-            {running ? <><Pause className="h-4 w-4" /> Pause</> : <><Play className="h-4 w-4" /> Start</>}
-          </Button>
-          <Button variant="secondary" onClick={reset} className="gap-2">
-            <RotateCcw className="h-4 w-4" /> Reset
-          </Button>
+        {/* Controls */}
+        <div className="mt-12 flex items-center justify-center gap-4">
+          <motion.div whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }}>
+            <Button 
+              onClick={toggle} 
+              className={cn("h-14 px-8 rounded-2xl font-bold text-lg border transition-all", activeTheme.bg, activeTheme.border, activeTheme.color, "hover:bg-opacity-20")}
+            >
+              {running ? <><Pause className="mr-2 h-5 w-5" /> PAUSE</> : <><Play className="mr-2 h-5 w-5" /> START</>}
+            </Button>
+          </motion.div>
+          <motion.div whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }}>
+            <Button 
+              variant="outline" 
+              onClick={reset} 
+              className="h-14 w-14 rounded-2xl bg-black/40 border-white/10 text-zinc-400 hover:text-white hover:bg-white/10"
+            >
+              <RotateCcw className="h-5 w-5" />
+            </Button>
+          </motion.div>
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatBig icon={<Timer />} label="Completed sessions" value={String(completedFocus)} />
-        <StatBig icon={<Coffee />} label="Total focus time" value={`${totalMinutes} min`} />
-        <StatBig icon={<Play />} label="This mode" value={LABELS[mode]} />
+      {/* Stats Row */}
+      <div className="grid gap-4 sm:grid-cols-3 max-w-3xl mx-auto">
+        <StatBig icon={<Timer className="text-amber-400"/>} label="Completed Sessions" value={String(completedFocus)} />
+        <StatBig icon={<Coffee className="text-cyan-400"/>} label="Total Deep Work" value={`${totalMinutes} min`} />
+        <StatBig icon={<Play className="text-indigo-400"/>} label="Current Mode" value={LABELS[mode]} />
       </div>
 
-      <div className="glass-card p-5">
-        <h3 className="font-display text-lg font-semibold">Recent sessions</h3>
+      {/* History Log */}
+      <div className="bg-zinc-900/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6 max-w-3xl mx-auto">
+        <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Recent Sessions</h3>
         {sessions.length === 0 ? (
-          <p className="mt-2 text-sm text-muted-foreground">No sessions yet. Start your first focus block.</p>
+          <div className="text-center py-8 text-zinc-600 border border-dashed border-zinc-800 rounded-2xl">
+            No sessions logged yet. Time to get to work.
+          </div>
         ) : (
-          <ul className="mt-3 divide-y divide-border/50">
-            {sessions.slice(0, 8).map((s) => (
-              <li key={s.id} className="flex items-center justify-between py-2.5 text-sm">
-                <span className="flex items-center gap-2">
-                  <span className={cn("h-2 w-2 rounded-full", s.completed ? "bg-success" : "bg-warning")} />
-                  {s.durationMin} min · {s.completed ? "completed" : "stopped early"}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {new Date(s.startedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                </span>
-              </li>
-            ))}
+          <ul className="space-y-2">
+            <AnimatePresence>
+              {sessions.slice(0, 5).map((s) => (
+                <motion.li 
+                  key={s.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.02] hover:bg-white/[0.04] transition-colors"
+                >
+                  <span className="flex items-center gap-3 text-sm font-medium text-zinc-200">
+                    <span className={cn(
+                      "h-2.5 w-2.5 rounded-full shadow-[0_0_10px_currentColor]", 
+                      s.completed ? "bg-emerald-400 text-emerald-400" : "bg-rose-500 text-rose-500"
+                    )} />
+                    {s.durationMin} min {s.completed ? "Focus Block" : "Interrupted"}
+                  </span>
+                  <span className="text-xs text-zinc-500 font-mono">
+                    {new Date(s.startedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </motion.li>
+              ))}
+            </AnimatePresence>
           </ul>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }
 
 function StatBig({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="glass-card flex items-center gap-4 p-4">
-      <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-secondary/60 text-primary">
+    <motion.div 
+      whileHover={{ y: -2 }}
+      className="bg-zinc-900/40 backdrop-blur-xl border border-white/5 flex items-center gap-4 p-5 rounded-3xl transition-all"
+    >
+      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/5 border border-white/10">
         {icon}
       </div>
       <div className="min-w-0">
-        <div className="text-xs text-muted-foreground">{label}</div>
-        <div className="truncate font-display text-xl font-bold">{value}</div>
+        <div className="text-[10px] uppercase tracking-widest font-bold text-zinc-500">{label}</div>
+        <div className="truncate text-2xl font-black text-white tracking-tight">{value}</div>
       </div>
-    </div>
+    </motion.div>
   );
 }
