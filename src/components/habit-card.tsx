@@ -24,15 +24,17 @@ const COLORS = [
 
 const EMOJIS = ["📚", "🧠", "🏃", "📵", "💧", "🧘", "✍️", "🎯", "🌙", "☀️", "💪", "🎧"];
 
-const colorClasses: Record<string, { ring: string; bg: string; text: string; lightBg: string }> = {
-  primary: { ring: "ring-blue-500/40", bg: "bg-blue-500", text: "text-blue-400", lightBg: "bg-blue-500/10" },
-  accent: { ring: "ring-indigo-500/40", bg: "bg-indigo-500", text: "text-indigo-400", lightBg: "bg-indigo-500/10" },
-  success: { ring: "ring-emerald-500/40", bg: "bg-emerald-500", text: "text-emerald-400", lightBg: "bg-emerald-500/10" },
-  warning: { ring: "ring-rose-500/40", bg: "bg-rose-500", text: "text-rose-400", lightBg: "bg-rose-500/10" },
+const colorClasses: Record<string, { ring: string; bg: string; text: string; lightBg: string; border: string }> = {
+  primary: { ring: "ring-blue-500/40", bg: "bg-blue-500", text: "text-blue-400", lightBg: "bg-blue-500/10", border: "border-blue-400" },
+  accent: { ring: "ring-indigo-500/40", bg: "bg-indigo-500", text: "text-indigo-400", lightBg: "bg-indigo-500/10", border: "border-indigo-400" },
+  success: { ring: "ring-emerald-500/40", bg: "bg-emerald-500", text: "text-emerald-400", lightBg: "bg-emerald-500/10", border: "border-emerald-400" },
+  warning: { ring: "ring-rose-500/40", bg: "bg-rose-500", text: "text-rose-400", lightBg: "bg-rose-500/10", border: "border-rose-400" },
 };
 
-// Premium Easing
-const spring = { type: "spring", stiffness: 400, damping: 25 };
+// Premium Easing for Card
+const cardSpring = { type: "spring", stiffness: 300, damping: 20 };
+// Hyper-responsive Easing for Tactile Button
+const tactileSpring = { type: "spring", stiffness: 500, damping: 15 };
 
 export function HabitCard({
   habit,
@@ -63,12 +65,15 @@ export function HabitCard({
   return (
     <motion.div
       layout
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
       whileHover={{ y: -4, scale: 1.01 }}
-      transition={spring}
+      transition={cardSpring}
       className={cn(
-        "glass-card group relative flex flex-col gap-5 p-6",
-        isOnFire && "animate-neon-breathe border-[1.5px]",
-        isOnFire && (habit.color === 'success' ? 'border-emerald-500/40' : habit.color === 'warning' ? 'border-rose-500/40' : habit.color === 'accent' ? 'border-indigo-500/40' : 'border-blue-500/40')
+        "glass-card group relative flex flex-col gap-5 p-6 transition-colors duration-500",
+        isOnFire ? "animate-neon-breathe border-[1.5px]" : "border border-white/5 bg-slate-900/40 hover:bg-slate-900/60",
+        isOnFire && (habit.color === 'success' ? 'border-emerald-500/40' : habit.color === 'warning' ? 'border-rose-500/40' : habit.color === 'accent' ? 'border-indigo-500/40' : 'border-blue-500/40'),
+        done && "bg-slate-900/20 opacity-80 hover:opacity-100"
       )}
     >
       <div className="flex items-start justify-between gap-3 relative z-10">
@@ -77,18 +82,27 @@ export function HabitCard({
             initial={{ scale: 0.8, rotate: -10 }}
             animate={{ scale: 1, rotate: 0 }}
             className={cn(
-              "grid h-14 w-14 shrink-0 place-items-center rounded-2xl text-2xl shadow-inner border border-white/10",
-              c.lightBg
+              "grid h-14 w-14 shrink-0 place-items-center rounded-2xl text-2xl shadow-inner border transition-all duration-500",
+              c.lightBg,
+              done ? "border-white/5 opacity-50 grayscale" : "border-white/10"
             )}
           >
             {habit.emoji}
           </motion.div>
           <div className="min-w-0">
-            <h3 className="truncate font-display text-lg font-bold text-white tracking-tight">{habit.name}</h3>
+            <h3 className={cn(
+              "truncate font-display text-lg font-bold tracking-tight transition-colors duration-500",
+              done ? "text-slate-400 line-through decoration-slate-600/50" : "text-white"
+            )}>
+              {habit.name}
+            </h3>
             
             {/* Frosted Glass Streak Pill */}
-            <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-white/5 border border-white/10 px-2.5 py-0.5 text-xs font-bold text-slate-300 shadow-sm backdrop-blur-md">
-              <Flame className={cn("h-3.5 w-3.5", isOnFire ? c.text : "text-slate-500")} />
+            <div className={cn(
+              "mt-1.5 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-bold shadow-sm backdrop-blur-md transition-all duration-500",
+              done ? "bg-white/[0.02] border-white/5 text-slate-500" : "bg-white/5 border-white/10 text-slate-300"
+            )}>
+              <Flame className={cn("h-3.5 w-3.5", isOnFire && !done ? c.text : "text-slate-500")} />
               <span>{streak} Streak</span>
             </div>
           </div>
@@ -117,13 +131,17 @@ export function HabitCard({
                 animate={{ scaleY: 1 }}
                 transition={{ delay: index * 0.05, duration: 0.4, type: "spring" }}
                 className={cn(
-                  "w-full rounded-md transition-all duration-500 origin-bottom border border-white/5 shadow-inner",
-                  isDone ? c.bg : "bg-slate-800/50 hover:bg-slate-700/50",
+                  "w-full rounded-md transition-all duration-500 origin-bottom shadow-inner",
+                  isDone ? c.bg : "bg-slate-800/50 hover:bg-slate-700/50 border border-white/5",
                   isToday && !isDone && "ring-2 ring-slate-600/50",
-                  isDone ? "h-7" : "h-3"
+                  isDone ? "h-7" : "h-3",
+                  isToday && isDone && "animate-pulse"
                 )}
               />
-              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
+              <span className={cn(
+                "text-[9px] font-bold uppercase tracking-wider",
+                isToday ? "text-white" : "text-slate-600"
+              )}>
                 {new Date(d).toLocaleDateString(undefined, { weekday: "narrow" })}
               </span>
             </div>
@@ -132,55 +150,83 @@ export function HabitCard({
       </div>
 
       {/* The Haptic Action Button */}
-      <motion.div whileTap={{ scale: 0.95 }} className="mt-2 w-full">
-        <Button
-          onClick={onToggle}
-          className={cn(
-            "w-full justify-center gap-2 h-12 rounded-xl text-sm font-black uppercase tracking-wide transition-all duration-300 relative overflow-hidden",
-            done 
-              ? "bg-white/10 text-white border-white/10 shadow-inner hover:bg-white/20" 
-              : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)] border border-blue-400/30"
-          )}
+      <div className="mt-2 w-full relative">
+        <motion.div 
+          whileTap={{ scale: 0.92, filter: "brightness(0.8)" }} 
+          transition={tactileSpring}
         >
-          <AnimatePresence mode="wait">
-            {done ? (
-              <motion.div
-                key="done"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="flex items-center gap-2"
-              >
-                {/* Liquid Draw SVG Checkmark */}
-                <motion.svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"
-                  className={c.text}
-                >
-                  <motion.path
-                    initial={{ pathLength: 0 }}
-                    animate={{ pathLength: 1 }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
-                    d="M20 6 9 17l-5-5"
-                  />
-                </motion.svg>
-                Momentum Logged
-              </motion.div>
-            ) : (
-              <motion.div
-                key="undone"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 10 }}
-                className="flex items-center gap-2"
-              >
-                <CheckCircle2 className="h-5 w-5 opacity-70" />
-                Mark Complete
-              </motion.div>
+          <Button
+            onClick={onToggle}
+            className={cn(
+              "w-full justify-center gap-2 h-12 rounded-xl text-sm font-black uppercase tracking-wide transition-all duration-300 relative overflow-hidden group",
+              done 
+                ? "bg-slate-900/50 text-slate-400 border border-white/5 shadow-[inset_0_4px_15px_rgba(0,0,0,0.5)] hover:bg-slate-800/50" 
+                : "bg-gradient-to-r from-slate-800 to-slate-700 text-white shadow-lg border border-white/10 hover:border-white/20 hover:shadow-xl"
             )}
-          </AnimatePresence>
-        </Button>
-      </motion.div>
+          >
+            {/* Visual Indicator of the Color Signature before completion */}
+            {!done && (
+               <div className={cn("absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity duration-300 bg-gradient-to-r", 
+                 c.bg === 'bg-blue-500' ? 'from-blue-600 to-indigo-600' :
+                 c.bg === 'bg-indigo-500' ? 'from-indigo-600 to-purple-600' :
+                 c.bg === 'bg-emerald-500' ? 'from-emerald-600 to-teal-600' :
+                 'from-rose-600 to-orange-600'
+               )} />
+            )}
+
+            <AnimatePresence mode="wait">
+              {done ? (
+                <motion.div
+                  key="done"
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                  className="flex items-center gap-2 z-10"
+                >
+                  <motion.svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"
+                    className={c.text}
+                  >
+                    <motion.path
+                      initial={{ pathLength: 0 }}
+                      animate={{ pathLength: 1 }}
+                      transition={{ duration: 0.4, ease: "easeOut", delay: 0.1 }}
+                      d="M20 6 9 17l-5-5"
+                    />
+                  </motion.svg>
+                  Momentum Logged
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="undone"
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="flex items-center gap-2 z-10"
+                >
+                  <CheckCircle2 className="h-5 w-5 opacity-70 group-hover:scale-110 transition-transform" />
+                  Mark Complete
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </Button>
+        </motion.div>
+
+        {/* Volumetric Shockwave Burst on Completion */}
+        <AnimatePresence>
+          {done && (
+            <motion.div
+              key="shockwave"
+              initial={{ scale: 0.9, opacity: 0.8, borderWidth: 8 }}
+              animate={{ scale: 1.3, opacity: 0, borderWidth: 0 }}
+              transition={{ duration: 0.6, ease: "easeOut" }}
+              className={cn("absolute inset-0 rounded-xl border pointer-events-none z-0", c.border)}
+            />
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* Enhanced Edit Dialog */}
       <Dialog open={editing} onOpenChange={setEditing}>
@@ -346,4 +392,5 @@ export function AddHabitDialog({
       </DialogContent>
     </Dialog>
   );
-}
+        }
+                
