@@ -83,6 +83,10 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
     api: "/api/chat",
     initialMessages,
     generateId: generateSafeId,
+    // FIX 1: Pass custom data using the built-in body property instead of mutating fetch options
+    body: {
+      appContext: appContextRef.current
+    },
     onError: (err) => {
       console.error("AI SDK Error:", err);
       toast.error(`Error: ${err.message}`);
@@ -95,35 +99,27 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
         headers.set("Authorization", `Bearer ${session.access_token}`);
       }
       
-      let reqBody: Record<string, any> = {};
-      if (typeof options?.body === "string") {
-        try {
-          reqBody = JSON.parse(options.body);
-        } catch (e) {
-          reqBody = {};
-        }
-      }
-      
-      reqBody.appContext = appContextRef.current;
-
+      // FIX 2: Removed fragile JSON parsing of options.body. 
+      // The SDK now handles injecting the body payload automatically.
       return fetch(url, {
         ...options,
         headers,
-        body: JSON.stringify(reqBody),
       });
     },
   });
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e?: React.FormEvent) => {
+    // FIX 3: Added standard event prevention to block rogue mobile webview reloads
+    if (e) e.preventDefault(); 
+    
     const userText = input.trim();
     if (!userText || isLoading) return;
     
     setInput("");
     
     try {
-      // FIX: Explicitly providing the ID bypasses the SDK's broken internal generator
+      // FIX 4: Send only role and content. The SDK will invoke generateSafeId() internally.
       await append({ 
-        id: generateSafeId(),
         role: "user", 
         content: userText 
       });
@@ -292,7 +288,6 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
           </div>
         )}
         
-        {/* FIX: Handlers simplified. The UI component handles event.preventDefault() internally */}
         <PromptInput onSubmit={handleSubmit}>
           <PromptInputTextarea
             placeholder="Initialize command..."
@@ -445,4 +440,4 @@ export function ChatAssistant() {
       </Drawer>
     </>
   );
-    }
+}
