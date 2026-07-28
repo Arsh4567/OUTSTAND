@@ -364,4 +364,4 @@ function StatCard({ icon, label, value, sub, accent }: { icon: React.ReactNode; 
       </div>
     </motion.div>
   );
-}                                                                                                 }
+}
