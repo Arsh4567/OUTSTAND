@@ -121,13 +121,18 @@ export const Route = createFileRoute("/api/chat")({
             conversationId = newConversation.id;
           }
 
-          // Persist user message
+          // Persist user message safely with fallback for text/parts formatting
           const userMessage = messages[messages.length - 1];
           if (userMessage?.role === "user") {
-            const text = userMessage.parts
-              ?.filter((p: any) => p.type === "text")
-              .map((p: any) => p.text)
-              .join("") || userMessage.content;
+            let text = "";
+            if (Array.isArray(userMessage.parts)) {
+              text = userMessage.parts
+                .filter((p: any) => p.type === "text")
+                .map((p: any) => p.text)
+                .join("");
+            } else if (typeof userMessage.content === "string") {
+              text = userMessage.content;
+            }
 
             if (text) {
               await supabase.from("chat_messages").insert({
@@ -148,11 +153,10 @@ export const Route = createFileRoute("/api/chat")({
             });
           }
 
-          // Pass API key via environment injection so the Google provider picks it up reliably
           process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
 
           const result = streamText({
-            model: google("gemini-1.5-flash"),
+            model: google("gemini-2.5-flash"), // Updated to current stable flash tier
             system: buildSystemPrompt(appContext),
             messages: messages as UIMessage[],
           });
