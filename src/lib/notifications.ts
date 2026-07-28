@@ -109,3 +109,33 @@ async function registerAndSubscribe() {
     alert("FRONTEND ERROR: Service Workers are not supported in this mobile browser.");
   }
 }
+
+// 7. HANDLE TEST PUSH (Sends authenticated user ID to your Vercel backend API)
+export async function handleTestPush() {
+  try {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      alert("You must be logged in to test push notifications.");
+      return;
+    }
+
+    const response = await fetch('/api/send-test-push', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId: session.user.id }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      alert("Test Push Failed: " + (result.error || 'Unknown error'));
+    } else {
+      alert("Test push sent successfully! Check your notification tray.");
+    }
+  } catch (err: any) {
+    alert("Error triggering test push: " + err.message);
+  }
+}
