@@ -393,4 +393,4 @@ function ActionCard({ active, emoji, label, description, points, tone, onClick }
     </motion.button>
   );
             }
-            
+          
