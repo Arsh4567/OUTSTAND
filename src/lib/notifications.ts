@@ -19,18 +19,25 @@ function urlBase64ToUint8Array(base64String: string) {
 
 export async function requestNotificationPermission() {
   if (!('Notification' in window)) {
+    alert("FRONTEND ERROR: This browser does not support desktop/push notifications.");
     console.error('This browser does not support desktop notification');
     return false;
   }
 
-  const permission = await Notification.requestPermission();
-  
-  if (permission === 'granted') {
-    console.log('Notification permission granted.');
-    await registerAndSubscribe();
-    return true;
-  } else {
-    console.warn('Notification permission denied.');
+  try {
+    const permission = await Notification.requestPermission();
+    
+    if (permission === 'granted') {
+      console.log('Notification permission granted.');
+      await registerAndSubscribe();
+      return true;
+    } else {
+      alert("FRONTEND ERROR: Notification permission was denied by the browser or user.");
+      console.warn('Notification permission denied.');
+      return false;
+    }
+  } catch (err: any) {
+    alert("FRONTEND ERROR requesting permission: " + (err.message || JSON.stringify(err)));
     return false;
   }
 }
@@ -40,6 +47,7 @@ async function registerAndSubscribe() {
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
   if (sessionError || !session) {
+    alert("FRONTEND ERROR: No active Supabase session found! Are you properly logged in?");
     console.error("Auth Error: No active Supabase session found. RLS will block this request.");
     return;
   }
@@ -83,16 +91,21 @@ async function registerAndSubscribe() {
         });
 
       if (error) {
+        alert("FRONTEND DB ERROR: " + error.message + " (Code: " + error.code + ")");
         console.error('Error saving subscription to DB:', error);
         if (error.code === '42501') {
            console.error("RLS 42501 Error: The user_id does not match the active session, or the policy is missing.");
         }
       } else {
+        alert("SUCCESS! Push subscription was saved to Supabase.");
         console.log('Successfully saved push subscription to Supabase!');
       }
       
-    } catch (error) {
+    } catch (error: any) {
+      alert("FRONTEND CATCH ERROR: " + (error.message || JSON.stringify(error)));
       console.error('Push subscription failed:', error);
     }
+  } else {
+    alert("FRONTEND ERROR: Service Workers are not supported in this mobile browser.");
   }
 }
