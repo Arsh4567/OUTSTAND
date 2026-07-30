@@ -195,7 +195,7 @@ export const OUTSTAND_CHALLENGES: OutstandChallenge[] = [
       minLevel: 5,
       completedChallengeIds: ["detox_morning_monk_01"],
     }
-  }
+  },
     // ---------------------------------------------------------------------------
   // BATCH 1 - PART 1: Focus, Phone Detox, Mindset
   // ---------------------------------------------------------------------------
