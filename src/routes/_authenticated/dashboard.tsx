@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Plus, Play, Zap, ChevronDown, ChevronUp, Droplets, BookOpen, Brain, Activity, Flame, Trophy, Target, Quote } from "lucide-react";
 import { toast } from "sonner";
@@ -16,7 +16,8 @@ import { useDailyLog } from "@/hooks/use-dopamine";
 import { todayISO } from "@/lib/habits";
 import { dailyChallenge } from "@/lib/Index";
 import { scoreColor } from "@/lib/dopamine";
-import { QUOTES } from "@/lib/quotes"; // Imported our new matrix
+import { QUOTES } from "@/lib/quotes";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -30,6 +31,30 @@ function Dashboard() {
   const { user, profile } = useAuth() ?? {};
   const { log } = useDailyLog() ?? {};
   const navigate = useNavigate();
+
+  // === ONBOARDING INTERCEPTOR ===
+  useEffect(() => {
+    const checkOnboardingStatus = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        // Fetch the user's profile to check if they've completed onboarding
+        const { data: userProfile } = await supabase
+          .from('profiles')
+          .select('has_completed_onboarding')
+          .eq('id', session.user.id)
+          .single();
+
+        // If the profile exists but they haven't completed onboarding, bounce them!
+        if (userProfile && !userProfile.has_completed_onboarding) {
+          navigate({ to: "/onboarding", replace: true });
+        }
+      }
+    };
+
+    checkOnboardingStatus();
+  }, [navigate]);
+  // ==============================
 
   const [showAllHabits, setShowAllHabits] = useState(false);
   const [dismissedWizard, setDismissedWizard] = useState(false);
@@ -356,8 +381,7 @@ function StatCard({ icon, label, value, sub, accent }: { icon: React.ReactNode; 
           {icon}
         </div>
       </div>
-
-      <div className="relative z-10">
+<div className="relative z-10">
         <div className="text-[10px] sm:text-xs uppercase tracking-[0.2em] text-slate-500 font-bold">{label}</div>
         <div className="font-display text-2xl sm:text-3xl font-black tracking-tight mt-1" style={{ color: accent || 'white' }}>{value}</div>
         <div className="text-[10px] sm:text-xs font-medium text-slate-400 mt-1">{sub}</div>
@@ -365,3 +389,4 @@ function StatCard({ icon, label, value, sub, accent }: { icon: React.ReactNode; 
     </motion.div>
   );
 }
+      
