@@ -95,7 +95,7 @@ function OutstandPage() {
       {/* 2. FOREGROUND UI ENGINE                                     */}
       {/* ========================================================= */}
       
-      <div className="w-full max-w-xl z-20 relative perspective-[1000px]">
+      <div className="w-full max-w-sm md:max-w-2xl lg:max-w-4xl z-20 relative perspective-[1000px]">
         <AnimatePresence mode="wait">
           
           {/* STATE A: GENERATOR PROTOCOL (IDLE) */}
