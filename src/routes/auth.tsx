@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
-// Removed lovable import as we will use native Supabase for Google Auth
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/auth")({
@@ -48,19 +47,21 @@ function AuthPage() {
           email,
           password,
           options: {
-            // FIXED: Redirect back to dashboard after email confirm
-            emailRedirectTo: `${window.location.origin}/dashboard`,
+            // CHANGED: Redirect to onboarding after email confirm
+            emailRedirectTo: `${window.location.origin}/onboarding`,
             data: { display_name: name || email.split("@")[0] },
           },
         });
         if (error) throw error;
         toast.success("Welcome to Outstand", { description: "Check your inbox to confirm your email." });
-        // FIXED: Route to dashboard
-        navigate({ to: "/dashboard", replace: true });
+        
+        // CHANGED: Route to onboarding directly for new accounts
+        navigate({ to: "/onboarding", replace: true });
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        // FIXED: Route to dashboard
+        
+        // KEEPS: Existing users still go straight to the dashboard
         navigate({ to: "/dashboard", replace: true });
       }
     } catch (err) {
@@ -188,4 +189,4 @@ function AuthPage() {
       </div>
     </div>
   );
-                                                                                                                                             }
+}
