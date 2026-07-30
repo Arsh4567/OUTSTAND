@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { motion, useMotionValue, useSpring, useTransform, animate, AnimatePresence } from "framer-motion";
+import { motion, useMotionValue, useSpring, useTransform, animate } from "framer-motion";
 import { CheckCircle2, Pause, Play, RotateCcw, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getChallengeStyles } from "@/lib/challenges.styles";
@@ -66,13 +66,13 @@ export function ChallengeCard({
   const xpValue = (challenge as any).xp || challenge.xpReward || 50;
   const durationFallback = (challenge as any).durationMinutes || 10;
 
-  // 2. 3D Parallax Tilt Physics Setup
+  // 2. 3D Parallax Tilt Physics Setup (Slightly dampened for a heavier, premium feel)
   const x = useMotionValue(0);
   const y = useMotionValue(0);
-  const mouseXSpring = useSpring(x, { stiffness: 150, damping: 15 });
-  const mouseYSpring = useSpring(y, { stiffness: 150, damping: 15 });
-  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["12deg", "-12deg"]);
-  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-12deg", "12deg"]);
+  const mouseXSpring = useSpring(x, { stiffness: 200, damping: 25 });
+  const mouseYSpring = useSpring(y, { stiffness: 200, damping: 25 });
+  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["8deg", "-8deg"]);
+  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-8deg", "8deg"]);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (completionStage !== 0) return;
@@ -90,40 +90,53 @@ export function ChallengeCard({
     y.set(0);
   };
 
+  // Safe time formatting to prevent layout overflow on 60+ min challenges
+  const formatTime = () => {
+    const totalMinutes = typeof mins === "number" ? mins : parseInt(mins) || 0;
+    const hours = Math.floor(totalMinutes / 60);
+    const remainingMins = totalMinutes % 60;
+    
+    const hStr = hours > 0 ? `${hours}:` : "";
+    const mStr = hours > 0 ? remainingMins.toString().padStart(2, "0") : remainingMins.toString().padStart(2, "0");
+    const sStr = secs.toString().padStart(2, "0");
+
+    return `${hStr}${mStr}:${sStr}`;
+  };
+
   return (
     <motion.div
       style={
         completionStage === 0
-          ? { rotateX, rotateY, transformStyle: "preserve-3d", perspective: 1000 }
+          ? { rotateX, rotateY, transformStyle: "preserve-3d", perspective: 1200 }
           : {}
       }
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      className="w-full max-w-md mx-auto flex justify-center perspective-[1000px] group z-10 relative"
+      className="w-full max-w-md mx-auto flex justify-center group z-10 relative"
     >
       <motion.div
         key="active"
         // 3. Levitation & Entrance Physics
-        initial={{ opacity: 0, scale: 0.8, y: 50 }}
+        initial={{ opacity: 0, scale: 0.9, y: 30 }}
         animate={
           completionStage === 1
             ? {
                 scale: 0.8, 
                 y: 0,
-                rotateZ: [0, -3, 3, -3, 3, 0], 
+                rotateZ: [0, -2, 2, -2, 2, 0], 
                 filter: "brightness(1.5)", 
               }
             : completionStage === 2
             ? {
-                scale: [0.8, 1.2, 0], 
-                y: [0, -20, -1000], 
+                scale: [0.8, 1.1, 0], 
+                y: [0, -20, -800], 
                 opacity: [1, 1, 0],
                 filter: "brightness(2)",
               }
             : {
                 opacity: 1,
                 scale: 1,
-                y: [-5, 5, -5], // Continuous Levitation
+                y: [-3, 3, -3], // Smooth subtle levitation
               }
         }
         transition={
@@ -132,8 +145,8 @@ export function ChallengeCard({
             : completionStage === 2
             ? { duration: 0.8, ease: "easeIn" }
             : { 
-                y: { duration: 6, repeat: Infinity, ease: "easeInOut" },
-                default: { type: "spring", stiffness: 200, damping: 20 }
+                y: { duration: 8, repeat: Infinity, ease: "easeInOut" },
+                default: { type: "spring", stiffness: 200, damping: 25 }
               }
         }
         className={cn(
@@ -141,29 +154,29 @@ export function ChallengeCard({
           completionStage > 0 ? "w-[240px] h-[80px]" : "w-full min-h-[440px]"
         )}
       >
-        {/* Layer 1: Massive Ambient Glow Background */}
+        {/* Layer 1: Atmospheric Background Spot */}
         {completionStage === 0 && (
           <div 
-            className="absolute inset-0 -z-10 blur-[80px] opacity-40 rounded-full scale-110"
-            style={{ backgroundColor: primaryColor }}
+            className="absolute inset-0 -z-10 blur-[100px] opacity-30 rounded-[3rem] scale-105 pointer-events-none"
+            style={{ backgroundImage: `radial-gradient(circle at 50% 0%, ${primaryColor}, transparent 70%)` }}
           />
         )}
 
-        {/* Layer 2: Deep Glassmorphism Card */}
+        {/* Layer 2: Deep Glassmorphism Card (Refined Borders) */}
         <div 
            className={cn(
              "absolute inset-0 transition-all duration-500 overflow-hidden", 
-             "bg-zinc-950/60 backdrop-blur-3xl",
-             "border-t border-l border-white/20 border-r border-b border-white/5", // 3D glassy border
+             "bg-zinc-900/40 backdrop-blur-2xl",
+             "border border-white/10", 
              completionStage > 0 ? "rounded-full" : "rounded-[2.5rem]",
-             completionStage === 0 && `shadow-[0_20px_60px_-15px_${primaryColor}60]` // Inner shadow
+             completionStage === 0 && `shadow-2xl`
            )}
         >
-          {/* Subtle top-down inner gradient for depth */}
-          <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent opacity-50" />
+          {/* Subtle top-down inner highlight */}
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
         </div>
 
-        {/* Layer 3: Explosion Particles */}
+        {/* Layer 3: Explosion Particles (Unchanged, excellent effect) */}
         {completionStage === 2 && (
           <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none">
             <motion.div
@@ -197,18 +210,17 @@ export function ChallengeCard({
         {/* Layer 4: The Content (Pushed out in 3D) */}
         <motion.div
           animate={completionStage > 0 ? { opacity: 0, scale: 0.5 } : { opacity: 1, scale: 1 }}
-          style={completionStage === 0 ? { transform: "translateZ(60px)" } : {}} 
+          style={completionStage === 0 ? { transform: "translateZ(50px)" } : {}} 
           className={cn("w-full flex flex-col items-center text-center relative z-10", completionStage === 0 ? "p-8" : "p-0")}
         >
           {/* Header Tags */}
-          <div className="flex justify-between items-center w-full px-2 text-[10px] sm:text-xs font-bold uppercase tracking-[0.2em]">
+          <div className="flex justify-between items-center w-full px-2 text-[10px] sm:text-xs font-bold uppercase tracking-[0.2em] mb-4">
             <span 
-              className="px-4 py-1.5 rounded-full border shadow-lg"
+              className="px-4 py-1.5 rounded-full border shadow-lg backdrop-blur-md"
               style={{ 
                 color: primaryColor, 
-                backgroundColor: `${primaryColor}15`,
-                borderColor: `${primaryColor}40`,
-                textShadow: `0 0 10px ${primaryColor}`
+                backgroundColor: `${primaryColor}10`,
+                borderColor: `${primaryColor}30`,
               }}
             >
               {challenge.rarity}
@@ -217,92 +229,85 @@ export function ChallengeCard({
           </div>
 
           {/* Holographic Emoji */}
-          <div className="relative mt-8 mb-4">
-            <div className="absolute inset-0 blur-[30px] opacity-50 scale-150 rounded-full" style={{ backgroundColor: primaryColor }} />
+          <div className="relative mt-2 mb-4">
+            <div className="absolute inset-0 blur-[40px] opacity-30 scale-150 rounded-full" style={{ backgroundColor: primaryColor }} />
             <motion.div 
-              animate={{ y: [0, -8, 0], scale: [1, 1.05, 1] }} 
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
               className="text-7xl sm:text-8xl drop-shadow-2xl relative z-10"
             >
               {challenge.emoji}
             </motion.div>
           </div>
           
-          <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-2">{challenge.title}</h2>
-          <p className="text-zinc-400 mt-3 text-sm leading-relaxed max-w-[280px]">{challenge.description}</p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mt-2">{challenge.title}</h2>
+          <p className="text-zinc-400 mt-3 text-sm font-medium leading-relaxed max-w-[280px]">{challenge.description}</p>
 
-          {/* Heavy Glowing Timer */}
-          <motion.div 
-            animate={running ? { scale: [1, 1.03, 1], filter: ["brightness(1)", "brightness(1.3)", "brightness(1)"] } : {}}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-            className="w-full my-8 bg-black/20 rounded-3xl py-4 border border-white/5 shadow-inner"
-          >
-            <div 
-              className="text-6xl sm:text-7xl font-mono font-black tabular-nums tracking-widest"
-              style={{ 
-                color: primaryColor,
-                textShadow: `0 0 20px ${primaryColor}80, 0 0 60px ${primaryColor}60` 
-              }}
-            >
-              {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
+          {/* Clean, Minimal Timer track */}
+          <div className="flex justify-center w-full my-8">
+            <div className="relative group">
+              <div 
+                className="absolute inset-0 blur-2xl opacity-10 transition-opacity duration-1000" 
+                style={{ backgroundColor: running ? primaryColor : 'transparent' }} 
+              />
+              <div className="relative px-8 py-3 bg-white/[0.03] border border-white/5 rounded-3xl backdrop-blur-md">
+                <span className="font-mono text-5xl sm:text-6xl font-light text-white tracking-tighter tabular-nums drop-shadow-md">
+                  {formatTime()}
+                </span>
+              </div>
             </div>
-          </motion.div>
+          </div>
 
-          {/* Tactile Controls */}
-          <div className="flex gap-4 justify-center items-center w-full mb-6">
-            <motion.div whileTap={{ scale: 0.85 }} whileHover={{ scale: 1.05 }}>
+          {/* Tactile Controls (Now perfectly round and sleek) */}
+          <div className="flex gap-6 justify-center items-center w-full mb-8">
+            <motion.div whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }}>
               <Button 
-                variant="outline" 
+                variant="ghost" 
                 onClick={() => { setRemaining(durationFallback * 60); setRunning(false); }} 
-                className="rounded-2xl w-14 h-14 bg-black/40 border-white/10 hover:bg-white/10 text-zinc-400 hover:text-white"
+                className="rounded-full w-12 h-12 bg-white/5 border border-white/10 hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
               >
-                <RotateCcw size={22} />
+                <RotateCcw size={18} />
               </Button>
             </motion.div>
             
-            <motion.div whileTap={{ scale: 0.85 }} whileHover={{ scale: 1.1 }}>
+            <motion.div whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }}>
               <Button 
                 onClick={() => setRunning(!running)} 
-                className="rounded-2xl w-20 h-20 shadow-2xl border border-white/20 transition-all relative overflow-hidden group"
-                style={{ backgroundColor: running ? '#ef4444' : primaryColor }}
+                className="rounded-full w-20 h-20 shadow-xl border backdrop-blur-md transition-all relative overflow-hidden flex items-center justify-center"
+                style={{ 
+                  backgroundColor: running ? 'rgba(255,255,255,0.1)' : `${primaryColor}20`,
+                  borderColor: running ? 'rgba(255,255,255,0.2)' : `${primaryColor}50`,
+                  color: running ? '#ffffff' : primaryColor
+                }}
               >
-                <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-                {running ? <Pause size={32} className="text-white relative z-10" /> : <Play size={32} className="text-white ml-1 relative z-10" />}
+                {running ? <Pause size={28} className="fill-current" /> : <Play size={28} className="fill-current ml-1" />}
               </Button>
             </motion.div>
 
-            <motion.div whileTap={{ scale: 0.85 }} whileHover={{ scale: 1.05 }}>
+            <motion.div whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }}>
               <Button 
                 variant="ghost" 
                 onClick={generate} 
-                className="rounded-2xl w-14 h-14 text-zinc-500 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/5"
+                className="rounded-full w-12 h-12 bg-white/5 border border-white/10 hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
               >
-                <SkipForward size={22} />
+                <SkipForward size={18} />
               </Button>
             </motion.div>
           </div>
 
-          {/* Premium Complete Button with Sweeping Glare */}
-          <motion.div whileTap={{ scale: 0.96 }} whileHover={{ scale: 1.02 }} className="w-full">
+          {/* High Contrast Apple-Style Complete Button */}
+          <motion.div whileTap={{ scale: 0.98 }} className="w-full">
             <Button 
               onClick={complete}
-              className="relative w-full h-16 rounded-2xl font-black text-lg overflow-hidden group border-t border-l border-white/30 border-b border-r border-black/50 shadow-2xl transition-all"
-              style={{ 
-                backgroundColor: primaryColor,
-                boxShadow: `0 10px 30px -10px ${primaryColor}` 
-              }}
+              disabled={mins > 0 || secs > 0}
+              className="relative w-full h-14 rounded-full font-bold text-sm uppercase tracking-[0.15em] overflow-hidden group transition-all bg-white text-black hover:bg-zinc-200 disabled:opacity-30 disabled:bg-white/10 disabled:text-zinc-500 shadow-[0_0_40px_rgba(255,255,255,0.1)] disabled:shadow-none"
             >
-              {/* Cinematic Sweeping Glare Animation */}
-              <motion.div
-                animate={{ x: ["-200%", "200%"] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                className="absolute inset-y-0 w-1/2 bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-12 z-0"
-              />
-              
-              <span className="relative flex items-center text-white drop-shadow-md z-10 tracking-widest">
-                <CheckCircle2 className="mr-3 h-6 w-6" /> 
-                COMPLETE (+{xpValue} XP)
+              <span className="relative flex items-center justify-center z-10 w-full">
+                <CheckCircle2 className="mr-2 h-5 w-5" /> 
+                Complete 
+                <span className="text-zinc-500 font-medium ml-1">
+                  (+{xpValue} XP)
+                </span>
               </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] pointer-events-none" />
             </Button>
           </motion.div>
         </motion.div>
@@ -312,4 +317,5 @@ export function ChallengeCard({
       </motion.div>
     </motion.div>
   );
-}
+              }
+          
