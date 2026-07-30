@@ -106,29 +106,34 @@ function Dashboard() {
         variants={containerVariants}
         initial="hidden"
         animate="show"
-        className="mx-auto max-w-7xl space-y-6 pb-24 pt-6 px-4 sm:px-6"
+        className="mx-auto max-w-7xl space-y-6 pb-24 pt-6 px-4 sm:px-6 relative overflow-hidden"
       >
+        {/* ENERGETIC BACKGROUND AMBIENT ORBS (Blue anchor with vibrant cyan/purple accents) */}
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-600/10 blur-[150px] rounded-full pointer-events-none -z-10" />
+        <div className="absolute top-1/3 right-10 w-[400px] h-[400px] bg-indigo-600/10 blur-[140px] rounded-full pointer-events-none -z-10" />
+        <div className="absolute bottom-10 left-10 w-[450px] h-[450px] bg-cyan-600/10 blur-[140px] rounded-full pointer-events-none -z-10" />
+
         {/* HERO SECTION */}
         <motion.header variants={itemVariants} className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-4">
           <div className="space-y-1">
             <h1 className="text-4xl md:text-5xl font-display font-black tracking-tight text-white">
               Welcome back,<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-blue-400">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-cyan-400 drop-shadow-[0_0_25px_rgba(59,130,246,0.3)]">
                 {name}.
               </span>
             </h1>
-            <p className="text-slate-400 text-sm md:text-base font-medium max-w-md leading-relaxed pt-2">
+            <p className="text-slate-300 text-sm md:text-base font-medium max-w-md leading-relaxed pt-2">
               {stats.pct >= 80 
                 ? "Incredible momentum today. Let's finish strong." 
                 : "Your potential is waiting. Turn your intentions into action."}
             </p>
           </div>
           <div className="flex w-full md:w-auto gap-3">
-             <Button variant="outline" className="flex-1 md:flex-none h-12 rounded-2xl border-white/10 bg-white/[0.02] hover:bg-white/[0.05] text-white transition-all active:scale-95" onClick={() => navigate({ to: "/dopamine" })}>
-               <Activity className="mr-2 h-4 w-4 text-slate-400" /> Log Dopamine
+             <Button variant="outline" className="flex-1 md:flex-none h-12 rounded-2xl border-blue-500/20 bg-blue-950/20 hover:bg-blue-900/30 text-white transition-all active:scale-95 shadow-sm" onClick={() => navigate({ to: "/dopamine" })}>
+               <Activity className="mr-2 h-4 w-4 text-cyan-400" /> Log Dopamine
              </Button>
-             <Button className="flex-1 md:flex-none h-12 bg-indigo-600 hover:bg-indigo-500 rounded-2xl shadow-[0_0_20px_rgba(79,70,229,0.2)] hover:shadow-[0_0_30px_rgba(79,70,229,0.4)] text-white transition-all active:scale-95 border border-indigo-500/50" onClick={() => navigate({ to: "/focus" })}>
-               <Play className="mr-2 h-4 w-4 fill-current" /> Start Focus
+             <Button className="flex-1 md:flex-none h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-2xl shadow-[0_0_25px_rgba(59,130,246,0.4)] hover:shadow-[0_0_35px_rgba(59,130,246,0.6)] text-white transition-all active:scale-95 border border-blue-400/30 font-bold" onClick={() => navigate({ to: "/focus" })}>
+               <Play className="mr-2 h-4 w-4 fill-current text-cyan-200" /> Start Focus
              </Button>
           </div>
         </motion.header>
@@ -136,25 +141,28 @@ function Dashboard() {
         {/* BENTO BOX GRID LAYOUT */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
           
-          {/* STATS BENTO ROW (Spans full width, internal grid) */}
+          {/* STATS BENTO ROW */}
           <motion.div variants={itemVariants} className="md:col-span-12 grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <StatCard 
-              icon={<Target className="text-blue-400 h-5 w-5" />}
+              icon={<Target className="text-cyan-400 h-5 w-5" />}
               label="Today's Progress" 
               value={`${stats.completed}/${stats.total}`} 
-              sub={`${stats.pct}% Completion Rate`} 
+              sub={`${stats.pct}% Completion Rate`}
+              accent="#22d3ee" // Cyan
             />
             <StatCard 
               icon={<Flame className="text-orange-400 h-5 w-5" />}
               label="Active Streak" 
               value={`${bestStreak} Days`} 
-              sub="Personal Best" 
+              sub="Personal Best"
+              accent="#fb923c" // Orange 
             />
             <StatCard 
               icon={<Trophy className="text-amber-400 h-5 w-5" />}
               label="Lifetime XP" 
               value={String(xp)} 
-              sub="Growth metric" 
+              sub="Growth metric"
+              accent="#fbbf24" // Amber 
             />
             <StatCard 
               icon={<Zap className="text-indigo-400 h-5 w-5" />}
@@ -165,21 +173,23 @@ function Dashboard() {
             />
           </motion.div>
 
-          {/* MAIN HABITS BENTO (Spans 8 columns on large screens) */}
-          <motion.div variants={itemVariants} className="md:col-span-12 lg:col-span-8 rounded-[2rem] border border-white/5 bg-slate-900/20 backdrop-blur-3xl p-6 sm:p-8 shadow-2xl flex flex-col h-full relative overflow-hidden">
+          {/* MAIN HABITS BENTO */}
+          <motion.div variants={itemVariants} className="md:col-span-12 lg:col-span-8 rounded-[2rem] border border-blue-500/20 bg-slate-950/40 backdrop-blur-3xl p-6 sm:p-8 shadow-2xl flex flex-col h-full relative overflow-hidden">
             {/* Ambient Background Glow */}
-            <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 blur-[100px] rounded-full pointer-events-none -translate-y-1/2 translate-x-1/3" />
+            <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/15 blur-[100px] rounded-full pointer-events-none -translate-y-1/2 translate-x-1/3" />
             
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 relative z-10">
               <div>
-                <h2 className="text-2xl font-display font-bold text-white">Daily Matrix</h2>
+                <h2 className="text-2xl font-display font-bold text-white flex items-center gap-2">
+                  Daily Matrix <span className="inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                </h2>
                 <p className="text-slate-400 text-sm mt-1">Consistency compounds. Tick them off.</p>
               </div>
               <AddHabitDialog
                 onAdd={(d) => { addHabit(d); toast.success("Habit initialized in the matrix."); }}
                 trigger={
-                  <Button variant="outline" size="sm" className="h-10 rounded-xl border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:text-white transition-all text-slate-300 backdrop-blur-md">
-                    <Plus className="mr-2 h-4 w-4" /> Add Habit
+                  <Button variant="outline" size="sm" className="h-10 rounded-xl border-blue-500/20 bg-blue-950/30 hover:bg-blue-900/40 hover:text-white transition-all text-blue-200 backdrop-blur-md shadow-sm">
+                    <Plus className="mr-2 h-4 w-4 text-cyan-400" /> Add Habit
                   </Button>
                 }
               />
@@ -205,9 +215,9 @@ function Dashboard() {
                     </motion.div>
                   ))
                 ) : (
-                  <div className="col-span-full flex flex-col items-center justify-center py-12 text-center border border-dashed border-white/10 rounded-3xl bg-white/[0.01]">
-                    <Target className="h-10 w-10 text-slate-600 mb-3" />
-                    <p className="text-slate-400 text-sm">Your matrix is empty.</p>
+                  <div className="col-span-full flex flex-col items-center justify-center py-12 text-center border border-dashed border-blue-500/20 rounded-3xl bg-blue-950/10">
+                    <Target className="h-10 w-10 text-blue-400 mb-3 animate-pulse" />
+                    <p className="text-slate-300 text-sm font-medium">Your matrix is empty.</p>
                     <p className="text-slate-500 text-xs mt-1">Add a habit to start building momentum.</p>
                   </div>
                 )}
@@ -215,46 +225,46 @@ function Dashboard() {
             </div>
 
             {habits.length > 4 && (
-              <motion.div className="mt-8 pt-4 border-t border-white/5 relative z-10" layout>
+              <motion.div className="mt-8 pt-4 border-t border-blue-500/10 relative z-10" layout>
                 <Button 
                   variant="ghost" 
-                  className="w-full text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all h-12" 
+                  className="w-full text-slate-300 hover:text-white hover:bg-blue-500/10 rounded-xl transition-all h-12" 
                   onClick={() => setShowAllHabits(!showAllHabits)}
                 >
                   {showAllHabits ? (
-                    <><ChevronUp className="mr-2 h-4 w-4" /> Collapse Matrix</>
+                    <><ChevronUp className="mr-2 h-4 w-4 text-blue-400" /> Collapse Matrix</>
                   ) : (
-                    <><ChevronDown className="mr-2 h-4 w-4" /> Reveal all {habits.length} habits</>
+                    <><ChevronDown className="mr-2 h-4 w-4 text-blue-400" /> Reveal all {habits.length} habits</>
                   )}
                 </Button>
               </motion.div>
             )}
           </motion.div>
 
-          {/* SIDEBAR BENTO (Spans 4 columns on large screens) */}
+          {/* SIDEBAR BENTO */}
           <motion.div variants={itemVariants} className="md:col-span-12 lg:col-span-4 flex flex-col gap-6">
             
             {/* Quote of the Day Card */}
             {dailyQuote && (
-              <div className="rounded-[2rem] border border-white/5 bg-slate-900/40 p-6 sm:p-7 shadow-2xl backdrop-blur-xl relative overflow-hidden group">
+              <div className="rounded-[2rem] border border-blue-500/20 bg-slate-950/40 p-6 sm:p-7 shadow-2xl backdrop-blur-xl relative overflow-hidden group">
                 {/* Large Background Quote Icon */}
-                <div className="absolute -top-6 -right-6 text-white/[0.02] group-hover:text-white/[0.04] transition-colors duration-500 pointer-events-none">
+                <div className="absolute -top-6 -right-6 text-blue-500/[0.04] group-hover:text-blue-500/[0.08] transition-colors duration-500 pointer-events-none">
                   <Quote className="w-32 h-32 rotate-12" />
                 </div>
                 
                 <div className="relative z-10 flex flex-col h-full">
-                  <div className="flex items-center gap-2 text-slate-400 text-[10px] font-bold uppercase tracking-[0.25em] mb-4">
+                  <div className="flex items-center gap-2 text-cyan-400 text-[10px] font-bold uppercase tracking-[0.25em] mb-4">
                     <Quote className="h-3 w-3" /> Daily Insight
                   </div>
                   
-                  <blockquote className="text-[1.05rem] font-medium text-slate-200 leading-relaxed mb-6 flex-grow">
+                  <blockquote className="text-[1.05rem] font-medium text-slate-100 leading-relaxed mb-6 flex-grow">
                     "{dailyQuote.quote}"
                   </blockquote>
                   
-                  <div className="flex flex-col border-t border-white/10 pt-4 mt-auto">
+                  <div className="flex flex-col border-t border-blue-500/10 pt-4 mt-auto">
                     <span className="text-sm font-bold text-white tracking-tight">{dailyQuote.author}</span>
                     <span className="text-xs text-slate-400 mt-1 line-clamp-2">
-                      <span className="font-semibold text-indigo-400">Action: </span> 
+                      <span className="font-semibold text-blue-400">Action: </span> 
                       {dailyQuote.application}
                     </span>
                   </div>
@@ -263,30 +273,30 @@ function Dashboard() {
             )}
 
             {/* Daily Challenge Card */}
-            <div className="rounded-[2rem] border border-indigo-500/20 bg-indigo-950/20 p-6 sm:p-7 shadow-2xl backdrop-blur-3xl group transition-all relative overflow-hidden flex flex-col">
-               {/* Decorative Gradient */}
-               <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-indigo-500/10 to-transparent pointer-events-none" />
-               <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-indigo-600/20 blur-[60px] rounded-full pointer-events-none group-hover:bg-indigo-500/30 transition-colors duration-700" />
+            <div className="rounded-[2rem] border border-indigo-500/30 bg-gradient-to-br from-blue-950/40 via-indigo-950/30 to-slate-950 p-6 sm:p-7 shadow-2xl backdrop-blur-3xl group transition-all relative overflow-hidden flex flex-col">
+               {/* Decorative Gradient Orbs */}
+               <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-blue-500/10 via-indigo-500/10 to-transparent pointer-events-none" />
+               <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-blue-600/20 blur-[60px] rounded-full pointer-events-none group-hover:bg-blue-500/40 transition-colors duration-700" />
 
                <div className="relative z-10">
                  <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
-                   <div className="flex items-center gap-2 text-indigo-400 text-[10px] font-bold uppercase tracking-[0.25em] bg-indigo-500/10 px-3 py-1.5 rounded-full border border-indigo-500/20">
-                      <Zap className="h-3 w-3" /> Daily Challenge
+                   <div className="flex items-center gap-2 text-cyan-300 text-[10px] font-bold uppercase tracking-[0.25em] bg-blue-500/15 px-3 py-1.5 rounded-full border border-blue-400/30 shadow-sm">
+                      <Zap className="h-3 w-3 text-cyan-400 animate-pulse" /> Daily Challenge
                    </div>
-                   <span className="text-xs font-mono text-indigo-300/50">OUTSTAND</span>
+                   <span className="text-xs font-mono text-blue-400/70 tracking-widest">OUTSTAND</span>
                  </div>
                  
-                 <h3 className="text-2xl font-display font-bold text-white group-hover:text-indigo-100 transition-colors leading-tight">
+                 <h3 className="text-2xl font-display font-bold text-white group-hover:text-cyan-200 transition-colors leading-tight">
                    {challenge.title}
                  </h3>
-                 <p className="text-sm font-medium text-indigo-200/60 mt-3 leading-relaxed line-clamp-3">
+                 <p className="text-sm font-medium text-slate-300 mt-3 leading-relaxed line-clamp-3">
                    {challenge.description}
                  </p>
                </div>
 
                <div className="relative z-10 mt-6 pt-2">
                  <Button 
-                    className="w-full h-12 rounded-xl transition-all bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_0_15px_rgba(79,70,229,0.3)] active:scale-95 border border-indigo-400/30" 
+                    className="w-full h-12 rounded-xl transition-all bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.3)] active:scale-95 border border-blue-400/40 font-bold" 
                     onClick={() => navigate({ to: "/outstand" })}
                   >
                    Accept Challenge
@@ -298,7 +308,7 @@ function Dashboard() {
         </div>
       </motion.div>
 
-      {/* ONBOARDING WIZARD OVERLAY (Enhanced Glassmorphism) */}
+      {/* ONBOARDING WIZARD OVERLAY */}
       <AnimatePresence>
         {showWizard && (
           <motion.div
@@ -312,14 +322,14 @@ function Dashboard() {
               animate={{ scale: 1, y: 0, opacity: 1 }}
               exit={{ scale: 0.95, y: 10, opacity: 0 }}
               transition={{ type: "spring", bounce: 0.3, duration: 0.7 }}
-              className="w-full max-w-lg rounded-[2.5rem] border border-white/10 bg-slate-900/90 p-8 md:p-10 shadow-[0_0_80px_rgba(79,70,229,0.2)] backdrop-blur-2xl relative overflow-hidden"
+              className="w-full max-w-lg rounded-[2.5rem] border border-blue-500/30 bg-slate-900/95 p-8 md:p-10 shadow-[0_0_90px_rgba(59,130,246,0.25)] backdrop-blur-2xl relative overflow-hidden"
             >
-               <div className="absolute -top-24 -right-24 w-72 h-72 bg-indigo-600/20 blur-[80px] rounded-full pointer-events-none" />
-               <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-blue-600/20 blur-[80px] rounded-full pointer-events-none" />
+               <div className="absolute -top-24 -right-24 w-72 h-72 bg-blue-600/25 blur-[90px] rounded-full pointer-events-none" />
+               <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-indigo-600/25 blur-[90px] rounded-full pointer-events-none" />
 
                <div className="relative z-10">
                  <h2 className="text-3xl font-display font-black tracking-tight text-white mb-2">Establish your baseline.</h2>
-                 <p className="text-slate-400 mb-8 text-sm leading-relaxed">
+                 <p className="text-slate-300 mb-8 text-sm leading-relaxed">
                    Your dashboard is empty. Select a high-leverage habit below to initialize your tracking matrix and build immediate momentum.
                  </p>
 
@@ -327,22 +337,22 @@ function Dashboard() {
                    {quickStartHabits.map((habit) => (
                      <motion.button
                        key={habit.name}
-                       whileHover={{ scale: 1.02, backgroundColor: "rgba(255,255,255,0.06)" }}
+                       whileHover={{ scale: 1.02, backgroundColor: "rgba(59,130,246,0.08)" }}
                        whileTap={{ scale: 0.98 }}
                        onClick={() => {
                          addHabit({ name: habit.name, emoji: habit.emoji, color: habit.color as any });
                          toast.success(`${habit.name} initialized.`);
                        }}
-                       className="w-full flex items-center gap-4 rounded-2xl border border-white/5 bg-white/[0.03] p-4 text-left transition-all hover:border-indigo-500/30 group shadow-lg"
+                       className="w-full flex items-center gap-4 rounded-2xl border border-blue-500/20 bg-blue-950/20 p-4 text-left transition-all hover:border-blue-400/50 group shadow-lg"
                      >
-                       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-950/50 border border-white/5 shadow-inner group-hover:shadow-[0_0_15px_rgba(79,70,229,0.3)] transition-all text-slate-300 group-hover:text-indigo-400">
+                       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-950/80 border border-blue-500/30 shadow-inner group-hover:shadow-[0_0_20px_rgba(59,130,246,0.4)] transition-all text-blue-200 group-hover:text-cyan-300">
                          {habit.icon}
                        </div>
                        <div>
-                         <div className="font-bold text-white group-hover:text-indigo-400 transition-colors tracking-tight text-sm md:text-base">{habit.name}</div>
-                         <div className="text-xs text-slate-500 mt-0.5">{habit.reason}</div>
+                         <div className="font-bold text-white group-hover:text-cyan-300 transition-colors tracking-tight text-sm md:text-base">{habit.name}</div>
+                         <div className="text-xs text-slate-400 mt-0.5">{habit.reason}</div>
                        </div>
-                       <Plus className="ml-auto h-5 w-5 text-slate-600 group-hover:text-indigo-500 transition-colors" />
+                       <Plus className="ml-auto h-5 w-5 text-blue-400 group-hover:text-cyan-300 transition-colors" />
                      </motion.button>
                    ))}
                  </div>
@@ -350,7 +360,7 @@ function Dashboard() {
                  <Button 
                    variant="ghost" 
                    onClick={() => setDismissedWizard(true)} 
-                   className="w-full mt-6 text-slate-500 hover:text-white hover:bg-white/5 rounded-xl tracking-wide text-sm h-12"
+                   className="w-full mt-6 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl tracking-wide text-sm h-12"
                  >
                    Skip and build my own
                  </Button>
@@ -363,30 +373,29 @@ function Dashboard() {
   );
 }
 
-// Updated StatCard for the Bento Layout
+// Updated StatCard for the Bento Layout with Energetic Accents
 function StatCard({ icon, label, value, sub, accent }: { icon: React.ReactNode; label: string; value: string; sub: string; accent?: string }) {
   return (
     <motion.div 
-      whileHover={{ y: -4, backgroundColor: "rgba(255,255,255,0.04)" }}
-      className="rounded-[1.5rem] border border-white/5 bg-slate-900/40 p-5 sm:p-6 backdrop-blur-xl transition-all duration-300 relative overflow-hidden group flex flex-col justify-between h-full shadow-lg"
+      whileHover={{ y: -4, backgroundColor: "rgba(30, 58, 138, 0.15)" }}
+      className="rounded-[1.5rem] border border-blue-500/20 bg-slate-950/40 p-5 sm:p-6 backdrop-blur-xl transition-all duration-300 relative overflow-hidden group flex flex-col justify-between h-full shadow-lg"
     >
-      {/* Interactive Radial Hover Gradient */}
+      {/* Interactive Radial Hover Gradient with custom accent color */}
       <div 
         className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" 
-        style={{ background: `radial-gradient(circle 120px at top right, ${accent ? accent + '15' : 'rgba(255,255,255,0.03)'}, transparent)` }} 
+        style={{ background: `radial-gradient(circle 140px at top right, ${accent ? accent + '20' : 'rgba(59,130,246,0.1)'}, transparent)` }} 
       />
       
       <div className="relative z-10 flex items-start justify-between w-full mb-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.03] border border-white/5 shadow-inner">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-950/40 border border-blue-500/30 shadow-inner group-hover:scale-110 transition-transform">
           {icon}
         </div>
       </div>
-<div className="relative z-10">
-        <div className="text-[10px] sm:text-xs uppercase tracking-[0.2em] text-slate-500 font-bold">{label}</div>
-        <div className="font-display text-2xl sm:text-3xl font-black tracking-tight mt-1" style={{ color: accent || 'white' }}>{value}</div>
+      <div className="relative z-10">
+        <div className="text-[10px] sm:text-xs uppercase tracking-[0.2em] text-slate-400 font-bold">{label}</div>
+        <div className="font-display text-2xl sm:text-3xl font-black tracking-tight mt-1 drop-shadow-sm" style={{ color: accent || 'white' }}>{value}</div>
         <div className="text-[10px] sm:text-xs font-medium text-slate-400 mt-1">{sub}</div>
       </div>
     </motion.div>
   );
 }
-      
