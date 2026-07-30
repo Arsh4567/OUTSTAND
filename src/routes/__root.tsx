@@ -1,14 +1,15 @@
- import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useLocation,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
 
 import { useEffect, type ReactNode } from "react";
-import { Bot, RefreshCw, Home, ShieldAlert } from "lucide-react";
+import { Bot, RefreshCw, Home, ShieldAlert, LayoutDashboard, Target, Activity, Zap } from "lucide-react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -19,7 +20,6 @@ import { Button } from "@/components/ui/button";
 function NotFoundComponent() {
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-[#050508] px-4 overflow-hidden selection:bg-indigo-500/30">
-      {/* Background ambient lighting */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
       
       <div className="relative z-10 max-w-md text-center p-8 rounded-3xl border border-white/10 bg-slate-950/60 backdrop-blur-xl shadow-[0_0_50px_rgba(0,0,0,0.8)]">
@@ -53,7 +53,6 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-[#050508] px-4 overflow-hidden selection:bg-rose-500/30">
-      {/* Background ambient lighting */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-rose-500/10 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="relative z-10 max-w-md text-center p-8 rounded-3xl border border-rose-500/20 bg-slate-950/60 backdrop-blur-xl shadow-[0_0_50px_rgba(0,0,0,0.8)]">
@@ -93,8 +92,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" },
-      
-      // --- PWA FULLSCREEN & NATIVE APP METADATA ---
       { name: "theme-color", content: "#050508" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
@@ -102,13 +99,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "apple-mobile-web-app-title", content: "Outstand" },
       { name: "application-name", content: "Outstand" },
       { name: "format-detection", content: "telephone=no" },
-      
-      // --- CORE SEO & IDENTITY ---
       { title: "Outstand | Premium Habit, Focus & Momentum Intelligence" },
       { name: "description", content: "Next-generation focus optimization, dopamine tracking, and habit protocol engineering designed for peak performers." },
       { name: "author", content: "Arsh" },
-      
-      // --- OPEN GRAPH (SOCIAL BILLBOARD) ---
       { property: "og:site_name", content: "Outstand" },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://outstand-by-arsh.vercel.app" },
@@ -117,8 +110,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/MbFMKUuM2TWHnUX1cvLR8J9s9Jf1/social-images/social-1783582818919-1000035610.webp" },
       { property: "og:image:width", content: "1200" },
       { property: "og:image:height", content: "630" },
-      
-      // --- TWITTER CARDS ---
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:url", content: "https://outstand-by-arsh.vercel.app" },
       { name: "twitter:title", content: "Outstand | Peak Performance & Habit Intelligence" },
@@ -127,13 +118,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      
-      // --- PWA & APP ASSETS ---
       { rel: "manifest", href: "/manifest.json" },
       { rel: "apple-touch-icon", href: "/outstand-logo.png" },
       { rel: "icon", type: "image/png", href: "/outstand-logo.png" },
-      
-      // --- PERFORMANCE & FONTS ---
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -162,12 +149,63 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+// Sidebar Link Helper Component
+function SidebarLink({ to, icon, label, currentPath }: { to: string, icon: React.ReactNode, label: string, currentPath: string }) {
+  const isActive = currentPath.startsWith(to) && to !== "/" || (to === "/" && currentPath === "/");
+  
+  return (
+    <Link
+      to={to}
+      className={`flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-300 group font-bold tracking-wide text-sm ${
+        isActive
+          ? "bg-white/10 text-white shadow-[0_0_20px_rgba(255,255,255,0.05)] border border-white/10"
+          : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+      }`}
+    >
+      <div className={`${isActive ? "text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.6)]" : "text-slate-500 group-hover:text-slate-300"} transition-colors duration-300`}>
+        {icon}
+      </div>
+      {label}
+    </Link>
+  );
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const location = useLocation(); // Used to highlight the active tab on desktop
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AppShell />
+      <div className="flex h-screen w-full bg-[#050508] text-slate-100 overflow-hidden">
+        
+        {/* DESKTOP SIDEBAR - Hidden on mobile, visible on medium screens and up */}
+        <aside className="hidden md:flex w-64 lg:w-72 flex-col border-r border-white/5 bg-[#0a0a0f]/80 backdrop-blur-2xl p-6 relative z-50 shadow-2xl">
+          {/* Ambient Sidebar Glow */}
+          <div className="absolute top-0 left-0 w-full h-64 bg-indigo-600/10 blur-[80px] pointer-events-none" />
+
+          {/* Logo / Brand */}
+          <div className="text-3xl font-display font-black mb-12 tracking-tighter text-white flex items-center gap-3 relative z-10">
+             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.4)] border border-white/20">
+                <Zap className="h-5 w-5 text-white fill-white" />
+             </div>
+             Outstand.
+          </div>
+
+          {/* Navigation Links */}
+          <nav className="flex flex-col gap-3 relative z-10">
+            <SidebarLink to="/dashboard" icon={<LayoutDashboard size={20} />} label="Dashboard" currentPath={location.pathname} />
+            <SidebarLink to="/dopamine" icon={<Activity size={20} />} label="Dopamine" currentPath={location.pathname} />
+            <SidebarLink to="/focus" icon={<Target size={20} />} label="Focus" currentPath={location.pathname} />
+            <SidebarLink to="/outstand" icon={<Zap size={20} />} label="Outstand" currentPath={location.pathname} />
+          </nav>
+        </aside>
+
+        {/* MAIN APP SHELL CONTENT */}
+        <main className="flex-1 relative overflow-hidden flex flex-col h-full w-full">
+          <AppShell />
+        </main>
+
+      </div>
       <Toaster />
     </QueryClientProvider>
   );
