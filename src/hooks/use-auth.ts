@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
-// Added full_name to align with your profile.tsx update logic
+// Expanded to include the new onboarding data we are collecting
 export type Profile = { 
   id: string; 
   display_name?: string | null; 
   full_name?: string | null;
-  avatar_url?: string | null; 
+  avatar_url?: string | null;
+  has_completed_onboarding?: boolean;
+  screen_time?: number | null; // Added for the Reality Check scene
 };
 
 export function useAuth() {
@@ -54,7 +56,6 @@ export function useAuth() {
       .then(({ data, error }) => {
         if (error) {
           console.error("Error fetching profile:", error);
-          // Don't crash, just provide fallback data
           setProfile({ id: user.id, display_name: null, full_name: null, avatar_url: null });
           return;
         }
@@ -66,11 +67,32 @@ export function useAuth() {
       });
   }, [user]);
 
-  return { user, profile, loading };
+  // 5. NEW: Optimistic Update Function for Cinematic Onboarding
+  const updateProfile = async (updates: Partial<Profile>) => {
+    if (!user?.id) return { error: "No authenticated user found." };
+
+    // Update the local UI instantly so there is zero visual lag
+    setProfile((prev) => prev ? { ...prev, ...updates } : { id: user.id, ...updates });
+
+    // Quietly sync with the database in the background
+    const { error } = await supabase
+      .from("profiles")
+      .update(updates)
+      .eq("id", user.id);
+
+    if (error) {
+      console.error("Failed to sync profile update:", error);
+      return { error };
+    }
+    
+    return { success: true };
+  };
+
+  return { user, profile, loading, updateProfile };
 }
 
 export function displayNameOf(user: User | null, profile: Profile | null): string {
-  // 5. Checks for BOTH full_name and display_name 
+  // Checks for BOTH full_name and display_name 
   return (
     profile?.full_name ||
     profile?.display_name ||
@@ -80,4 +102,3 @@ export function displayNameOf(user: User | null, profile: Profile | null): strin
     "Hustler"
   );
 }
-  
