@@ -88,7 +88,7 @@ export const CHALLENGE_THEMES: Record<string, ChallengeTheme> = {
  * THE MASTER CHALLENGE MATRIX (V1)
  * ---------------------------------------------------------------------------
  */
-export const OUTSTAND_CHALLENGES: OutstandChallenge[] = [
+export const CHALLENGES: OutstandChallenge[] = [
   {
     id: "focus_deep_work_01",
     title: "The Deep Trench",
