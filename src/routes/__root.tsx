@@ -3,13 +3,12 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
-  useLocation,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
 
 import { useEffect, type ReactNode } from "react";
-import { Bot, RefreshCw, Home, ShieldAlert, LayoutDashboard, Target, Activity, Zap } from "lucide-react";
+import { Bot, RefreshCw, Home, ShieldAlert } from "lucide-react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -149,64 +148,13 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
-// Sidebar Link Helper Component
-function SidebarLink({ to, icon, label, currentPath }: { to: string, icon: React.ReactNode, label: string, currentPath: string }) {
-  const isActive = currentPath.startsWith(to) && to !== "/" || (to === "/" && currentPath === "/");
-  
-  return (
-    <Link
-      to={to}
-      className={`flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-300 group font-bold tracking-wide text-sm ${
-        isActive
-          ? "bg-white/10 text-white shadow-[0_0_20px_rgba(255,255,255,0.05)] border border-white/10"
-          : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
-      }`}
-    >
-      <div className={`${isActive ? "text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.6)]" : "text-slate-500 group-hover:text-slate-300"} transition-colors duration-300`}>
-        {icon}
-      </div>
-      {label}
-    </Link>
-  );
-}
-
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const location = useLocation(); // Used to highlight the active tab on desktop
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="flex h-screen w-full bg-[#050508] text-slate-100 overflow-hidden">
-        
-        {/* DESKTOP SIDEBAR - Hidden on mobile, visible on medium screens and up */}
-        <aside className="hidden md:flex w-64 lg:w-72 flex-col border-r border-white/5 bg-[#0a0a0f]/80 backdrop-blur-2xl p-6 relative z-50 shadow-2xl">
-          {/* Ambient Sidebar Glow */}
-          <div className="absolute top-0 left-0 w-full h-64 bg-indigo-600/10 blur-[80px] pointer-events-none" />
-
-          {/* Logo / Brand */}
-          <div className="text-3xl font-display font-black mb-12 tracking-tighter text-white flex items-center gap-3 relative z-10">
-             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.4)] border border-white/20">
-                <Zap className="h-5 w-5 text-white fill-white" />
-             </div>
-             Outstand.
-          </div>
-
-          {/* Navigation Links */}
-          <nav className="flex flex-col gap-3 relative z-10">
-            <SidebarLink to="/dashboard" icon={<LayoutDashboard size={20} />} label="Dashboard" currentPath={location.pathname} />
-            <SidebarLink to="/dopamine" icon={<Activity size={20} />} label="Dopamine" currentPath={location.pathname} />
-            <SidebarLink to="/focus" icon={<Target size={20} />} label="Focus" currentPath={location.pathname} />
-            <SidebarLink to="/outstand" icon={<Zap size={20} />} label="Outstand" currentPath={location.pathname} />
-          </nav>
-        </aside>
-
-        {/* MAIN APP SHELL CONTENT */}
-        <main className="flex-1 relative overflow-hidden flex flex-col h-full w-full">
-          <AppShell />
-        </main>
-
-      </div>
+      <AppShell />
       <Toaster />
     </QueryClientProvider>
   );
-}
+      }
