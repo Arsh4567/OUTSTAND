@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { AddHabitDialog, HabitCard } from "@/components/habit-card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import RegainTrigger from "@/components/dashboard/RegainTrigger";
 
 // Hooks & Libs
 import { useAppState } from "@/hooks/use-app-state";
@@ -95,10 +96,9 @@ function Dashboard() {
   const quickStartHabits = [
     { name: "Hydrate (3L)", emoji: "💧", icon: <Droplets className="h-5 w-5" />, reason: "Baseline energy and cognitive function.", color: "primary" },
     { name: "Deep Work (60m)", emoji: "🧠", icon: <Brain className="h-5 w-5" />, reason: "Uninterrupted focus for maximum output.", color: "accent" },
-    { name: "Read 10 Pages", emoji: "📚", icon: <BookOpen className="h-5 w-5" />, reason: "Continuous learning and mental clarity.", color: "success" }
+    { name: "Read 10 Pages", emoji: "📖", icon: <BookOpen className="h-5 w-5" />, reason: "Continuous learning and mental clarity.", color: "success" }
   ];
-
-  return (
+    return (
     <>
       <motion.div 
         variants={containerVariants}
@@ -135,6 +135,11 @@ function Dashboard() {
              </Button>
           </div>
         </motion.header>
+
+        {/* REGAIN ESCAPE HATCH */}
+        <motion.div variants={itemVariants} className="w-full">
+          <RegainTrigger />
+        </motion.div>
 
         {/* BENTO BOX GRID LAYOUT */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
@@ -205,7 +210,7 @@ function Dashboard() {
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.9, y: -10 }}
                         transition={{ delay: i * 0.05, duration: 0.4, ease: smoothEase }}
-                        // 🔥 GREEN / RED LOGIC APPLIED HERE
+                        // 🟢 GREEN / RED LOGIC APPLIED HERE
                         className={cn(
                           "rounded-2xl transition-all duration-500 border bg-slate-900/50 backdrop-blur-sm",
                           isCompleted 
@@ -320,7 +325,7 @@ function Dashboard() {
                <div className="relative z-10 mt-6 pt-2">
                  <Button 
                     className="w-full h-12 rounded-xl transition-all bg-gradient-to-r from-fuchsia-600 to-violet-600 hover:from-fuchsia-500 hover:to-violet-500 text-white shadow-[0_0_20px_rgba(217,70,239,0.3)] active:scale-95 border border-fuchsia-400/40 font-bold" 
-                    // 🔥 ROUTING LINK FIXED HERE! Passing the challenge ID in search params
+                    // 🟢 ROUTING LINK FIXED HERE! Passing the challenge ID in search params
                     onClick={() => navigate({ 
                       to: "/outstand", 
                       search: { challengeId: challenge.id || challenge.title.toLowerCase().replace(/\s+/g, '-') } 
@@ -423,5 +428,5 @@ function StatCard({ icon, label, value, sub, accent }: { icon: React.ReactNode; 
       </div>
     </motion.div>
   );
-      }
-                 
+            }
+                                                      
