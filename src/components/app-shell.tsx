@@ -74,14 +74,12 @@ function ShellWithChrome() {
   useEffect(() => {
     setIsClient(true);
     
-    // Prevent level-up animation on initial load/hydration
     if (!hasHydratedRef.current) {
       hasHydratedRef.current = true;
       prevLevelRef.current = level;
       return;
     }
 
-    // Trigger Supernova if the level actually increased
     if (level > prevLevelRef.current) {
       setShowSupernova(true);
     }
@@ -185,8 +183,7 @@ function ShellWithChrome() {
     toast.success("Signed out successfully");
     navigate({ to: "/auth", replace: true });
   };
-
-  return (
+    return (
     <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-[#050814] pb-24 text-slate-50 transition-colors duration-300 md:pb-0">
       
       {/* 💥 SUPERNOVA LEVEL-UP OVERLAY 💥 */}
@@ -196,13 +193,11 @@ function ShellWithChrome() {
         )}
       </AnimatePresence>
 
-      {/* --- GLOBAL CINEMATIC BLUE AMBIENT LIGHTING --- */}
       <div className="fixed inset-0 z-[-1] pointer-events-none overflow-hidden">
         <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-600/10 blur-[150px]" />
         <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] rounded-full bg-indigo-900/15 blur-[150px]" />
       </div>
 
-      {/* DESKTOP FLOATING DOCK */}
       <div className="hidden lg:flex fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-3rem)] max-w-6xl">
         <header className="w-full flex items-center justify-between rounded-full border border-blue-500/15 bg-[#0a0f1a]/80 px-6 py-3 shadow-[0_0_50px_rgba(37,99,235,0.15)] backdrop-blur-3xl">
           
@@ -213,7 +208,6 @@ function ShellWithChrome() {
             <div className="font-display text-lg font-bold tracking-tight text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">Outstand</div>
           </Link>
 
-          {/* Desktop Nav Links */}
           <nav className="flex items-center gap-2 absolute left-1/2 -translate-x-1/2">
             {NAV.map((item) => {
               const isActive = pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to));
@@ -234,7 +228,6 @@ function ShellWithChrome() {
             })}
           </nav>
 
-          {/* Dynamic Top-Right Actions */}
           <div className="flex items-center gap-4">
             <AnimatePresence mode="wait">
               {pathname === "/profile" ? (
@@ -255,7 +248,6 @@ function ShellWithChrome() {
                 </motion.div>
               ) : pathname === "/dopamine" ? (
                 <motion.div key="dopamine-actions" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.2 }} className="flex items-center gap-4">
-                  {/* WRAPPED XP FOR DESKTOP DOPAMINE PAGE */}
                   <Link to="/league" className="transition-transform hover:scale-105 active:scale-95 cursor-pointer">
                     <XpBadge xp={safeXp} level={level} pct={pct} variantId="dopamine" />
                   </Link>
@@ -270,7 +262,6 @@ function ShellWithChrome() {
                     <span className="text-sm font-bold text-orange-50">{bestStreak}</span>
                   </div>
                   
-                  {/* WRAPPED XP FOR DESKTOP DEFAULT DASHBOARD */}
                   <Link to="/league" className="transition-transform hover:scale-105 active:scale-95 cursor-pointer">
                     <XpBadge xp={safeXp} level={level} pct={pct} variantId="default" />
                   </Link>
@@ -307,7 +298,6 @@ function ShellWithChrome() {
         </header>
       </div>
       
-      {/* MOBILE TOP HEADER */}
       <div className="lg:hidden flex items-center justify-between px-6 py-4">
          <Link to="/" className="flex items-center gap-3">
             <div className="h-8 w-8 overflow-hidden rounded-full border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
@@ -317,7 +307,6 @@ function ShellWithChrome() {
           </Link>
           
           <div className="flex items-center gap-3">
-            {/* RESTORED AND WRAPPED XP BADGE ON MOBILE */}
             <Link to="/league" className="transition-transform active:scale-95 cursor-pointer">
               <XpBadge xp={safeXp} level={level} pct={pct} variantId="mobile" />
             </Link>
@@ -335,14 +324,12 @@ function ShellWithChrome() {
           </div>
       </div>
 
-      {/* MAIN CONTENT */}
       <AnimatePresence mode="wait">
         <motion.main key={pathname} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.3, ease: "easeOut" }} className="mx-auto w-full max-w-7xl flex-1 px-4 py-2 lg:pt-32 relative z-10">
           <Outlet />
         </motion.main>
       </AnimatePresence>
       
-      {/* MOBILE PREMIUM BOTTOM DOCK (Blue Theme) */}
       <div className="pointer-events-none fixed bottom-6 left-0 right-0 z-50 flex justify-center px-4 lg:hidden">
         <nav className="pointer-events-auto flex items-center gap-2 rounded-[2rem] border border-blue-500/20 bg-[#0a0f1a]/80 p-2 shadow-[0_0_40px_rgba(37,99,235,0.15)] backdrop-blur-3xl">
           {NAV.map((item) => {
@@ -364,7 +351,6 @@ function ShellWithChrome() {
         </nav>
       </div>
 
-      {/* ⚙️ SETTINGS SHEETS ⚙️ */}
       <AppSettingsSheet 
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
@@ -381,7 +367,7 @@ function ShellWithChrome() {
         onSignOut={signOut}
       />
 
-      TimerSettingsSheet 
+      <TimerSettingsSheet 
         isOpen={isTimerSettingsOpen}
         onClose={() => setIsTimerSettingsOpen(false)}
       />
@@ -390,30 +376,24 @@ function ShellWithChrome() {
   );
 }
 
-// --------------------------------------------------------
-// SUPERNOVA COMPONENT - Renders the intense Level-Up effect
-// --------------------------------------------------------
 function SupernovaEffect({ level, onClose }: { level: number, onClose: () => void }) {
-  // Generate random particles for the explosion
   const particles = Array.from({ length: 45 }).map((_, i) => {
     const angle = Math.random() * Math.PI * 2;
-    const distance = Math.random() * 400 + 100; // Explode outward between 100px to 500px
+    const distance = Math.random() * 400 + 100; 
     return {
       id: i,
       x: Math.cos(angle) * distance,
       y: Math.sin(angle) * distance,
       size: Math.random() * 10 + 4,
-      color: Math.random() > 0.5 ? "#fbbf24" : "#60a5fa", // Mix of Gold and Blue
+      color: Math.random() > 0.5 ? "#fbbf24" : "#60a5fa", 
     };
   });
 
   useEffect(() => {
-    // Physical controller rumble (if supported by device)
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       navigator.vibrate([200, 100, 200, 100, 500]);
     }
     
-    // Auto-unmount after the cinematic finishes
     const timer = setTimeout(onClose, 4000);
     return () => clearTimeout(timer);
   }, [onClose]);
@@ -421,13 +401,11 @@ function SupernovaEffect({ level, onClose }: { level: number, onClose: () => voi
   return (
     <motion.div
       className="fixed inset-0 z-[100] flex flex-col items-center justify-center pointer-events-none overflow-hidden"
-      // The initial white flash bang fading into a dark cinematic overlay
       initial={{ backgroundColor: "rgba(255, 255, 255, 1)" }}
       animate={{ backgroundColor: "rgba(3, 7, 18, 0.85)" }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.8, ease: "easeOut" }}
     >
-      {/* Explosive Particles */}
       {particles.map((p) => (
         <motion.div
           key={p.id}
@@ -443,7 +421,7 @@ function SupernovaEffect({ level, onClose }: { level: number, onClose: () => voi
           transition={{ duration: 1.5 + Math.random(), ease: "easeOut" }}
         />
       ))}
-      {/* Level Up Text Container */}
+
       <motion.div 
         className="relative z-10 text-center flex flex-col items-center"
         initial={{ scale: 0.5, opacity: 0, y: 50 }}
@@ -465,4 +443,5 @@ function SupernovaEffect({ level, onClose }: { level: number, onClose: () => voi
       </motion.div>
     </motion.div>
   );
-}
+    }
+                
