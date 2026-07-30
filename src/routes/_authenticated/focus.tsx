@@ -23,13 +23,14 @@ const DURATIONS: Record<Mode, number> = { focus: 25 * 60, short: 5 * 60, long: 1
 const LABELS: Record<Mode, string> = { focus: "Deep Focus", short: "Short Break", long: "Deep Rest" };
 
 // Theme engine for the Pomodoro timer
-const THEMES: Record<Mode, { color: string; bg: string; border: string; glow: string; aura: string; icon: React.ReactNode }> = {
+const THEMES: Record<Mode, { color: string; bg: string; border: string; glow: string; aura: string; hex: string; icon: React.ReactNode }> = {
   focus: {
     color: "text-amber-400",
     bg: "bg-amber-500/10",
     border: "border-amber-500/30",
     glow: "shadow-[0_0_40px_rgba(251,191,36,0.15)]",
     aura: "bg-amber-500/20",
+    hex: "251, 191, 36", // Amber-400 rgb
     icon: <Flame size={14} className="text-amber-400" />
   },
   short: {
@@ -38,6 +39,7 @@ const THEMES: Record<Mode, { color: string; bg: string; border: string; glow: st
     border: "border-cyan-500/30",
     glow: "shadow-[0_0_40px_rgba(6,182,212,0.15)]",
     aura: "bg-cyan-500/20",
+    hex: "34, 211, 238", // Cyan-400 rgb
     icon: <Zap size={14} className="text-cyan-400" />
   },
   long: {
@@ -46,6 +48,7 @@ const THEMES: Record<Mode, { color: string; bg: string; border: string; glow: st
     border: "border-indigo-500/30",
     glow: "shadow-[0_0_40px_rgba(99,102,241,0.15)]",
     aura: "bg-indigo-500/20",
+    hex: "129, 140, 248", // Indigo-400 rgb
     icon: <Moon size={14} className="text-indigo-400" />
   }
 };
@@ -60,6 +63,7 @@ function FocusPage() {
   // New Features State
   const [intent, setIntent] = useState("");
   const [zenMode, setZenMode] = useState(false);
+  const [shake, setShake] = useState(false); // Guilt-shake state
   
   const intervalRef = useRef<number | null>(null);
   const startedAtRef = useRef<number | null>(null);
@@ -75,13 +79,13 @@ function FocusPage() {
           window.clearInterval(intervalRef.current!);
           setRunning(false);
           
-          if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
+          if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
 
           if (mode === "focus") {
             recordSession(DURATIONS.focus / 60, true);
             addPositive("pomodoro");
             toast.success("Focus session complete", { description: "+20 dopamine · +25 XP" });
-            if (zenMode) setZenMode(false); // Auto-exit zen mode on completion
+            if (zenMode) setZenMode(false); 
           } else {
             toast("Break over", { description: "Back to work." });
           }
@@ -112,8 +116,13 @@ function FocusPage() {
 
   const reset = () => {
     if (running && mode === "focus" && remaining < DURATIONS.focus) {
+      // Trigger the guilt shake
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+      
       recordSession(Math.round((DURATIONS.focus - remaining) / 60), false);
       addNegative("broke_focus");
+      toast.error("Focus Broken", { description: "Mission aborted. Streak penalized." });
     }
     setRunning(false);
     setRemaining(DURATIONS[mode]);
@@ -128,13 +137,15 @@ function FocusPage() {
   const completedFocus = sessions.filter((s) => s.completed).length;
   const totalMinutes = sessions.filter((s) => s.completed).reduce((a, b) => a + b.durationMin, 0);
 
-  // Circumference for the SVG circle (2 * Math.PI * 46)
   const CIRCUMFERENCE = 289.026;
   const strokeDashoffset = CIRCUMFERENCE - progress * CIRCUMFERENCE;
 
   return (
     <>
-      {/* Zen Mode Cinematic Background */}
+      {/* Dynamic Warp Speed Background */}
+      <WarpSpeedCanvas isActive={running} colorRgb={activeTheme.hex} />
+
+      {/* Zen Mode Dimmer Overlay */}
       <AnimatePresence>
         {zenMode && (
           <motion.div 
@@ -142,16 +153,21 @@ function FocusPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.8 }}
-            className="fixed inset-0 bg-[#030712] z-40 pointer-events-none"
+            className="fixed inset-0 bg-[#030712]/70 backdrop-blur-sm z-40 pointer-events-none"
           />
         )}
       </AnimatePresence>
 
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
+        animate={{ 
+          opacity: 1, 
+          y: 0,
+          x: shake ? [-15, 15, -10, 10, -5, 5, 0] : 0 // The violent shake effect
+        }}
+        transition={{ duration: shake ? 0.4 : 0.7 }}
         className={cn(
-          "space-y-8 pb-20 max-w-5xl mx-auto px-4 sm:px-6 relative transition-all duration-700",
+          "space-y-8 pb-20 max-w-5xl mx-auto px-4 sm:px-6 relative",
           zenMode ? "z-50 mt-12" : "z-10"
         )}
       >
@@ -174,9 +190,9 @@ function FocusPage() {
         {/* Main Timer Glass Card */}
         <div className={cn(
           "relative mx-auto w-full max-w-xl p-4 sm:p-8 rounded-[2.5rem] backdrop-blur-2xl border transition-all duration-700",
-          "bg-zinc-900/50", 
+          running ? "bg-black/60 shadow-2xl" : "bg-zinc-900/50", 
           activeTheme.border,
-          activeTheme.glow,
+          running ? activeTheme.glow : "",
           zenMode && "bg-transparent border-transparent shadow-none"
         )}>
           
@@ -217,7 +233,7 @@ function FocusPage() {
               <motion.div 
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={cn("text-center font-medium tracking-wide", activeTheme.color)}
+                className={cn("text-center font-medium tracking-wide drop-shadow-md", activeTheme.color)}
               >
                 Target: {intent}
               </motion.div>
@@ -239,14 +255,14 @@ function FocusPage() {
           {/* Circular Timer Display */}
           <div className="relative mx-auto mt-8 flex h-[260px] w-[260px] sm:h-[320px] sm:w-[320px] items-center justify-center">
             
-            {/* Feature: Ambient Breathing Aura */}
+            {/* Ambient Breathing Aura */}
             <AnimatePresence>
               {running && (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: [1, 1.15, 1] }}
+                  animate={{ opacity: 1, scale: [1, 1.2, 1] }}
                   exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
                   className={cn("absolute inset-0 rounded-full blur-[60px] -z-10", activeTheme.aura)}
                 />
               )}
@@ -254,9 +270,7 @@ function FocusPage() {
 
             {/* SVG Progress Ring */}
             <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full -rotate-90 drop-shadow-2xl z-10">
-              {/* Background Track */}
               <circle cx="50" cy="50" r="46" fill="none" className="stroke-white/5" strokeWidth="2" />
-              {/* Progress Track */}
               <circle
                 cx="50" cy="50" r="46" fill="none"
                 stroke={`url(#${mode}Grad)`} strokeWidth="3" strokeLinecap="round"
@@ -282,14 +296,22 @@ function FocusPage() {
 
             {/* Time Text */}
             <motion.div 
-              animate={running ? { scale: [1, 1.02, 1] } : { scale: 1 }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              animate={running ? { scale: [1, 1.03, 1] } : { scale: 1 }}
+              transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
               className={cn(
-                "z-20 flex flex-col items-center justify-center h-[210px] w-[210px] sm:h-[260px] sm:w-[260px] rounded-full border border-white/5 bg-black/40 backdrop-blur-md shadow-inner",
-                running && activeTheme.glow
+                "z-20 flex flex-col items-center justify-center h-[210px] w-[210px] sm:h-[260px] sm:w-[260px] rounded-full border bg-black/50 backdrop-blur-md shadow-inner transition-colors duration-500",
+                running ? activeTheme.border : "border-white/5"
               )}
             >
-              <div className={cn("font-mono text-6xl sm:text-7xl font-black tabular-nums tracking-tighter drop-shadow-lg", activeTheme.color)}>
+              <div 
+                className={cn(
+                  "font-mono text-6xl sm:text-7xl font-black tabular-nums tracking-tighter transition-all duration-500", 
+                  activeTheme.color
+                )}
+                style={{
+                  textShadow: running ? `0 0 30px rgba(${activeTheme.hex}, 0.6)` : "none"
+                }}
+              >
                 {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
               </div>
               <div className="mt-2 text-[10px] sm:text-xs font-bold uppercase tracking-[0.3em] text-zinc-500">{LABELS[mode]}</div>
@@ -310,7 +332,7 @@ function FocusPage() {
               <Button 
                 variant="outline" 
                 onClick={reset} 
-                className="h-14 w-14 rounded-2xl bg-black/40 border-white/10 text-zinc-400 hover:text-white hover:bg-white/10 shadow-lg"
+                className="h-14 w-14 rounded-2xl bg-black/40 border-white/10 text-zinc-400 hover:text-white hover:bg-rose-500/20 hover:text-rose-400 hover:border-rose-500/50 shadow-lg transition-all"
               >
                 <RotateCcw className="h-5 w-5" />
               </Button>
@@ -324,7 +346,7 @@ function FocusPage() {
             <motion.div 
               initial={{ opacity: 1 }}
               exit={{ opacity: 0, y: 20 }}
-              className="space-y-8"
+              className="space-y-8 relative z-10"
             >
               {/* Stats Row */}
               <div className="grid gap-4 sm:grid-cols-3 max-w-3xl mx-auto">
@@ -389,5 +411,101 @@ function StatBig({ icon, label, value }: { icon: React.ReactNode; label: string;
       </div>
     </motion.div>
   );
+}
+
+// --- LOCAL WARP SPEED COMPONENT ---
+// Injected directly so it has immediate access to the current color hexes without needing prop drilling across files.
+function WarpSpeedCanvas({ isActive, colorRgb }: { isActive: boolean, colorRgb: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let animationFrameId: number;
+    let stars: { x: number; y: number; z: number; pz: number }[] = [];
+    const numStars = 400;
+    const maxDepth = 2000;
+    
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    window.addEventListener("resize", resize);
+    resize();
+
+    for (let i = 0; i < numStars; i++) {
+      stars.push({
+        x: (Math.random() - 0.5) * canvas.width * 2,
+        y: (Math.random() - 0.5) * canvas.height * 2,
+        z: Math.random() * maxDepth,
+        pz: Math.random() * maxDepth,
+      });
+    }
+
+    const draw = () => {
+      // Very transparent black to create motion trails
+      ctx.fillStyle = "rgba(3, 7, 18, 0.3)"; 
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      
+      // Speed scales up significantly when running
+      const speed = isActive ? 30 : 0.5;
+
+      stars.forEach((star) => {
+        star.pz = star.z;
+        star.z -= speed;
+
+        if (star.z <= 0) {
+          star.x = (Math.random() - 0.5) * canvas.width * 2;
+          star.y = (Math.random() - 0.5) * canvas.height * 2;
+          star.z = maxDepth;
+          star.pz = maxDepth;
         }
-            
+
+        const fov = 300;
+        const sx = (star.x / star.z) * fov + centerX;
+        const sy = (star.y / star.z) * fov + centerY;
+        const px = (star.x / star.pz) * fov + centerX;
+        const py = (star.y / star.pz) * fov + centerY;
+
+        const opacity = 1 - star.z / maxDepth;
+        
+        ctx.beginPath();
+        if (isActive) {
+        // Dynamic streaks based on current Pomodoro theme
+          ctx.strokeStyle = `rgba(${colorRgb}, ${opacity})`;
+          ctx.lineWidth = 2;
+          ctx.moveTo(px, py);
+          ctx.lineTo(sx, sy);
+          ctx.stroke();
+        } else {
+          // Idle state stars
+          ctx.fillStyle = `rgba(255, 255, 255, ${opacity * 0.5})`;
+          ctx.arc(sx, sy, 1, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
+
+      animationFrameId = requestAnimationFrame(draw);
+    };
+
+    draw();
+
+    return () => {
+      window.removeEventListener("resize", resize);
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [isActive, colorRgb]);
+
+  return (
+    <div className="fixed inset-0 z-0 pointer-events-none opacity-80 mix-blend-screen transition-opacity duration-1000">
+      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full object-cover" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,#030712_80%)]" />
+    </div>
+  );
+}  
