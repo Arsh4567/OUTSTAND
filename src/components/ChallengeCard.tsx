@@ -41,7 +41,7 @@ function XPCounter({ xp, color }: { xp: number; color?: string }) {
       initial={{ opacity: 0, scale: 0.5 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ type: "spring", bounce: 0.5 }}
-      className="absolute inset-0 flex items-center justify-center font-black text-6xl tracking-tighter z-50 drop-shadow-2xl"
+      className="absolute inset-0 flex items-center justify-center font-black text-6xl md:text-8xl tracking-tighter z-50 drop-shadow-2xl"
       style={{ color: color || "#ffffff", textShadow: `0px 0px 40px ${color || '#ffffff'}` }}
       ref={nodeRef}
     />
@@ -112,7 +112,8 @@ export function ChallengeCard({
       }
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      className="w-full max-w-md mx-auto flex justify-center group z-10 relative"
+      // Responsive Container Upgrade
+      className="w-full max-w-md md:max-w-2xl lg:max-w-4xl mx-auto flex justify-center group z-10 relative"
     >
       <motion.div
         key="active"
@@ -151,13 +152,16 @@ export function ChallengeCard({
         }
         className={cn(
           "relative flex flex-col items-center justify-center transition-all",
-          completionStage > 0 ? "w-[240px] h-[80px]" : "w-full min-h-[440px]"
+          // Responsive height and completion stage pill sizes
+          completionStage > 0 
+            ? "w-[240px] h-[80px] md:w-[320px] md:h-[100px]" 
+            : "w-full min-h-[440px] md:min-h-[560px] lg:min-h-[640px]"
         )}
       >
         {/* Layer 1: Atmospheric Background Spot */}
         {completionStage === 0 && (
           <div 
-            className="absolute inset-0 -z-10 blur-[100px] opacity-30 rounded-[3rem] scale-105 pointer-events-none"
+            className="absolute inset-0 -z-10 blur-[100px] md:blur-[140px] opacity-30 rounded-[3rem] scale-105 pointer-events-none transition-all"
             style={{ backgroundImage: `radial-gradient(circle at 50% 0%, ${primaryColor}, transparent 70%)` }}
           />
         )}
@@ -168,7 +172,8 @@ export function ChallengeCard({
              "absolute inset-0 transition-all duration-500 overflow-hidden", 
              "bg-zinc-900/40 backdrop-blur-2xl",
              "border border-white/10", 
-             completionStage > 0 ? "rounded-full" : "rounded-[2.5rem]",
+             // Responsive border radius
+             completionStage > 0 ? "rounded-full" : "rounded-[2.5rem] lg:rounded-[3.5rem]",
              completionStage === 0 && `shadow-2xl`
            )}
         >
@@ -176,12 +181,12 @@ export function ChallengeCard({
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
         </div>
 
-        {/* Layer 3: Explosion Particles (Unchanged, excellent effect) */}
+        {/* Layer 3: Explosion Particles */}
         {completionStage === 2 && (
           <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none">
             <motion.div
               initial={{ scale: 0.5, opacity: 1, borderWidth: "40px" }}
-              animate={{ scale: 4, opacity: 0, borderWidth: "0px" }}
+              animate={{ scale: 6, opacity: 0, borderWidth: "0px" }} // Increased explosion scale for desktop
               transition={{ duration: 0.8, ease: "easeOut" }}
               className="absolute rounded-full"
               style={{ borderColor: primaryColor, borderStyle: "solid", width: "150px", height: "150px" }}
@@ -193,14 +198,14 @@ export function ChallengeCard({
                   key={`spark-${i}`}
                   initial={{ scale: 0, x: 0, y: 0, opacity: 1 }}
                   animate={{
-                    scale: [0, Math.random() * 2 + 1, 0],
+                    scale: [0, Math.random() * 2 + 1.5, 0], // Bigger particles
                     opacity: [1, 1, 0],
-                    x: Math.cos((i * 18 * Math.PI) / 180) * (Math.random() * 400 + 200),
-                    y: Math.sin((i * 18 * Math.PI) / 180) * (Math.random() * 400 + 200),
+                    x: Math.cos((i * 18 * Math.PI) / 180) * (Math.random() * 600 + 300), // Wider scatter
+                    y: Math.sin((i * 18 * Math.PI) / 180) * (Math.random() * 600 + 300),
                   }}
                   transition={{ duration: 1 + Math.random() * 0.5, ease: "easeOut" }}
-                  className="absolute w-3 h-3 rounded-full"
-                  style={{ backgroundColor: sparkColor, boxShadow: `0 0 20px ${sparkColor}` }}
+                  className="absolute w-4 h-4 rounded-full"
+                  style={{ backgroundColor: sparkColor, boxShadow: `0 0 30px ${sparkColor}` }}
                 />
               );
             })}
@@ -211,12 +216,13 @@ export function ChallengeCard({
         <motion.div
           animate={completionStage > 0 ? { opacity: 0, scale: 0.5 } : { opacity: 1, scale: 1 }}
           style={completionStage === 0 ? { transform: "translateZ(50px)" } : {}} 
-          className={cn("w-full flex flex-col items-center text-center relative z-10", completionStage === 0 ? "p-8" : "p-0")}
+          // Responsive padding
+          className={cn("w-full flex flex-col items-center text-center relative z-10", completionStage === 0 ? "p-8 md:p-12 lg:p-16" : "p-0")}
         >
           {/* Header Tags */}
-          <div className="flex justify-between items-center w-full px-2 text-[10px] sm:text-xs font-bold uppercase tracking-[0.2em] mb-4">
+          <div className="flex justify-between items-center w-full px-2 text-[10px] sm:text-xs md:text-sm font-bold uppercase tracking-[0.2em] mb-4 md:mb-8">
             <span 
-              className="px-4 py-1.5 rounded-full border shadow-lg backdrop-blur-md"
+              className="px-4 py-1.5 md:px-5 md:py-2 rounded-full border shadow-lg backdrop-blur-md"
               style={{ 
                 color: primaryColor, 
                 backgroundColor: `${primaryColor}10`,
@@ -228,57 +234,61 @@ export function ChallengeCard({
             <span className="text-zinc-500">{challenge.category}</span>
           </div>
 
-          {/* Holographic Emoji */}
-          <div className="relative mt-2 mb-4">
-            <div className="absolute inset-0 blur-[40px] opacity-30 scale-150 rounded-full" style={{ backgroundColor: primaryColor }} />
+          {/* Holographic Emoji - Responsive Sizing */}
+          <div className="relative mt-2 mb-4 md:mb-6">
+            <div className="absolute inset-0 blur-[40px] md:blur-[60px] opacity-30 scale-150 rounded-full" style={{ backgroundColor: primaryColor }} />
             <motion.div 
-              className="text-7xl sm:text-8xl drop-shadow-2xl relative z-10"
+              className="text-7xl sm:text-8xl md:text-[120px] lg:text-[140px] drop-shadow-2xl relative z-10 transition-all"
             >
               {challenge.emoji}
             </motion.div>
           </div>
           
-          <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mt-2">{challenge.title}</h2>
-          <p className="text-zinc-400 mt-3 text-sm font-medium leading-relaxed max-w-[280px]">{challenge.description}</p>
+          <h2 className="text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-bold text-white tracking-tight mt-2 transition-all">{challenge.title}</h2>
+          <p className="text-zinc-400 mt-3 md:mt-5 text-sm md:text-base lg:text-lg font-medium leading-relaxed max-w-[280px] md:max-w-md lg:max-w-xl transition-all">{challenge.description}</p>
 
-          {/* Clean, Minimal Timer track */}
-          <div className="flex justify-center w-full my-8">
+          {/* Clean, Minimal Timer track - Responsive Sizing */}
+          <div className="flex justify-center w-full my-8 md:my-12">
             <div className="relative group">
               <div 
-                className="absolute inset-0 blur-2xl opacity-10 transition-opacity duration-1000" 
+                className="absolute inset-0 blur-2xl md:blur-3xl opacity-10 transition-opacity duration-1000" 
                 style={{ backgroundColor: running ? primaryColor : 'transparent' }} 
               />
-              <div className="relative px-8 py-3 bg-white/[0.03] border border-white/5 rounded-3xl backdrop-blur-md">
-                <span className="font-mono text-5xl sm:text-6xl font-light text-white tracking-tighter tabular-nums drop-shadow-md">
+              <div className="relative px-8 py-3 md:px-12 md:py-5 bg-white/[0.03] border border-white/5 rounded-3xl md:rounded-[2rem] backdrop-blur-md">
+                <span className="font-mono text-5xl sm:text-6xl md:text-8xl font-light text-white tracking-tighter tabular-nums drop-shadow-md transition-all">
                   {formatTime()}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Tactile Controls (Now perfectly round and sleek) */}
-          <div className="flex gap-6 justify-center items-center w-full mb-8">
+          {/* Tactile Controls - Responsive Scaling */}
+          <div className="flex gap-6 md:gap-10 justify-center items-center w-full mb-8 md:mb-12">
             <motion.div whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }}>
               <Button 
                 variant="ghost" 
                 onClick={() => { setRemaining(durationFallback * 60); setRunning(false); }} 
-                className="rounded-full w-12 h-12 bg-white/5 border border-white/10 hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
+                className="rounded-full w-12 h-12 md:w-16 md:h-16 bg-white/5 border border-white/10 hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
               >
-                <RotateCcw size={18} />
+                <RotateCcw className="w-4 h-4 md:w-6 md:h-6" />
               </Button>
             </motion.div>
             
             <motion.div whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }}>
               <Button 
                 onClick={() => setRunning(!running)} 
-                className="rounded-full w-20 h-20 shadow-xl border backdrop-blur-md transition-all relative overflow-hidden flex items-center justify-center"
+                className="rounded-full w-20 h-20 md:w-28 md:h-28 shadow-xl border backdrop-blur-md transition-all relative overflow-hidden flex items-center justify-center"
                 style={{ 
                   backgroundColor: running ? 'rgba(255,255,255,0.1)' : `${primaryColor}20`,
                   borderColor: running ? 'rgba(255,255,255,0.2)' : `${primaryColor}50`,
                   color: running ? '#ffffff' : primaryColor
                 }}
               >
-                {running ? <Pause size={28} className="fill-current" /> : <Play size={28} className="fill-current ml-1" />}
+                {running ? (
+                  <Pause className="w-8 h-8 md:w-12 md:h-12 fill-current" />
+                ) : (
+                  <Play className="w-8 h-8 md:w-12 md:h-12 fill-current ml-1 md:ml-2" />
+                )}
               </Button>
             </motion.div>
 
@@ -286,9 +296,9 @@ export function ChallengeCard({
               <Button 
                 variant="ghost" 
                 onClick={generate} 
-                className="rounded-full w-12 h-12 bg-white/5 border border-white/10 hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
+                className="rounded-full w-12 h-12 md:w-16 md:h-16 bg-white/5 border border-white/10 hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
               >
-                <SkipForward size={18} />
+                <SkipForward className="w-4 h-4 md:w-6 md:h-6" />
               </Button>
             </motion.div>
           </div>
@@ -298,12 +308,12 @@ export function ChallengeCard({
             <Button 
               onClick={complete}
               disabled={mins > 0 || secs > 0}
-              className="relative w-full h-14 rounded-full font-bold text-sm uppercase tracking-[0.15em] overflow-hidden group transition-all bg-white text-black hover:bg-zinc-200 disabled:opacity-30 disabled:bg-white/10 disabled:text-zinc-500 shadow-[0_0_40px_rgba(255,255,255,0.1)] disabled:shadow-none"
+              className="relative w-full h-14 md:h-20 md:text-lg rounded-full font-bold text-sm uppercase tracking-[0.15em] overflow-hidden group transition-all bg-white text-black hover:bg-zinc-200 disabled:opacity-30 disabled:bg-white/10 disabled:text-zinc-500 shadow-[0_0_40px_rgba(255,255,255,0.1)] disabled:shadow-none"
             >
               <span className="relative flex items-center justify-center z-10 w-full">
-                <CheckCircle2 className="mr-2 h-5 w-5" /> 
+                <CheckCircle2 className="mr-2 h-5 w-5 md:h-7 md:w-7" /> 
                 Complete 
-                <span className="text-zinc-500 font-medium ml-1">
+                <span className="text-zinc-500 font-medium ml-1 md:ml-2">
                   (+{xpValue} XP)
                 </span>
               </span>
@@ -317,5 +327,4 @@ export function ChallengeCard({
       </motion.div>
     </motion.div>
   );
-              }
-          
+          }
