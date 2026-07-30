@@ -1,11 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { Zap, Sparkles } from "lucide-react";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useOutstand } from "@/hooks/use-outstand";
 import { ChallengeCard } from "@/components/ChallengeCard";
 
+// 1. Define the expected search parameters for deep linking
+type OutstandSearch = {
+  challengeId?: string;
+};
+
+// 2. Add validateSearch to the route definition
 export const Route = createFileRoute("/_authenticated/outstand")({
+  validateSearch: (search: Record<string, unknown>): OutstandSearch => {
+    return {
+      challengeId: search.challengeId as string | undefined,
+    };
+  },
   component: OutstandPage,
 });
 
@@ -13,6 +25,9 @@ export const Route = createFileRoute("/_authenticated/outstand")({
 const cinematicEase = [0.19, 1, 0.22, 1];
 
 function OutstandPage() {
+  // 3. Extract the challengeId from the URL search params
+  const { challengeId } = Route.useSearch();
+
   const {
     challenge,
     running,
@@ -25,7 +40,21 @@ function OutstandPage() {
     complete,
     mins,
     secs,
+    loadChallenge, // <-- Make sure to export this from useOutstand!
   } = useOutstand();
+
+  // 4. Auto-load the specific challenge if the ID exists in the URL
+  useEffect(() => {
+    if (challengeId && loadChallenge) {
+      // Slight delay ensures the page transition finishes before the card glides in,
+      // creating a premium staggered cinematic effect.
+      const timer = setTimeout(() => {
+        loadChallenge(challengeId);
+      }, 150);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [challengeId, loadChallenge]);
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center p-4 sm:p-6 overflow-hidden bg-zinc-950 font-sans">
@@ -132,7 +161,7 @@ function OutstandPage() {
                   transition={{ type: "spring", stiffness: 400, damping: 20 }}
                 >
                   <Button 
-                    onClick={generate}
+                    onClick={() => generate()}
                     className="relative h-28 w-28 sm:h-32 sm:w-32 rounded-full bg-indigo-600 hover:bg-indigo-500 border border-white/20 transition-colors overflow-hidden group z-10 flex items-center justify-center"
                   >
                     {/* Inner flare sweep */}
@@ -199,7 +228,7 @@ function OutstandPage() {
                 secs={secs}
                 setRunning={setRunning}
                 setRemaining={setRemaining}
-                generate={generate}
+                generate={() => generate()}
                 complete={complete}
               />
             </motion.div>
@@ -209,4 +238,4 @@ function OutstandPage() {
       </div>
     </div>
   );
-}
+                    }
