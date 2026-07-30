@@ -1,3 +1,4 @@
+// src/hooks/use-app-state.ts
 import { useMemo } from "react";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import {
@@ -106,6 +107,19 @@ export function useAppState() {
     setHabits((prev) => [...(Array.isArray(prev) ? prev : []), habit]);
   };
 
+  // NEW: Bulk setup function for onboarding initialization
+  const setInitialHabits = (chosenHabits: Array<{ name: string; emoji: string; color: string }>) => {
+    const formattedHabits: Habit[] = chosenHabits.map((item) => ({
+      id: crypto.randomUUID(),
+      name: item.name,
+      emoji: item.emoji,
+      color: item.color,
+      createdAt: new Date().toISOString(),
+      history: [],
+    }));
+    setHabits(formattedHabits);
+  };
+
   const updateHabit = (id: string, data: Partial<Pick<Habit, "name" | "emoji" | "color">>) => {
     setHabits((prev) => {
       const safePrev = Array.isArray(prev) ? prev : [];
@@ -151,6 +165,7 @@ export function useAppState() {
     streaks,
     toggleToday,
     addHabit,
+    setInitialHabits,
     updateHabit,
     deleteHabit,
     recordSession,
