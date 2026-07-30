@@ -45,6 +45,26 @@ export function useOutstand() {
     }, 80); 
   };
 
+  // 🔥 NEW: loadChallenge function specifically for deep-linking from the Dashboard
+  const loadChallenge = (id: string) => {
+    // Find the specific challenge by its ID in your main CHALLENGES matrix
+    const specificChallenge = CHALLENGES.find((c) => c.id === id);
+    
+    if (specificChallenge) {
+      setChallenge(specificChallenge);
+      
+      // Inherit the exact same fallback logic used in the generator
+      const duration = specificChallenge.durationMinutes ? specificChallenge.durationMinutes * 60 : 600;
+      
+      setRemaining(duration);
+      setRunning(false);
+      setIsShuffling(false);
+      setCompletionStage(0);
+    } else {
+      console.warn(`Outstand challenge with ID "${id}" not found.`);
+    }
+  };
+
   useEffect(() => {
     if (!running) return;
     intervalRef.current = window.setInterval(() => {
@@ -123,7 +143,8 @@ export function useOutstand() {
     completionStage,
     generate,
     complete,
+    loadChallenge, // 🔥 Exporting the new deep-link function
     mins: Math.floor(remaining / 60),
     secs: remaining % 60,
   };
-                }
+}
