@@ -1,6 +1,6 @@
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Activity, Flame, LogOut, Timer, Zap, Brain, User, Settings, Share, History, SlidersHorizontal } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAppState } from "@/hooks/use-app-state";
 import { useAuth, displayNameOf } from "@/hooks/use-auth";
 import { levelFromXP } from "@/lib/habits";
@@ -14,7 +14,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-// import { ChatAssistant } from "@/components/chat-assistant"; // AI Assistant temporarily disabled
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { requestNotificationPermission } from "@/lib/notifications";
@@ -66,8 +65,31 @@ function ShellWithChrome() {
   const [isNotificationsGranted, setIsNotificationsGranted] = useState(false);
   const [isTestingPush, setIsTestingPush] = useState(false);
 
+  // Gamification: Supernova State
+  const [showSupernova, setShowSupernova] = useState(false);
+  const prevLevelRef = useRef(level);
+  const hasHydratedRef = useRef(false);
+
+  // Initialize and check for level-ups
   useEffect(() => {
     setIsClient(true);
+    
+    // Prevent level-up animation on initial load/hydration
+    if (!hasHydratedRef.current) {
+      hasHydratedRef.current = true;
+      prevLevelRef.current = level;
+      return;
+    }
+
+    // Trigger Supernova if the level actually increased
+    if (level > prevLevelRef.current) {
+      setShowSupernova(true);
+    }
+    
+    prevLevelRef.current = level;
+  }, [level]);
+
+  useEffect(() => {
     const savedTheme = localStorage.getItem("outstand-theme") as "dark" | "light" | null;
     if (savedTheme) {
       setTheme(savedTheme);
@@ -167,6 +189,13 @@ function ShellWithChrome() {
   return (
     <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-[#050814] pb-24 text-slate-50 transition-colors duration-300 md:pb-0">
       
+      {/* 💥 SUPERNOVA LEVEL-UP OVERLAY 💥 */}
+      <AnimatePresence>
+        {showSupernova && (
+          <SupernovaEffect level={level} onClose={() => setShowSupernova(false)} />
+        )}
+      </AnimatePresence>
+
       {/* --- GLOBAL CINEMATIC BLUE AMBIENT LIGHTING --- */}
       <div className="fixed inset-0 z-[-1] pointer-events-none overflow-hidden">
         <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-600/10 blur-[150px]" />
@@ -226,7 +255,10 @@ function ShellWithChrome() {
                 </motion.div>
               ) : pathname === "/dopamine" ? (
                 <motion.div key="dopamine-actions" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.2 }} className="flex items-center gap-4">
-                  <XpBadge xp={safeXp} level={level} pct={pct} variantId="dopamine" />
+                  {/* WRAPPED XP FOR DESKTOP DOPAMINE PAGE */}
+                  <Link to="/league" className="transition-transform hover:scale-105 active:scale-95 cursor-pointer">
+                    <XpBadge xp={safeXp} level={level} pct={pct} variantId="dopamine" />
+                  </Link>
                   <button onClick={() => navigate({ to: "/dopamine/history" })} className="grid h-10 w-10 place-items-center rounded-full bg-blue-500/5 border border-blue-500/10 text-zinc-400 hover:bg-blue-500/15 hover:text-blue-400 transition-all active:scale-95 shadow-[0_0_15px_rgba(37,99,235,0)] hover:shadow-[0_0_15px_rgba(37,99,235,0.2)]">
                     <History className="h-4 w-4" />
                   </button>
@@ -238,7 +270,10 @@ function ShellWithChrome() {
                     <span className="text-sm font-bold text-orange-50">{bestStreak}</span>
                   </div>
                   
-                  <XpBadge xp={safeXp} level={level} pct={pct} variantId="default" />
+                  {/* WRAPPED XP FOR DESKTOP DEFAULT DASHBOARD */}
+                  <Link to="/league" className="transition-transform hover:scale-105 active:scale-95 cursor-pointer">
+                    <XpBadge xp={safeXp} level={level} pct={pct} variantId="default" />
+                  </Link>
                   
                   <DropdownMenu>
                     <DropdownMenuTrigger className="grid h-10 w-10 place-items-center rounded-full border border-blue-500/20 bg-[#0a0f1a] text-sm font-bold text-blue-100 transition-all hover:border-blue-500/50 hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] focus:outline-none">
@@ -280,16 +315,24 @@ function ShellWithChrome() {
             </div>
             <div className="font-display text-base font-bold text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">Outstand</div>
           </Link>
-          <DropdownMenu>
-            <DropdownMenuTrigger className="grid h-8 w-8 place-items-center rounded-full border border-blue-500/20 bg-[#0a0f1a] text-xs font-bold text-blue-100 shadow-[0_0_10px_rgba(59,130,246,0.1)]">
-              {profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full rounded-full object-cover" /> : safeName.charAt(0).toUpperCase()}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 border-blue-500/20 bg-[#0a0f1a]/95 backdrop-blur-xl text-slate-100 shadow-[0_10px_40px_rgba(37,99,235,0.2)]">
-               <DropdownMenuItem onClick={() => navigate({ to: "/profile" })} className="focus:bg-blue-500/20 focus:text-blue-300"><User className="mr-2 h-4 w-4" /> Profile</DropdownMenuItem>
-               <DropdownMenuItem onClick={() => setIsSettingsOpen(true)} className="focus:bg-blue-500/20 focus:text-blue-300"><Settings className="mr-2 h-4 w-4" /> Settings</DropdownMenuItem>
-               <DropdownMenuItem onClick={signOut} className="text-red-400 focus:bg-red-500/20 focus:text-red-300"><LogOut className="mr-2 h-4 w-4" /> Sign out</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          
+          <div className="flex items-center gap-3">
+            {/* RESTORED AND WRAPPED XP BADGE ON MOBILE */}
+            <Link to="/league" className="transition-transform active:scale-95 cursor-pointer">
+              <XpBadge xp={safeXp} level={level} pct={pct} variantId="mobile" />
+            </Link>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger className="grid h-8 w-8 place-items-center rounded-full border border-blue-500/20 bg-[#0a0f1a] text-xs font-bold text-blue-100 shadow-[0_0_10px_rgba(59,130,246,0.1)]">
+                {profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full rounded-full object-cover" /> : safeName.charAt(0).toUpperCase()}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 border-blue-500/20 bg-[#0a0f1a]/95 backdrop-blur-xl text-slate-100 shadow-[0_10px_40px_rgba(37,99,235,0.2)]">
+                 <DropdownMenuItem onClick={() => navigate({ to: "/profile" })} className="focus:bg-blue-500/20 focus:text-blue-300"><User className="mr-2 h-4 w-4" /> Profile</DropdownMenuItem>
+                 <DropdownMenuItem onClick={() => setIsSettingsOpen(true)} className="focus:bg-blue-500/20 focus:text-blue-300"><Settings className="mr-2 h-4 w-4" /> Settings</DropdownMenuItem>
+                 <DropdownMenuItem onClick={signOut} className="text-red-400 focus:bg-red-500/20 focus:text-red-300"><LogOut className="mr-2 h-4 w-4" /> Sign out</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
       </div>
 
       {/* MAIN CONTENT */}
@@ -338,12 +381,88 @@ function ShellWithChrome() {
         onSignOut={signOut}
       />
 
-      <TimerSettingsSheet 
+      TimerSettingsSheet 
         isOpen={isTimerSettingsOpen}
         onClose={() => setIsTimerSettingsOpen(false)}
       />
 
     </div>
   );
-                        }
-                    
+}
+
+// --------------------------------------------------------
+// SUPERNOVA COMPONENT - Renders the intense Level-Up effect
+// --------------------------------------------------------
+function SupernovaEffect({ level, onClose }: { level: number, onClose: () => void }) {
+  // Generate random particles for the explosion
+  const particles = Array.from({ length: 45 }).map((_, i) => {
+    const angle = Math.random() * Math.PI * 2;
+    const distance = Math.random() * 400 + 100; // Explode outward between 100px to 500px
+    return {
+      id: i,
+      x: Math.cos(angle) * distance,
+      y: Math.sin(angle) * distance,
+      size: Math.random() * 10 + 4,
+      color: Math.random() > 0.5 ? "#fbbf24" : "#60a5fa", // Mix of Gold and Blue
+    };
+  });
+
+  useEffect(() => {
+    // Physical controller rumble (if supported by device)
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate([200, 100, 200, 100, 500]);
+    }
+    
+    // Auto-unmount after the cinematic finishes
+    const timer = setTimeout(onClose, 4000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center pointer-events-none overflow-hidden"
+      // The initial white flash bang fading into a dark cinematic overlay
+      initial={{ backgroundColor: "rgba(255, 255, 255, 1)" }}
+      animate={{ backgroundColor: "rgba(3, 7, 18, 0.85)" }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.8, ease: "easeOut" }}
+    >
+      {/* Explosive Particles */}
+      {particles.map((p) => (
+        <motion.div
+          key={p.id}
+          className="absolute top-1/2 left-1/2 rounded-full"
+          style={{ 
+            backgroundColor: p.color, 
+            width: p.size, 
+            height: p.size,
+            boxShadow: `0 0 20px ${p.color}` 
+          }}
+          initial={{ x: 0, y: 0, scale: 0, opacity: 1 }}
+          animate={{ x: p.x, y: p.y, scale: Math.random() * 1.5 + 0.5, opacity: 0 }}
+          transition={{ duration: 1.5 + Math.random(), ease: "easeOut" }}
+        />
+      ))}
+      {/* Level Up Text Container */}
+      <motion.div 
+        className="relative z-10 text-center flex flex-col items-center"
+        initial={{ scale: 0.5, opacity: 0, y: 50 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        transition={{ delay: 0.2, type: "spring", bounce: 0.6 }}
+      >
+        <motion.div 
+          className="text-yellow-400 font-black tracking-widest uppercase mb-2 drop-shadow-[0_0_30px_rgba(250,204,21,0.6)]"
+          style={{ fontSize: "clamp(3rem, 10vw, 6rem)" }}
+          animate={{ scale: [1, 1.05, 1] }}
+          transition={{ repeat: Infinity, duration: 2 }}
+        >
+          Level Up
+        </motion.div>
+        
+        <div className="bg-white/10 border border-white/20 backdrop-blur-md px-6 py-2 rounded-full text-white font-medium text-lg sm:text-2xl tracking-wide shadow-2xl">
+          You reached Level <span className="text-blue-400 font-bold">{level}</span>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
