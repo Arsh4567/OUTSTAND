@@ -22,7 +22,7 @@ import confetti from 'canvas-confetti';
 
 // --- NEW SUPABASE IMPORT ---
 import { supabase } from "@/integrations/supabase/client";
-
+import { useDpps } from "@/hooks/useDpps";
 export const Route = createFileRoute("/_authenticated/study")({
   component: StudyHubPage,
 });
@@ -43,6 +43,7 @@ const DIFFICULTY_CONFIG = {
   Medium: { icon: Swords, color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/30", glow: "group-hover:shadow-[0_0_15px_rgba(251,191,36,0.15)]" },
   Hard: { icon: Skull, color: "text-red-500", bg: "bg-red-500/10", border: "border-red-500/30", glow: "group-hover:shadow-[0_0_15px_rgba(239,68,68,0.2)]" },
 };
+const { data: dpps, isLoading, error } = useDpps();
 
 // --- CONFETTI UTILITY ---
 const triggerXpConfetti = () => {
