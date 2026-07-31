@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { ArrowLeft } from 'lucide-react';
 import BlackHole from '@/components/regain/BlackHole';
+import KineticForge from '@/components/regain/KineticForge';
 
 export const Route = createFileRoute('/regain')({
   component: RegainPage,
@@ -37,9 +38,15 @@ function RegainPage() {
           </p>
         </div>
 
-        {/* The Black Hole Component */}
-        <div className="w-full w-full max-w-lg">
+        {/* The Triad Container */}
+        <div className="w-full max-w-lg flex flex-col gap-10">
+          
+          {/* Tool 1: Guilt Purge */}
           <BlackHole onDestructionComplete={handlePurgeComplete} />
+          
+          {/* Tool 2: Kinetic Venting */}
+          <KineticForge />
+          
         </div>
         
       </div>
