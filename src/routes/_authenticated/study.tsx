@@ -21,7 +21,7 @@ import { CBSE_CLASS_10_SYLLABUS } from "@/lib/cbse-data";
 import confetti from 'canvas-confetti';
 
 // --- NEW SUPABASE IMPORT ---
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/study")({
   component: StudyHubPage,
