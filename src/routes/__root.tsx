@@ -16,6 +16,9 @@ import { AppShell } from "@/components/app-shell";
 import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 
+// 1. ADD THIS IMPORT RIGHT HERE
+import SidebarLayout from "@/components/layout/SidebarLayout"; 
+
 function NotFoundComponent() {
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-[#050508] px-4 overflow-hidden selection:bg-indigo-500/30">
@@ -153,8 +156,11 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AppShell />
+      {/* 2. WRAP APPSHELL WITH SIDEBARLAYOUT */}
+      <SidebarLayout>
+        <AppShell />
+      </SidebarLayout>
       <Toaster />
     </QueryClientProvider>
   );
-      }
+}
