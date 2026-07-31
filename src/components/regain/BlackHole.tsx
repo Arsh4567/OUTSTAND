@@ -6,164 +6,199 @@ interface BlackHoleProps {
 }
 
 export default function BlackHole({ onDestructionComplete }: BlackHoleProps) {
-  const [inputText, setInputText] = useState('');
-  const [isDestroying, setIsDestroying] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const handleDestroy = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputText.trim() || isDestroying) return;
-    
-    setIsDestroying(true);
-    
-    // Trigger mobile haptic feedback if supported
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate([100, 50, 100, 50, 200]);
-    }
-  };
+  const [distraction, setDistraction] = useState('');
+  const [isPurging, setIsPurging] = useState(false);
 
   useEffect(() => {
-    if (!isDestroying) return;
-
     const canvas = canvasRef.current;
     const container = containerRef.current;
-    
-    // STRICT NULL CHECK: Prevents the runtime anomaly
     if (!canvas || !container) return;
-    
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    canvas.width = container.clientWidth;
-    canvas.height = container.clientHeight;
-
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-
-    let particles: any[] = [];
-    for (let i = 0; i < 150; i++) {
-      particles.push({
-        x: Math.random() * canvas.width,
-        y: (Math.random() * 100) + (centerY - 50),
-        size: Math.random() * 3 + 1,
-        color: Math.random() > 0.5 ? '#3b82f6' : '#eab308',
-        vx: (Math.random() - 0.5) * 10,
-        vy: (Math.random() - 0.5) * 10,
-      });
-    }
+    // Sized to prevent navbar overlap
+    const resizeCanvas = () => {
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
+    };
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
 
     let animationFrameId: number;
-    let eventHorizonRadius = 0;
+    const particles: Particle[] = [];
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const eventHorizonRadius = 45;
 
-    const render = () => {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    class Particle {
+      x: number;
+      y: number;
+      size: number;
+      color: string;
+      angle: number;
+      distance: number;
+      speed: number;
 
-      if (eventHorizonRadius < 40) eventHorizonRadius += 0.5;
+      constructor(x: number, y: number) {
+        this.x = x;
+        this.y = y;
+        this.size = Math.random() * 2 + 1;
+        this.color = Math.random() > 0.5 ? '#60a5fa' : '#c084fc'; // Blue & Purple
+        
+        const dx = centerX - x;
+        const dy = centerY - y;
+        this.angle = Math.atan2(dy, dx);
+        this.distance = Math.sqrt(dx * dx + dy * dy);
+        this.speed = Math.random() * 2 + 1;
+      }
+
+      update() {
+        // Spiral inwards
+        this.angle += 0.05;
+        this.distance -= this.speed;
+        this.speed += 0.1; // Accelerate as it gets closer
+
+        this.x = centerX - Math.cos(this.angle) * this.distance;
+        this.y = centerY - Math.sin(this.angle) * this.distance;
+      }
+
+      draw() {
+        if (!ctx) return;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = this.color;
+        ctx.fill();
+      }
+    }
+
+    const drawSingularity = () => {
+      // The Accretion Disk (Glow)
+      const gradient = ctx.createRadialGradient(centerX, centerY, eventHorizonRadius * 0.8, centerX, centerY, eventHorizonRadius * 3);
+      gradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
+      gradient.addColorStop(0.2, 'rgba(30, 58, 138, 0.4)'); // Deep blue edge
+      gradient.addColorStop(1, 'rgba(3, 7, 18, 0)'); // Fade to background
       
+      ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.arc(centerX, centerY, eventHorizonRadius + 10, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(59, 130, 246, 0.2)';
-      ctx.shadowBlur = 30;
-      ctx.shadowColor = '#3b82f6';
+      ctx.arc(centerX, centerY, eventHorizonRadius * 3, 0, Math.PI * 2);
       ctx.fill();
 
+      // The Void (Pure Black Center)
+      ctx.fillStyle = '#000000';
       ctx.beginPath();
       ctx.arc(centerX, centerY, eventHorizonRadius, 0, Math.PI * 2);
-      ctx.fillStyle = '#000000';
       ctx.shadowBlur = 0;
       ctx.fill();
+    };
 
-      let activeParticles = 0;
+    const render = () => {
+      // Deep space trail effect (replaces the ugly yellow)
+      ctx.fillStyle = 'rgba(3, 7, 18, 0.2)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      particles.forEach((p) => {
-        const dx = centerX - p.x;
-        const dy = centerY - p.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
+      drawSingularity();
 
-        if (distance > eventHorizonRadius) {
-          activeParticles++;
-          const pull = 200 / (distance + 10);
-          p.vx += (dx / distance) * pull;
-          p.vy += (dy / distance) * pull;
-          p.x += p.vx;
-          p.y += p.vy;
-          p.x += (dy / distance) * 5;
-          p.y -= (dx / distance) * 5;
-
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-          ctx.fillStyle = p.color;
-          ctx.shadowBlur = 10;
-          ctx.shadowColor = p.color;
-          ctx.fill();
+      if (isPurging) {
+        // Generate particles randomly around the screen edges if purging
+        if (Math.random() > 0.5) {
+          const startX = Math.random() > 0.5 ? 0 : canvas.width;
+          const startY = Math.random() * canvas.height;
+          particles.push(new Particle(startX, startY));
         }
-      });
 
-      if (activeParticles > 0) {
-        animationFrameId = requestAnimationFrame(render);
-      } else {
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Use a slight timeout for the flash effect, then reset
-        setTimeout(() => {
-          if (onDestructionComplete) onDestructionComplete();
-          setIsDestroying(false);
-          setInputText('');
-        }, 300);
+        for (let i = 0; i < particles.length; i++) {
+          particles[i].update();
+          particles[i].draw();
+
+          // Remove particles that cross the event horizon
+          if (particles[i].distance <= eventHorizonRadius) {
+            particles.splice(i, 1);
+            i--;
+          }
+        }
       }
+
+      animationFrameId = requestAnimationFrame(render);
     };
 
     render();
 
-    return () => cancelAnimationFrame(animationFrameId);
-  }, [isDestroying, onDestructionComplete]);
+    return () => {
+      window.removeEventListener('resize', resizeCanvas);
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [isPurging]);
+
+  const handlePurge = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!distraction.trim()) return;
+    
+    setIsPurging(true);
+    
+    // Mobile haptic feedback for dopamine hit
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate([30, 50, 30]); 
+    }
+
+    // Reset after 2.5 seconds of destruction
+    setTimeout(() => {
+      setIsPurging(false);
+      setDistraction('');
+      if (onDestructionComplete) onDestructionComplete();
+    }, 2500);
+  };
 
   return (
-    <div ref={containerRef} className="relative w-full h-[40vh] bg-black rounded-3xl overflow-hidden border border-blue-900/30 flex items-center justify-center">
-      {isDestroying && (
-        <canvas ref={canvasRef} className="absolute inset-0 z-20 pointer-events-none" />
-      )}
+    <div 
+      ref={containerRef}
+      className="relative w-full h-[40vh] min-h-[300px] max-h-[400px] bg-[#030712] rounded-3xl overflow-hidden border border-slate-800/50 shadow-[0_0_50px_rgba(0,0,0,0.5)_inset] mb-8"
+    >
+      {/* The Canvas Background */}
+      <canvas ref={canvasRef} className="absolute inset-0 z-0 block" />
 
-      <AnimatePresence>
-        {!isDestroying && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.1, filter: "blur(10px)" }}
-            transition={{ duration: 0.4 }}
-            className="z-10 w-full max-w-sm px-6 flex flex-col items-center gap-6"
-          >
-            <div className="text-center">
-              <h3 className="text-blue-500 font-mono tracking-[0.2em] uppercase text-sm mb-2">
-                Memory Purge
-              </h3>
-              <p className="text-gray-400 text-xs">
-                Enter the distraction or guilt. Let the system annihilate it.
-              </p>
-            </div>
-
-            <form onSubmit={handleDestroy} className="w-full flex flex-col gap-4">
+      {/* The UI Overlay */}
+      <div className="absolute inset-0 z-10 flex flex-col items-center justify-end pb-8 px-6">
+        <AnimatePresence>
+          {!isPurging ? (
+            <motion.form 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, filter: 'blur(10px)' }}
+              onSubmit={handlePurge}
+              className="w-full flex flex-col items-center gap-4"
+            >
               <input
                 type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder="e.g., Wasted 3 hours on TikTok"
-                className="w-full bg-black/50 border-b-2 border-blue-900/50 px-4 py-3 text-center text-white placeholder-gray-600 focus:outline-none focus:border-yellow-500 transition-colors font-mono"
-                required
+                value={distraction}
+                onChange={(e) => setDistraction(e.target.value)}
+                placeholder="What is distracting you?"
+                className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl px-4 py-3 text-center text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-mono text-sm"
+                autoComplete="off"
               />
-              <button
+              <button 
                 type="submit"
-                className="w-full py-4 bg-gradient-to-r from-blue-900/40 to-black border border-blue-800/50 rounded-xl text-blue-400 uppercase tracking-widest font-bold hover:bg-blue-900/60 hover:text-white transition-all active:scale-95"
+                disabled={!distraction.trim()}
+                className="px-6 py-2 bg-red-950/40 text-red-400 border border-red-900/50 rounded-full font-mono text-xs tracking-widest uppercase hover:bg-red-900/60 hover:text-red-300 disabled:opacity-30 transition-all"
               >
                 Eradicate
               </button>
-            </form>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </motion.form>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-blue-400 font-mono text-xs tracking-[0.3em] uppercase animate-pulse"
+            >
+              Purging...
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
