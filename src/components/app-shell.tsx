@@ -1,33 +1,15 @@
-import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Activity, Flame, LogOut, Timer, Zap, Brain, User, Settings, Share, History, SlidersHorizontal } from "lucide-react";
+import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, useRef } from "react";
 import { useAppState } from "@/hooks/use-app-state";
-import { useAuth, displayNameOf } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/use-auth";
 import { levelFromXP } from "@/lib/habits";
-import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { requestNotificationPermission } from "@/lib/notifications";
 
-import { XpBadge } from "@/components/xp-badge";
 import { AppSettingsSheet } from "@/components/app-settings-sheet";
 import { TimerSettingsSheet } from "@/components/timer-settings-sheet";
-
-const NAV = [
-  { to: "/", label: "Dashboard", icon: Activity },
-  { to: "/dopamine", label: "Dopamine", icon: Brain },
-  { to: "/focus", label: "Focus", icon: Timer },
-  { to: "/outstand", label: "Outstand", icon: Zap },
-] as const;
 
 export function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -39,19 +21,14 @@ export function AppShell() {
 }
 
 function ShellWithChrome() {
-  const { xp, bestStreak } = useAppState(); 
-  const { user, profile } = useAuth();
+  const { xp } = useAppState(); 
+  const { user } = useAuth();
   
   const safeXp = xp || 0;
-  const { level, into, need } = levelFromXP(safeXp);
-  const safeNeed = need > 0 ? need : 1; 
-  const pct = Math.max(0, Math.min(100, Math.round((into / safeNeed) * 100)));
+  const { level } = levelFromXP(safeXp);
   
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  
-  const rawName = displayNameOf(user, profile);
-  const safeName = rawName || "User";
   
   const [isClient, setIsClient] = useState(false);
   
@@ -139,7 +116,7 @@ function ShellWithChrome() {
       });
       
       if (response.ok) {
-        toast.success("Test notification triggered! 🎉");
+        toast.success("Test notification triggered! 🚀");
       } else {
         const errData = await response.json().catch(() => ({}));
         toast.error(errData.error || "Failed to send test push notification.");
@@ -149,22 +126,6 @@ function ShellWithChrome() {
       toast.error("Network error while trying to send test push.");
     } finally {
       setIsTestingPush(false);
-    }
-  };
-
-  const handleShare = async () => {
-    const shareText = `I'm crushing goals on Outstand! Level ${level} with a ${bestStreak} day streak 🔥`;
-    const url = window.location.origin;
-
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: "My Outstand Stats", text: shareText, url });
-      } catch (err) {
-        console.log("Share canceled", err);
-      }
-    } else {
-      await navigator.clipboard.writeText(`${shareText} - ${url}`);
-      toast.success("Stats copied to clipboard!");
     }
   };
 
@@ -183,10 +144,11 @@ function ShellWithChrome() {
     toast.success("Signed out successfully");
     navigate({ to: "/auth", replace: true });
   };
-    return (
-    <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-[#050814] pb-24 text-slate-50 transition-colors duration-300 md:pb-0">
+
+  return (
+    <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-transparent pb-0 text-slate-50 transition-colors duration-300">
       
-      {/* 💥 SUPERNOVA LEVEL-UP OVERLAY 💥 */}
+      {/* 🌟 SUPERNOVA LEVEL-UP OVERLAY 🌟 */}
       <AnimatePresence>
         {showSupernova && (
           <SupernovaEffect level={level} onClose={() => setShowSupernova(false)} />
@@ -198,159 +160,19 @@ function ShellWithChrome() {
         <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] rounded-full bg-indigo-900/15 blur-[150px]" />
       </div>
 
-      <div className="hidden lg:flex fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-3rem)] max-w-6xl">
-        <header className="w-full flex items-center justify-between rounded-full border border-blue-500/15 bg-[#0a0f1a]/80 px-6 py-3 shadow-[0_0_50px_rgba(37,99,235,0.15)] backdrop-blur-3xl">
-          
-          <Link to="/" className="group flex items-center gap-3">
-            <div className="h-10 w-10 overflow-hidden rounded-full shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all duration-300 group-hover:scale-105 group-hover:shadow-[0_0_25px_rgba(59,130,246,0.4)] border border-blue-500/20">
-              <img src="/outstand-logo.png" alt="Outstand Logo" className="h-full w-full object-cover" />
-            </div>
-            <div className="font-display text-lg font-bold tracking-tight text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">Outstand</div>
-          </Link>
-
-          <nav className="flex items-center gap-2 absolute left-1/2 -translate-x-1/2">
-            {NAV.map((item) => {
-              const isActive = pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to));
-              return (
-                <Link key={item.to} to={item.to} className={cn("relative rounded-full px-5 py-2.5 text-sm font-bold transition-all duration-300", isActive ? "text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]" : "text-zinc-400 hover:text-blue-300")}>
-                  {isActive && (
-                    <motion.div 
-                      layoutId="desktopNav" 
-                      className="absolute inset-0 rounded-full bg-blue-500/10 border border-blue-400/20 shadow-[0_0_20px_rgba(59,130,246,0.15)]" 
-                      transition={{ type: "spring", bounce: 0.2, duration: 0.6 }} 
-                    />
-                  )}
-                  <span className="relative z-10 flex items-center gap-2">
-                    <item.icon className="h-4 w-4" />{item.label}
-                  </span>
-                </Link>
-              );
-            })}
-          </nav>
-
-          <div className="flex items-center gap-4">
-            <AnimatePresence mode="wait">
-              {pathname === "/profile" ? (
-                <motion.div key="profile-actions" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.2 }} className="flex items-center gap-3">
-                  <button onClick={handleShare} className="grid h-10 w-10 place-items-center rounded-full bg-blue-500/5 border border-blue-500/10 text-zinc-400 hover:bg-blue-500/15 hover:text-blue-400 transition-all active:scale-95 shadow-[0_0_15px_rgba(37,99,235,0)] hover:shadow-[0_0_15px_rgba(37,99,235,0.2)]">
-                    <Share className="h-4 w-4" />
-                  </button>
-                  <button onClick={() => setIsSettingsOpen(true)} className="grid h-10 w-10 place-items-center rounded-full bg-blue-500/5 border border-blue-500/10 text-zinc-400 hover:bg-blue-500/15 hover:text-blue-400 transition-all active:scale-95 shadow-[0_0_15px_rgba(37,99,235,0)] hover:shadow-[0_0_15px_rgba(37,99,235,0.2)]">
-                    <Settings className="h-4 w-4" />
-                  </button>
-                </motion.div>
-              ) : pathname === "/focus" ? (
-                <motion.div key="focus-actions" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.2 }}>
-                  <button onClick={() => setIsTimerSettingsOpen(true)} className="flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/5 px-4 py-2 text-sm font-medium text-zinc-300 transition-all hover:bg-blue-500/15 hover:text-blue-400 hover:shadow-[0_0_15px_rgba(37,99,235,0.2)] active:scale-95">
-                    <SlidersHorizontal className="h-4 w-4" />
-                    <span>Timer Settings</span>
-                  </button>
-                </motion.div>
-              ) : pathname === "/dopamine" ? (
-                <motion.div key="dopamine-actions" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.2 }} className="flex items-center gap-4">
-                  <Link to="/league" className="transition-transform hover:scale-105 active:scale-95 cursor-pointer">
-                    <XpBadge xp={safeXp} level={level} pct={pct} variantId="dopamine" />
-                  </Link>
-                  <button onClick={() => navigate({ to: "/dopamine/history" })} className="grid h-10 w-10 place-items-center rounded-full bg-blue-500/5 border border-blue-500/10 text-zinc-400 hover:bg-blue-500/15 hover:text-blue-400 transition-all active:scale-95 shadow-[0_0_15px_rgba(37,99,235,0)] hover:shadow-[0_0_15px_rgba(37,99,235,0.2)]">
-                    <History className="h-4 w-4" />
-                  </button>
-                </motion.div>
-              ) : (
-                <motion.div key="default-actions" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.2 }} className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 rounded-full border border-orange-500/30 bg-orange-500/10 px-4 py-1.5 shadow-[0_0_15px_rgba(249,115,22,0.15)]">
-                    <Flame className="h-4 w-4 text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
-                    <span className="text-sm font-bold text-orange-50">{bestStreak}</span>
-                  </div>
-                  
-                  <Link to="/league" className="transition-transform hover:scale-105 active:scale-95 cursor-pointer">
-                    <XpBadge xp={safeXp} level={level} pct={pct} variantId="default" />
-                  </Link>
-                  
-                  <DropdownMenu>
-                    <DropdownMenuTrigger className="grid h-10 w-10 place-items-center rounded-full border border-blue-500/20 bg-[#0a0f1a] text-sm font-bold text-blue-100 transition-all hover:border-blue-500/50 hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] focus:outline-none">
-                      {profile?.avatar_url ? (
-                        <img src={profile.avatar_url} alt="" className="h-full w-full rounded-full object-cover" />
-                      ) : (
-                        safeName.charAt(0).toUpperCase()
-                      )}
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56 border-blue-500/20 bg-[#0a0f1a]/95 backdrop-blur-xl text-slate-100 rounded-2xl p-2 shadow-[0_10px_40px_rgba(37,99,235,0.2)]">
-                      <DropdownMenuLabel className="px-2 py-1.5">
-                        <div className="text-sm font-bold text-white">{safeName}</div>
-                        <div className="truncate text-xs font-medium text-blue-300/70">{user?.email}</div>
-                      </DropdownMenuLabel>
-                      <DropdownMenuSeparator className="bg-blue-500/10 my-1" />
-                      <DropdownMenuItem onClick={() => navigate({ to: "/profile" })} className="cursor-pointer rounded-lg focus:bg-blue-500/20 focus:text-blue-300 transition-colors">
-                        <User className="mr-2 h-4 w-4" /> View profile
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setIsSettingsOpen(true)} className="cursor-pointer rounded-lg focus:bg-blue-500/20 focus:text-blue-300 transition-colors">
-                        <Settings className="mr-2 h-4 w-4" /> Settings
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={signOut} className="cursor-pointer rounded-lg text-red-400 focus:bg-red-500/20 focus:text-red-300 transition-colors">
-                        <LogOut className="mr-2 h-4 w-4" /> Sign out
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </header>
-      </div>
-      
-      <div className="lg:hidden flex items-center justify-between px-6 py-4">
-         <Link to="/" className="flex items-center gap-3">
-            <div className="h-8 w-8 overflow-hidden rounded-full border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
-              <img src="/outstand-logo.png" alt="Outstand Logo" className="h-full w-full object-cover" />
-            </div>
-            <div className="font-display text-base font-bold text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">Outstand</div>
-          </Link>
-          
-          <div className="flex items-center gap-3">
-            <Link to="/league" className="transition-transform active:scale-95 cursor-pointer">
-              <XpBadge xp={safeXp} level={level} pct={pct} variantId="mobile" />
-            </Link>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger className="grid h-8 w-8 place-items-center rounded-full border border-blue-500/20 bg-[#0a0f1a] text-xs font-bold text-blue-100 shadow-[0_0_10px_rgba(59,130,246,0.1)]">
-                {profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full rounded-full object-cover" /> : safeName.charAt(0).toUpperCase()}
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 border-blue-500/20 bg-[#0a0f1a]/95 backdrop-blur-xl text-slate-100 shadow-[0_10px_40px_rgba(37,99,235,0.2)]">
-                 <DropdownMenuItem onClick={() => navigate({ to: "/profile" })} className="focus:bg-blue-500/20 focus:text-blue-300"><User className="mr-2 h-4 w-4" /> Profile</DropdownMenuItem>
-                 <DropdownMenuItem onClick={() => setIsSettingsOpen(true)} className="focus:bg-blue-500/20 focus:text-blue-300"><Settings className="mr-2 h-4 w-4" /> Settings</DropdownMenuItem>
-                 <DropdownMenuItem onClick={signOut} className="text-red-400 focus:bg-red-500/20 focus:text-red-300"><LogOut className="mr-2 h-4 w-4" /> Sign out</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-      </div>
-
       <AnimatePresence mode="wait">
-        <motion.main key={pathname} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.3, ease: "easeOut" }} className="mx-auto w-full max-w-7xl flex-1 px-4 py-2 lg:pt-32 relative z-10">
+        <motion.main 
+          key={pathname} 
+          initial={{ opacity: 0, y: 15 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          exit={{ opacity: 0, y: -15 }} 
+          transition={{ duration: 0.3, ease: "easeOut" }} 
+          className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 relative z-10"
+        >
           <Outlet />
         </motion.main>
       </AnimatePresence>
       
-      <div className="pointer-events-none fixed bottom-6 left-0 right-0 z-50 flex justify-center px-4 lg:hidden">
-        <nav className="pointer-events-auto flex items-center gap-2 rounded-[2rem] border border-blue-500/20 bg-[#0a0f1a]/80 p-2 shadow-[0_0_40px_rgba(37,99,235,0.15)] backdrop-blur-3xl">
-          {NAV.map((item) => {
-            const isActive = pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to));
-            return (
-              <Link key={item.to} to={item.to} className={cn("relative flex h-14 w-[4.5rem] flex-col items-center justify-center gap-1 rounded-2xl transition-all duration-300 active:scale-90", isActive ? "text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.6)]" : "text-zinc-500 hover:text-blue-300")}>
-                {isActive && (
-                  <motion.div 
-                    layoutId="mobileNav" 
-                    className="absolute inset-0 rounded-2xl bg-gradient-to-b from-blue-500/20 to-blue-600/5 border border-blue-400/20 shadow-[0_0_20px_rgba(59,130,246,0.15)]" 
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }} 
-                  />
-                )}
-                <item.icon className={cn("relative z-10 h-5 w-5 transition-transform duration-300", isActive && "scale-110")} strokeWidth={isActive ? 2.5 : 2} />
-                <span className="relative z-10 text-[9px] font-bold uppercase tracking-wider">{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
-
       <AppSettingsSheet 
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
@@ -443,5 +265,4 @@ function SupernovaEffect({ level, onClose }: { level: number, onClose: () => voi
       </motion.div>
     </motion.div>
   );
-    }
-                
+}
