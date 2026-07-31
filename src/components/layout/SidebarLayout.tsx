@@ -11,22 +11,23 @@ import {
   Zap,
   Brain,
   User,
-  Target
+  BookOpen
 } from "lucide-react";
 import { useAuth, displayNameOf } from "@/hooks/use-auth";
 import { useAppState } from "@/hooks/use-app-state";
 import { levelFromXP } from "@/lib/habits";
 import { cn } from "@/lib/utils";
 
+// Added Study Hub to the sidebar items array
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", icon: Home },
+  { to: "/study", label: "Study Hub", icon: BookOpen },
   { to: "/focus", label: "Focus", icon: Timer },
   { to: "/dopamine", label: "Dopamine", icon: Brain },
   { to: "/outstand", label: "Outstand", icon: Zap },
   { to: "/league", label: "Leaderboard", icon: Trophy },
 ];
 
-// Refined buttery-smooth easing curve
 const customEase = [0.22, 1, 0.36, 1];
 
 const containerVariants = {
@@ -60,7 +61,6 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
   const { level } = levelFromXP(safeXp);
   const safeName = displayNameOf(user, profile) || "Student";
 
-  // Lock background scroll when drawer is open
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -71,30 +71,20 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
   }, [isOpen]);
 
   return (
-    <div className="min-h-screen bg-[#030508] flex flex-col font-sans selection:bg-blue-500/30">
+    <div className="min-h-screen bg-[#050508] flex flex-col font-sans selection:bg-blue-500/30">
       
-      {/* Enhanced Top Bar */}
-      <header className="sticky top-0 z-40 flex h-16 items-center justify-between px-4 backdrop-blur-xl bg-[#030508]/80 border-b border-white/5 shadow-sm">
+      {/* Top Header: Removed "OUTSTAND" text and logo as requested */}
+      <header className="sticky top-0 z-40 flex h-16 items-center px-4 backdrop-blur-xl bg-[#030508]/80 border-b border-white/5 shadow-sm">
         <button
           onClick={() => setIsOpen(true)}
           className="p-2 -ml-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all duration-300 active:scale-95"
         >
           <Menu className="h-6 w-6" />
         </button>
-
-        {/* Center Brand */}
-        <div className="flex items-center gap-2 absolute left-1/2 -translate-x-1/2">
-          <Target className="h-5 w-5 text-blue-500 drop-shadow-[0_0_10px_rgba(59,130,246,0.6)]" />
-          <span className="font-black text-lg text-white tracking-[0.2em] uppercase">Outstand</span>
-        </div>
-
-        {/* Right side placeholder (keeps brand centered) */}
-        <div className="w-10" /> 
       </header>
 
       {/* Main Content Area */}
       <main className="flex-1 w-full max-w-7xl mx-auto relative">
-        {/* Subtle background noise/gradient for depth */}
         <div className="absolute inset-0 bg-gradient-to-br from-blue-900/5 via-transparent to-transparent pointer-events-none" />
         <div className="relative z-10">
           {children}
@@ -105,7 +95,6 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
       <AnimatePresence>
         {isOpen && (
           <>
-            {/* Cinematic Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -114,7 +103,6 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
               className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md"
             />
 
-            {/* High-Tech Side Drawer */}
             <motion.div
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
@@ -122,7 +110,6 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
               transition={{ ease: customEase, duration: 0.5 }}
               className="fixed top-0 left-0 bottom-0 z-50 w-[280px] sm:w-80 bg-[#050810] border-r border-white/5 shadow-[20px_0_40px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden"
             >
-              {/* Subtle Grid Background inside drawer */}
               <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none mix-blend-overlay" />
 
               <div className="p-5 flex justify-end relative z-10">
@@ -134,7 +121,7 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
                 </button>
               </div>
 
-              {/* Profile Section - Glowing & Clickable */}
+              {/* Profile Section */}
               <Link
                 to="/profile"
                 onClick={() => setIsOpen(false)}
@@ -160,7 +147,7 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
                 </div>
               </Link>
 
-              {/* Navigation Items */}
+              {/* Navigation Items including Study Hub */}
               <motion.div 
                 variants={containerVariants}
                 initial="hidden"
@@ -185,7 +172,6 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
                             : "hover:bg-white/5 border border-transparent hover:border-white/5"
                         )}
                       >
-                        {/* Active Indicator Bar */}
                         {isActive && (
                           <motion.div 
                             layoutId="activeNavIndicator"
@@ -217,14 +203,13 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
                 })}
               </motion.div>
 
-              {/* Regain Protocol - Isolated Red Action */}
+              {/* Regain Protocol */}
               <div className="p-4 mt-auto border-t border-white/5 relative z-10 bg-[#050810]/80 backdrop-blur-md">
                 <Link
                   to="/regain"
                   onClick={() => setIsOpen(false)}
                   className="flex items-center justify-center gap-3 w-full px-4 py-4 rounded-xl border border-red-500/20 bg-red-500/5 text-slate-300 hover:bg-red-500/10 hover:border-red-500/40 hover:shadow-[0_0_20px_rgba(239,68,68,0.15)] transition-all duration-300 group overflow-hidden relative"
                 >
-                  {/* Subtle red background flare on hover */}
                   <div className="absolute inset-0 bg-gradient-to-r from-red-500/0 via-red-500/5 to-red-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                   
                   <ShieldAlert className="h-5 w-5 text-red-400 group-hover:scale-110 group-hover:rotate-12 transition-all duration-300 drop-shadow-[0_0_5px_rgba(239,68,68,0.5)] relative z-10" />
@@ -239,5 +224,4 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
       </AnimatePresence>
     </div>
   );
-      }
-                    
+}
