@@ -11,12 +11,16 @@ import {
   Swords,
   Skull,
   X,
-  LayoutGrid
+  LayoutGrid,
+  Check
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { useAppState } from "@/hooks/use-app-state";
 import { cn } from "@/lib/utils";
-import { CBSE_CLASS_10_SYLLABUS } from "@/lib/cbse-data"; // Adjust path if needed
+import { CBSE_CLASS_10_SYLLABUS } from "@/lib/cbse-data";
+
+// Standard npm import
+import confetti from 'canvas-confetti';
 
 export const Route = createFileRoute("/_authenticated/study")({
   component: StudyHubPage,
@@ -33,19 +37,34 @@ interface DPP {
   estimatedTime: string;
 }
 
-const ACTIVE_DPPS: DPP[] = [
-  { id: "dpp_1", subject: "Science (Physics)", topic: "Light: Reflection & Refraction", xp: 50, difficulty: "Easy", estimatedTime: "15m" },
-  { id: "dpp_2", subject: "Mathematics", topic: "Real Numbers: Irrationality Proofs", xp: 50, difficulty: "Easy", estimatedTime: "20m" },
-  { id: "dpp_3", subject: "Social Science", topic: "The Rise of Nationalism in Europe", xp: 100, difficulty: "Medium", estimatedTime: "30m" },
-  { id: "dpp_4", subject: "Mathematics", topic: "Quadratic Equations: Word Problems", xp: 150, difficulty: "Medium", estimatedTime: "35m" },
-  { id: "dpp_5", subject: "Science (Chemistry)", topic: "Carbon & Its Compounds: Nomenclature", xp: 250, difficulty: "Hard", estimatedTime: "45m" },
-  { id: "dpp_6", subject: "Mathematics", topic: "Trigonometric Identities (Proofs)", xp: 300, difficulty: "Hard", estimatedTime: "50m" },
-];
-
 const DIFFICULTY_CONFIG = {
   Easy: { icon: Shield, color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/30", glow: "group-hover:shadow-[0_0_15px_rgba(52,211,153,0.15)]" },
   Medium: { icon: Swords, color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/30", glow: "group-hover:shadow-[0_0_15px_rgba(251,191,36,0.15)]" },
   Hard: { icon: Skull, color: "text-red-500", bg: "bg-red-500/10", border: "border-red-500/30", glow: "group-hover:shadow-[0_0_15px_rgba(239,68,68,0.2)]" },
+};
+
+// --- CONFETTI UTILITY ---
+const triggerXpConfetti = () => {
+  const duration = 2500;
+  const animationEnd = Date.now() + duration;
+  const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 };
+
+  const randomInRange = (min: number, max: number) => {
+    return Math.random() * (max - min) + min;
+  }
+
+  const interval: any = setInterval(function() {
+    const timeLeft = animationEnd - Date.now();
+
+    if (timeLeft <= 0) {
+      return clearInterval(interval);
+    }
+
+    const particleCount = 50 * (timeLeft / duration);
+    
+    confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+    confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
+  }, 250);
 };
 
 function StudyHubPage() {
@@ -53,8 +72,11 @@ function StudyHubPage() {
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<"All" | Difficulty>("All");
   const [isSyllabusModalOpen, setIsSyllabusModalOpen] = useState(false);
+  
+  // Replaced mock data with a state. 
+  // TODO: Populate this inside a useEffect using your Supabase fetch logic!
+  const [activeDPPs, setActiveDPPs] = useState<DPP[]>([]);
 
-  // Lock body scroll when modal is open
   useEffect(() => {
     if (isSyllabusModalOpen) {
       document.body.style.overflow = 'hidden';
@@ -65,30 +87,37 @@ function StudyHubPage() {
   }, [isSyllabusModalOpen]);
 
   const filteredDPPs = useMemo(() => {
-    if (activeFilter === "All") return ACTIVE_DPPS;
-    return ACTIVE_DPPS.filter(dpp => dpp.difficulty === activeFilter);
-  }, [activeFilter]);
+    if (activeFilter === "All") return activeDPPs;
+    return activeDPPs.filter(dpp => dpp.difficulty === activeFilter);
+  }, [activeFilter, activeDPPs]);
 
-  // Calculate global subject progress dynamically from the data file
   const subjectProgress = useMemo(() => {
     return CBSE_CLASS_10_SYLLABUS.map(subject => {
       const totalChapters = subject.chapters.length;
       const completedScore = subject.chapters.reduce((acc, chap) => acc + chap.progress, 0);
       const overallProgress = Math.round(completedScore / totalChapters);
-      return {
-        ...subject,
-        overallProgress
-      };
+      return { ...subject, overallProgress };
     });
   }, []);
 
   const handleCompleteDPP = async (dppId: string, rewardXp: number) => {
     setCompletingId(dppId);
+    
     try {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      console.log(`Awarded ${rewardXp} XP for completing ${dppId}`);
+      // TODO: Replace this timeout with your actual Supabase completeDPP hook call
+      await new Promise(resolve => setTimeout(resolve, 800)); 
+      
+      // 1. Fire Confetti!
+      triggerXpConfetti();
+      
+      // 2. Remove the DPP from the list so it animates away
+      setActiveDPPs(prev => prev.filter(dpp => dpp.id !== dppId));
+      
+      // 3. TODO: Update global XP context here
+      console.log(`Secured ${rewardXp} XP!`);
+      
     } catch (error) {
-      console.error("Failed to complete DPP:", error);
+      console.error("Mission failed:", error);
     } finally {
       setCompletingId(null);
     }
@@ -162,73 +191,96 @@ function StudyHubPage() {
 
               <div className="space-y-4 min-h-[400px]">
                 <AnimatePresence mode="popLayout">
-                  {filteredDPPs.map((dpp) => {
-                    const isCompleting = completingId === dpp.id;
-                    const config = DIFFICULTY_CONFIG[dpp.difficulty];
-                    const DiffIcon = config.icon;
-                    
-                    return (
-                      <motion.div 
-                        layout
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-                        key={dpp.id} 
-                        className={cn(
-                          "group relative overflow-hidden rounded-2xl bg-[#0a0f1a] border transition-all duration-300 p-5 lg:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6",
-                          "border-white/5 hover:bg-[#0c121e]",
-                          config.glow
-                        )}
-                      >
-                        <div className="flex-1 relative z-10 w-full">
-                          <div className="flex flex-wrap items-center gap-3 mb-3">
-                            <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-blue-400 bg-blue-950/40 px-3 py-1 rounded-md border border-blue-900/50">
-                              {dpp.subject}
-                            </span>
-                            <span className={cn("flex items-center gap-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-md border", config.color, config.bg, config.border)}>
-                              <DiffIcon className="h-3.5 w-3.5" /> {dpp.difficulty}
-                            </span>
-                            <span className="text-slate-500 text-xs font-medium font-mono ml-auto sm:ml-0">
-                              ~{dpp.estimatedTime}
-                            </span>
-                          </div>
-                          <h3 className="text-lg lg:text-xl font-bold text-slate-200 group-hover:text-white transition-colors">
-                            {dpp.topic}
-                          </h3>
-                        </div>
+                  {filteredDPPs.length === 0 ? (
+                    <motion.div 
+                      key="empty-state"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      className="flex flex-col items-center justify-center p-12 text-center border border-dashed border-white/10 rounded-2xl bg-white/[0.02]"
+                    >
+                      <div className="bg-emerald-500/10 p-4 rounded-full mb-4 border border-emerald-500/20">
+                        <Check className="h-8 w-8 text-emerald-400" />
+                      </div>
+                      <h3 className="text-xl font-black text-white mb-2">Sector Cleared!</h3>
+                      <p className="text-slate-400 font-medium">All directives in this sector are complete. Great work, commander.</p>
+                    </motion.div>
+                  ) : (
+                    filteredDPPs.map((dpp) => {
+                      const isCompleting = completingId === dpp.id;
+                      const config = DIFFICULTY_CONFIG[dpp.difficulty];
+                      const DiffIcon = config.icon;
+                      
+                      return (
+                        <motion.div 
+                          layout
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, x: -50, transition: { duration: 0.3 } }}
+                          key={dpp.id} 
+                          className={cn(
+                            "group relative overflow-hidden rounded-2xl bg-[#0a0f1a] border transition-all duration-300 p-5 lg:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6",
+                            isCompleting ? "border-emerald-500/50 bg-emerald-950/20" : "border-white/5 hover:bg-[#0c121e]",
+                            !isCompleting && config.glow
+                          )}
+                        >
+                          {/* Success Glow Pulse */}
+                          {isCompleting && (
+                            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/10 to-emerald-500/0 animate-pulse" />
+                          )}
 
-                        <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end relative z-10 border-t sm:border-t-0 border-white/5 pt-4 sm:pt-0 mt-2 sm:mt-0">
-                          <div className="text-left sm:text-right">
-                            <div className={cn("text-base lg:text-lg font-black", config.color)}>
-                              +{dpp.xp} <span className="text-xs text-slate-500 font-sans tracking-wide">XP</span>
+                          <div className="flex-1 relative z-10 w-full">
+                            <div className="flex flex-wrap items-center gap-3 mb-3">
+                              <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-blue-400 bg-blue-950/40 px-3 py-1 rounded-md border border-blue-900/50">
+                                {dpp.subject}
+                              </span>
+                              <span className={cn("flex items-center gap-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-md border", config.color, config.bg, config.border)}>
+                                <DiffIcon className="h-3.5 w-3.5" /> {dpp.difficulty}
+                              </span>
+                              <span className="text-slate-500 text-xs font-medium font-mono ml-auto sm:ml-0">
+                                ~{dpp.estimatedTime}
+                              </span>
                             </div>
+                            <h3 className="text-lg lg:text-xl font-bold text-slate-200 group-hover:text-white transition-colors">
+                              {dpp.topic}
+                            </h3>
                           </div>
-                          <button 
-                            onClick={() => handleCompleteDPP(dpp.id, dpp.xp)}
-                            disabled={isCompleting}
-                            className={cn(
-                              "relative overflow-hidden flex items-center justify-center gap-2 h-10 lg:h-12 px-5 lg:px-6 rounded-xl font-bold transition-all duration-300",
-                              isCompleting 
-                                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                                : "bg-white text-black hover:bg-slate-200 shadow-[0_0_15px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(255,255,255,0.3)] hover:scale-105"
-                            )}
-                          >
-                            {isCompleting ? (
-                              <>
-                                <CheckCircle2 className="h-5 w-5 animate-pulse" />
-                                <span className="hidden sm:inline">Verifying...</span>
-                              </>
-                            ) : (
-                              <>
-                                <span>Execute</span>
-                                <ChevronRight className="h-4 w-4" />
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
+
+                          <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end relative z-10 border-t sm:border-t-0 border-white/5 pt-4 sm:pt-0 mt-2 sm:mt-0">
+                            <div className="text-left sm:text-right">
+                              <div className={cn("text-base lg:text-lg font-black", config.color)}>
+                                +{dpp.xp} <span className="text-xs text-slate-500 font-sans tracking-wide">XP</span>
+                              </div>
+                            </div>
+                            <motion.button 
+                              whileHover={!isCompleting ? { scale: 1.05 } : {}}
+                              whileTap={!isCompleting ? { scale: 0.95 } : {}}
+                              onClick={() => handleCompleteDPP(dpp.id, dpp.xp)}
+                              disabled={isCompleting}
+                              className={cn(
+                                "relative overflow-hidden flex items-center justify-center gap-2 h-10 lg:h-12 px-5 lg:px-6 rounded-xl font-bold transition-all duration-300",
+                                isCompleting 
+                                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 cursor-default"
+                                  : "bg-white text-black hover:bg-slate-200 shadow-[0_0_15px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(255,255,255,0.3)]"
+                              )}
+                            >
+                              {isCompleting ? (
+                                <>
+                                  <CheckCircle2 className="h-5 w-5 animate-pulse" />
+                                  <span className="hidden sm:inline">Securing...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span>Execute</span>
+                                  <ChevronRight className="h-4 w-4" />
+                                </>
+                              )}
+                            </motion.button>
+                          </div>
+                        </motion.div>
+                      );
+                    })
+                  )}
                 </AnimatePresence>
               </div>
             </motion.div>
@@ -306,7 +358,7 @@ function StudyHubPage() {
                 </button>
               </div>
 
-              {/* Modal Body - Scrollable */}
+             {/* Modal Body - Scrollable */}
               <div className="flex-1 overflow-y-auto p-6 lg:p-8 scrollbar-hide space-y-12">
                 {subjectProgress.map((subject) => (
                   <div key={subject.subject} className="space-y-6">
@@ -370,4 +422,4 @@ function StudyHubPage() {
       </AnimatePresence>
     </>
   );
-}
+}  
