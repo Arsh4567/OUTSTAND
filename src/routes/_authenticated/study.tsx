@@ -18,9 +18,10 @@ import { useState, useMemo, useEffect } from "react";
 import { useAppState } from "@/hooks/use-app-state";
 import { cn } from "@/lib/utils";
 import { CBSE_CLASS_10_SYLLABUS } from "@/lib/cbse-data";
-
-// Standard npm import
 import confetti from 'canvas-confetti';
+
+// --- NEW SUPABASE IMPORT ---
+import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/_authenticated/study")({
   component: StudyHubPage,
@@ -73,9 +74,34 @@ function StudyHubPage() {
   const [activeFilter, setActiveFilter] = useState<"All" | Difficulty>("All");
   const [isSyllabusModalOpen, setIsSyllabusModalOpen] = useState(false);
   
-  // Replaced mock data with a state. 
-  // TODO: Populate this inside a useEffect using your Supabase fetch logic!
+  // --- REAL DATA STATES ---
   const [activeDPPs, setActiveDPPs] = useState<DPP[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // --- FETCH DIRECTIVES ON MOUNT ---
+  useEffect(() => {
+    const fetchDirectives = async () => {
+      try {
+        setIsLoading(true);
+        const { data, error } = await supabase
+          .from('dpps')
+          .select('*')
+          .order('xp', { ascending: true }); 
+
+        if (error) throw error;
+        
+        if (data) {
+          setActiveDPPs(data as DPP[]);
+        }
+      } catch (error) {
+        console.error("Comm-link failed. Could not fetch directives:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDirectives();
+  }, []);
 
   useEffect(() => {
     if (isSyllabusModalOpen) {
@@ -100,29 +126,27 @@ function StudyHubPage() {
     });
   }, []);
 
+  // --- EXECUTE SECURE RPC FUNCTION ---
   const handleCompleteDPP = async (dppId: string, rewardXp: number) => {
     setCompletingId(dppId);
     
     try {
-      // TODO: Replace this timeout with your actual Supabase completeDPP hook call
-      await new Promise(resolve => setTimeout(resolve, 800)); 
+      const { error } = await supabase.rpc('complete_dpp_and_award_xp', { 
+        p_dpp_id: dppId 
+      });
+
+      if (error) throw error;
       
-      // 1. Fire Confetti!
       triggerXpConfetti();
-      
-      // 2. Remove the DPP from the list so it animates away
       setActiveDPPs(prev => prev.filter(dpp => dpp.id !== dppId));
-      
-      // 3. TODO: Update global XP context here
       console.log(`Secured ${rewardXp} XP!`);
       
     } catch (error) {
-      console.error("Mission failed:", error);
+      console.error("Mission failed during execution:", error);
     } finally {
       setCompletingId(null);
     }
   };
-
   return (
     <>
       <div className="min-h-[calc(100vh-4rem)] w-full py-8 px-4 sm:px-6 lg:py-12 lg:px-8 font-sans flex flex-col items-center">
@@ -191,7 +215,19 @@ function StudyHubPage() {
 
               <div className="space-y-4 min-h-[400px]">
                 <AnimatePresence mode="popLayout">
-                  {filteredDPPs.length === 0 ? (
+                  {/* --- NEW LOADING STATE --- */}
+                  {isLoading ? (
+                    <motion.div 
+                      key="loading-state"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="flex flex-col items-center justify-center p-12 text-center"
+                    >
+                      <BrainCircuit className="h-8 w-8 text-blue-500 animate-spin mb-4" />
+                      <p className="text-slate-400 font-medium">Decrypting directives from command...</p>
+                    </motion.div>
+                  ) : filteredDPPs.length === 0 ? (
                     <motion.div 
                       key="empty-state"
                       initial={{ opacity: 0, scale: 0.9 }}
@@ -224,7 +260,6 @@ function StudyHubPage() {
                             !isCompleting && config.glow
                           )}
                         >
-                          {/* Success Glow Pulse */}
                           {isCompleting && (
                             <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/10 to-emerald-500/0 animate-pulse" />
                           )}
@@ -344,7 +379,6 @@ function StudyHubPage() {
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
               className="w-full max-w-6xl max-h-[90vh] bg-[#050810] border border-slate-800 rounded-3xl shadow-2xl flex flex-col overflow-hidden"
             >
-              {/* Modal Header */}
               <div className="flex items-center justify-between p-6 lg:p-8 border-b border-slate-800 bg-[#0a0f1a]">
                 <div className="flex items-center gap-3">
                   <BookOpen className="h-6 w-6 text-slate-400" />
@@ -358,7 +392,6 @@ function StudyHubPage() {
                 </button>
               </div>
 
-             {/* Modal Body - Scrollable */}
               <div className="flex-1 overflow-y-auto p-6 lg:p-8 scrollbar-hide space-y-12">
                 {subjectProgress.map((subject) => (
                   <div key={subject.subject} className="space-y-6">
