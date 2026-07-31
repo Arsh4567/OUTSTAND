@@ -1,174 +1,194 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useRouterState } from '@tanstack/react-router';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Menu, X, Home, BookOpen, 
-  ShieldAlert, Trophy, User, ChevronRight, Sparkles 
-} from 'lucide-react';
+import React, { useState } from "react";
+import { Link, useRouterState } from "@tanstack/react-router";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Menu,
+  X,
+  Home,
+  Trophy,
+  ShieldAlert,
+  Timer,
+  Zap,
+  Brain,
+  User
+} from "lucide-react";
+import { useAuth, displayNameOf } from "@/hooks/use-auth";
+import { useAppState } from "@/hooks/use-app-state";
+import { levelFromXP } from "@/lib/habits";
+import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { name: 'Dashboard', path: '/dashboard', icon: Home },
-  { name: 'Study Hub', path: '/study', icon: BookOpen },
-  { name: 'Leaderboard', path: '/leaderboard', icon: Trophy },
-  { name: 'Regain Protocol', path: '/regain', icon: ShieldAlert, emergency: true },
+  { to: "/", label: "Dashboard", icon: Home },
+  { to: "/focus", label: "Focus", icon: Timer },
+  { to: "/dopamine", label: "Dopamine", icon: Brain },
+  { to: "/outstand", label: "Outstand", icon: Zap },
+  { to: "/league", label: "Leaderboard", icon: Trophy },
 ];
 
-// 1. Framer Motion Animation Blueprints (The Stagger Effect)
-const sidebarVariants = {
-  hidden: { x: '-100%', opacity: 0.8 },
-  visible: { 
-    x: 0, 
+// Motion variants for staggering the list items
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
     opacity: 1,
-    transition: { type: 'spring', damping: 25, stiffness: 250, staggerChildren: 0.05, delayChildren: 0.1 }
+    transition: {
+      staggerChildren: 0.05,
+      delayChildren: 0.1,
+    },
   },
-  exit: { 
-    x: '-100%', 
-    opacity: 0,
-    transition: { type: 'spring', damping: 25, stiffness: 200 } 
-  }
 };
 
 const itemVariants = {
   hidden: { opacity: 0, x: -20 },
-  visible: { opacity: 1, x: 0, transition: { type: 'spring', stiffness: 300 } }
+  show: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 300, damping: 24 } },
 };
 
 export default function SidebarLayout({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
-  const routerState = useRouterState();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  // 2. Haptic Feedback Engine
-  const triggerHaptic = (intensity: number = 15) => {
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate(intensity);
-    }
-  };
-
-  const toggleMenu = (state: boolean) => {
-    setIsOpen(state);
-    triggerHaptic(state ? 20 : 10); // Heavier thud on open, lighter tap on close
-  };
-
-  useEffect(() => {
-    setIsOpen(false);
-  }, [routerState.location.pathname]);
-
-  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const { user, profile } = useAuth();
+  const { xp } = useAppState();
   
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStart(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!touchStart) return;
-    const touchEnd = e.changedTouches[0].clientX;
-    const distance = touchStart - touchEnd;
-    
-    if (distance < -50 && touchStart < 50) toggleMenu(true);
-    if (distance > 50 && isOpen) toggleMenu(false);
-  };
+  const safeXp = xp || 0;
+  const { level } = levelFromXP(safeXp);
+  const safeName = displayNameOf(user, profile) || "Student";
 
   return (
-    <div 
-      className="min-h-screen bg-[#030712] text-slate-100 font-sans overflow-x-hidden selection:bg-cyan-500/30"
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-    >
-      {/* Sleeker Header with Glassmorphism */}
-      <header className="fixed top-0 left-0 w-full h-16 z-40 flex items-center px-4 bg-[#030712]/60 backdrop-blur-xl border-b border-white/5">
-        <button 
-          onClick={() => toggleMenu(true)}
-          className="p-2 -ml-2 text-slate-400 hover:text-cyan-400 transition-colors focus:outline-none"
+    <div className="min-h-screen bg-[#050508] flex flex-col font-sans">
+      {/* Top Bar - Clean and minimal */}
+      <header className="sticky top-0 z-40 flex h-16 items-center px-4 backdrop-blur-md bg-[#050508]/80 border-b border-white/5">
+        <button
+          onClick={() => setIsOpen(true)}
+          className="p-2 -ml-2 text-slate-400 hover:text-cyan-400 hover:scale-110 transition-all duration-300"
         >
-          <Menu className="w-6 h-6" />
+          <Menu className="h-6 w-6" />
         </button>
-        <div className="ml-4 flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-cyan-500" />
-          <span className="font-display font-bold tracking-[0.2em] uppercase text-xs text-white/90">
-            Outstand
-          </span>
-        </div>
       </header>
 
-      <main className="pt-16 min-h-screen">
+      {/* Main Content */}
+      <div className="flex-1 w-full max-w-7xl mx-auto">
         {children}
-      </main>
+      </div>
 
+      {/* Sidebar Overlay & Menu */}
       <AnimatePresence>
         {isOpen && (
           <>
-            {/* Darker, deeper blur for the background overlay */}
+            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              onClick={() => toggleMenu(false)}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md z-50"
+              onClick={() => setIsOpen(false)}
+              className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md"
             />
 
+            {/* Side Drawer */}
             <motion.div
-              variants={sidebarVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              className="fixed top-0 left-0 h-full w-[80vw] max-w-[320px] bg-gradient-to-b from-[#0a0e17] to-[#03050a] border-r border-white/10 z-50 flex flex-col shadow-[20px_0_40px_rgba(0,0,0,0.7)]"
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%", transition: { ease: "easeInOut", duration: 0.3 } }}
+              transition={{ type: "spring", bounce: 0, duration: 0.5 }}
+              className="fixed top-0 left-0 bottom-0 z-50 w-72 bg-gradient-to-b from-[#0a0f1a] to-[#050810] border-r border-blue-500/20 shadow-[0_0_30px_rgba(0,0,0,0.8)] flex flex-col"
             >
-              {/* Premium Profile Section */}
-              <div className="p-6 border-b border-white/5 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-full bg-blue-500/5 blur-3xl rounded-full" />
+              <div className="p-4 flex justify-end">
                 <button 
-                  onClick={() => toggleMenu(false)}
-                  className="absolute top-4 right-4 p-2 text-slate-500 hover:text-white transition-colors z-10"
+                  onClick={() => setIsOpen(false)} 
+                  className="text-slate-500 hover:text-white hover:rotate-90 transition-all duration-300"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="h-6 w-6" />
                 </button>
-                
-                <motion.div variants={itemVariants} className="flex items-center gap-4 mt-6 relative z-10">
-                  <div className="w-14 h-14 rounded-full bg-slate-900 border border-cyan-500/40 shadow-[0_0_15px_rgba(6,182,212,0.2)] flex items-center justify-center overflow-hidden">
-                    <User className="w-7 h-7 text-cyan-400" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="font-bold text-white tracking-wide text-lg">Recruit #042</span>
-                    <span className="text-xs text-cyan-400 font-mono tracking-widest uppercase mt-0.5">Level 12 Scholar</span>
-                  </div>
-                </motion.div>
               </div>
 
-              {/* Staggered Navigation Links */}
-              <nav className="flex-1 overflow-y-auto py-6 px-4 flex flex-col gap-2">
+              {/* Profile Section - Glowing & Clickable */}
+              <Link
+                to="/profile"
+                onClick={() => setIsOpen(false)}
+                className="px-6 pb-6 flex items-center gap-4 border-b border-white/10 group transition-all duration-300 hover:bg-white/5"
+              >
+                <div className="relative h-14 w-14 rounded-full border-2 border-cyan-500/50 flex items-center justify-center bg-cyan-900/20 overflow-hidden group-hover:border-cyan-400 group-hover:shadow-[0_0_15px_rgba(34,211,238,0.4)] transition-all duration-500">
+                  {profile?.avatar_url ? (
+                    <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <User className="h-7 w-7 text-cyan-400 group-hover:scale-110 transition-transform duration-300" />
+                  )}
+                </div>
+                <div className="flex flex-col justify-center">
+                  <h3 className="text-white font-bold text-lg group-hover:text-cyan-300 transition-colors truncate max-w-[140px] drop-shadow-[0_2px_10px_rgba(255,255,255,0.1)]">
+                    {safeName}
+                  </h3>
+                  <p className="text-cyan-400 text-[11px] font-bold tracking-[0.2em] uppercase drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]">
+                    Level {level} Scholar
+                  </p>
+                </div>
+              </Link>
+
+              {/* Navigation Items - Staggered entrance */}
+              <motion.div 
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+                className="flex-1 overflow-y-auto py-6 px-4 space-y-1.5 scrollbar-hide"
+              >
                 {NAV_ITEMS.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = routerState.location.pathname.startsWith(item.path);
-                  
+                  const isActive = pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to));
                   return (
-                    <motion.div variants={itemVariants} key={item.path}>
+                    <motion.div key={item.to} variants={itemVariants}>
                       <Link
-                        to={item.path}
-                        onClick={() => triggerHaptic(10)}
-                        className={`
-                          flex items-center justify-between p-4 rounded-xl transition-all duration-300 group
-                          ${isActive 
-                            ? 'bg-gradient-to-r from-cyan-500/10 to-transparent text-cyan-400 border border-cyan-500/20 shadow-[inset_4px_0_0_rgba(6,182,212,1)]' 
-                            : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
-                          }
-                          ${item.emergency ? 'mt-8 border border-red-900/30 text-red-400 hover:bg-red-900/10 hover:text-red-300 shadow-none' : ''}
-                        `}
+                        to={item.to}
+                        onClick={() => setIsOpen(false)}
+                        className={cn(
+                          "group flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all duration-300 overflow-hidden relative",
+                          isActive 
+                            ? "bg-blue-600/15 border border-blue-500/30 shadow-[inset_0_0_20px_rgba(59,130,246,0.1)]" 
+                            : "hover:bg-white/5 border border-transparent hover:border-white/5"
+                        )}
                       >
-                        <div className="flex items-center gap-4">
-                          <Icon className={`w-5 h-5 transition-transform duration-300 group-hover:scale-110 ${isActive ? 'drop-shadow-[0_0_8px_rgba(6,182,212,0.6)]' : ''}`} />
-                          <span className="font-medium tracking-wide">{item.name}</span>
-                        </div>
-                        <ChevronRight className={`w-4 h-4 transition-all duration-300 ${isActive ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 group-hover:opacity-50 group-hover:translate-x-0'}`} />
+                        {/* Active Indicator Bar */}
+                        {isActive && (
+                          <motion.div 
+                            layoutId="activeNavIndicator"
+                            className="absolute left-0 top-2 bottom-2 w-1 bg-blue-500 rounded-r-full shadow-[0_0_10px_rgba(59,130,246,1)]"
+                          />
+                        )}
+                        
+                        <item.icon 
+                          className={cn(
+                            "h-5 w-5 transition-transform duration-300", 
+                            isActive ? "text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.8)]" : "text-slate-400 group-hover:text-slate-200 group-hover:scale-110"
+                          )} 
+                        />
+                        <span 
+                          className={cn(
+                            "font-medium tracking-wide transition-all duration-300 group-hover:translate-x-1",
+                            isActive ? "text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]" : "text-slate-400 group-hover:text-slate-200"
+                          )}
+                        >
+                          {item.label}
+                        </span>
                       </Link>
                     </motion.div>
                   );
                 })}
-              </nav>
+              </motion.div>
+
+              {/* Regain Protocol - Isolated Red Action */}
+              <div className="p-4 mt-auto">
+                <Link
+                  to="/regain"
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center gap-3 w-full px-4 py-4 rounded-2xl border border-red-500/20 bg-red-500/5 text-slate-300 hover:bg-red-500/10 hover:border-red-500/40 hover:shadow-[0_0_20px_rgba(239,68,68,0.15)] transition-all duration-300 group"
+                >
+                  <ShieldAlert className="h-5 w-5 text-red-400 group-hover:scale-110 group-hover:rotate-12 transition-all duration-300 drop-shadow-[0_0_5px_rgba(239,68,68,0.5)]" />
+                  <span className="font-semibold text-sm tracking-wide group-hover:text-red-100 transition-colors">
+                    Regain Protocol
+                  </span>
+                </Link>
+              </div>
             </motion.div>
           </>
         )}
       </AnimatePresence>
     </div>
   );
-                  }
+                          }
