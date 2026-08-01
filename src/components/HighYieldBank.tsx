@@ -11,7 +11,6 @@ const HighYieldBank: React.FC = () => {
   const [activeSubject, setActiveSubject] = useState<'Science' | 'Mathematics'>('Science');
   const [activeChapter, setActiveChapter] = useState<string | null>(null);
   
-  // LocalStorage state for completed questions
   const [completedQs, setCompletedQs] = useState<string[]>([]);
   
   useEffect(() => {
@@ -41,19 +40,41 @@ const HighYieldBank: React.FC = () => {
     }, {} as Record<string, Question[]>);
   }, [allQuestions, activeSubject]);
 
-  const getAbbreviation = (title: string) => {
-    const words = title.replace(/and|&/gi, '').split(' ').filter(Boolean);
-    if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
-    return title.substring(0, 2).toUpperCase();
-  };
-
   return (
-    <div className="relative w-full min-h-[85vh] bg-[#02040a] text-slate-200 py-6 sm:py-8 px-4 sm:px-6 rounded-[2rem] border border-white/5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] overflow-hidden">
+    // Removed all rounded corners, max-widths, and margins to force edge-to-edge
+    <div className="relative w-full min-h-screen bg-[#02040a] text-slate-200 overflow-hidden">
       
-      {/* Background Ambient Glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-64 bg-blue-600/10 blur-[120px] pointer-events-none rounded-full" />
+      {/* ========================================= */}
+      {/* GLOWING BLUE CRYSTALS BACKGROUND          */}
+      {/* ========================================= */}
+      <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+        {/* Crystal 1 - Top Left */}
+        <div 
+          className="absolute -left-16 top-10 w-72 h-[400px] bg-gradient-to-b from-blue-500/20 to-transparent rotate-45 backdrop-blur-3xl"
+          style={{ 
+            clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
+            boxShadow: '0 0 120px 20px rgba(59, 130, 246, 0.4)' 
+          }} 
+        />
+        {/* Crystal 2 - Middle Right */}
+        <div 
+          className="absolute -right-20 top-1/3 w-80 h-[500px] bg-gradient-to-t from-indigo-500/20 to-blue-900/10 -rotate-12 backdrop-blur-2xl"
+          style={{ 
+            clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
+            boxShadow: '0 0 150px 30px rgba(79, 70, 229, 0.3)' 
+          }} 
+        />
+        {/* Crystal 3 - Bottom Left Center */}
+        <div 
+          className="absolute left-1/4 bottom-[-10%] w-56 h-[300px] bg-gradient-to-tr from-cyan-500/10 to-transparent rotate-[60deg]"
+          style={{ 
+            clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
+            boxShadow: '0 0 90px 10px rgba(34, 211, 238, 0.2)' 
+          }} 
+        />
+      </div>
 
-      <div className="relative z-10 w-full max-w-4xl mx-auto">
+      <div className="relative z-10 w-full">
         
         <AnimatePresence mode="wait">
           
@@ -63,83 +84,82 @@ const HighYieldBank: React.FC = () => {
           {!activeChapter ? (
             <motion.div 
               key="list-view"
-              initial={{ opacity: 0, y: 15 }} 
-              animate={{ opacity: 1, y: 0 }} 
-              exit={{ opacity: 0, y: -15, filter: "blur(4px)" }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              className="space-y-8"
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }}
+              className="w-full"
             >
-              {/* Header */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-gradient-to-br from-blue-600/20 to-indigo-600/20 rounded-2xl border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.15)]">
-                    <Zap className="w-7 h-7 text-blue-400 fill-blue-500/20" />
+              {/* Header Section (Padding added here just to keep text off screen edges) */}
+              <div className="px-4 sm:px-8 py-8 space-y-8">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-gradient-to-br from-blue-600/20 to-indigo-600/20 rounded-2xl border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.15)]">
+                      <Zap className="w-7 h-7 text-blue-400 fill-blue-500/20" />
+                    </div>
+                    <div>
+                      <h1 className="text-3xl font-extrabold text-white tracking-tight">Question Bank</h1>
+                      <p className="text-sm text-slate-400 mt-1 font-medium flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> High-Yield Targets
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h1 className="text-3xl font-extrabold text-white tracking-tight">Question Bank</h1>
-                    <p className="text-sm text-slate-400 mt-1 font-medium flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> High-Yield Targets
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex flex-col items-end">
-                  <div className="flex items-center gap-2 px-4 py-2 bg-[#0a0f1a] rounded-xl border border-white/10 shadow-inner">
+                  
+                  <div className="flex items-center gap-2 px-4 py-2 bg-[#0a0f1a]/80 backdrop-blur-md rounded-xl border border-white/10 w-fit">
                     <Award className="w-4 h-4 text-amber-400" />
                     <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total XP</span>
                     <span className="text-base font-black text-white">{completedQs.length * 10}</span>
                   </div>
                 </div>
-              </div>
 
-              {/* Subject Tabs */}
-              <div className="flex space-x-2 p-1.5 bg-[#0a0f1a] rounded-2xl border border-white/5 shadow-inner w-full sm:w-fit">
-                <button
-                  onClick={() => setActiveSubject('Science')}
-                  className={`relative flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-6 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${
-                    activeSubject === 'Science' 
-                      ? 'text-white' 
-                      : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
-                  }`}
-                >
-                  {activeSubject === 'Science' && (
-                    <motion.div layoutId="activeTabBg" className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border border-blue-500/30 rounded-xl shadow-[0_0_15px_rgba(59,130,246,0.1)]" />
-                  )}
-                  <BrainCircuit className={`w-4 h-4 relative z-10 ${activeSubject === 'Science' ? 'text-blue-400' : ''}`} /> 
-                  <span className="relative z-10">Science</span>
-                </button>
-                
-                <button
-                  onClick={() => setActiveSubject('Mathematics')}
-                  className={`relative flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-6 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${
-                    activeSubject === 'Mathematics' 
-                      ? 'text-white' 
-                      : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
-                  }`}
-                >
-                  {activeSubject === 'Mathematics' && (
-                    <motion.div layoutId="activeTabBg" className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border border-blue-500/30 rounded-xl shadow-[0_0_15px_rgba(59,130,246,0.1)]" />
-                  )}
-                  <Calculator className={`w-4 h-4 relative z-10 ${activeSubject === 'Mathematics' ? 'text-blue-400' : ''}`} /> 
-                  <span className="relative z-10">Mathematics</span>
-                </button>
-              </div>
+                {/* Subject Tabs */}
+                <div className="flex space-x-2 p-1.5 bg-[#0a0f1a]/80 backdrop-blur-md rounded-2xl border border-white/5 shadow-inner w-full sm:w-fit">
+                  <button
+                    onClick={() => setActiveSubject('Science')}
+                    className={`relative flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-6 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${
+                      activeSubject === 'Science' 
+                        ? 'text-white' 
+                        : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                    }`}
+                  >
+                    {activeSubject === 'Science' && (
+                      <motion.div layoutId="activeTabBg" className="absolute inset-0 bg-gradient-to-r from-blue-600/30 to-indigo-600/30 border border-blue-500/40 rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.2)]" />
+                    )}
+                    <BrainCircuit className={`w-4 h-4 relative z-10 ${activeSubject === 'Science' ? 'text-blue-400' : ''}`} /> 
+                    <span className="relative z-10">Science</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => setActiveSubject('Mathematics')}
+                    className={`relative flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-6 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${
+                      activeSubject === 'Mathematics' 
+                        ? 'text-white' 
+                        : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                    }`}
+                  >
+                    {activeSubject === 'Mathematics' && (
+                      <motion.div layoutId="activeTabBg" className="absolute inset-0 bg-gradient-to-r from-blue-600/30 to-indigo-600/30 border border-blue-500/40 rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.2)]" />
+                    )}
+                    <Calculator className={`w-4 h-4 relative z-10 ${activeSubject === 'Mathematics' ? 'text-blue-400' : ''}`} /> 
+                    <span className="relative z-10">Mathematics</span>
+                  </button>
+                </div>
 
-              {/* Search Bar */}
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/10 to-blue-500/0 opacity-0 group-focus-within:opacity-100 transition-opacity rounded-2xl blur-md" />
-                <div className="relative flex items-center">
-                  <Search className="absolute left-4 w-5 h-5 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
-                  <input 
-                    type="text" 
-                    placeholder={`Search topics in ${activeSubject}...`} 
-                    className="w-full bg-[#0a0f1a] text-white rounded-2xl py-4 pl-12 pr-4 outline-none border border-white/10 focus:border-blue-500/50 transition-all placeholder:text-slate-600 font-medium shadow-inner"
-                  />
+                {/* Search Bar */}
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/20 to-blue-500/0 opacity-0 group-focus-within:opacity-100 transition-opacity rounded-2xl blur-lg" />
+                  <div className="relative flex items-center">
+                    <Search className="absolute left-4 w-5 h-5 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
+                    <input 
+                      type="text" 
+                      placeholder={`Search topics in ${activeSubject}...`} 
+                      className="w-full bg-[#0a0f1a]/80 backdrop-blur-xl text-white rounded-2xl py-4 pl-12 pr-4 outline-none border border-white/10 focus:border-blue-500/50 transition-all placeholder:text-slate-600 font-medium shadow-inner"
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Chapter Cards List */}
-              <div className="grid gap-3">
+              {/* Edge-to-Edge Chapter Cards List */}
+              <div className="w-full border-t border-white/5">
                 {Object.entries(groupedQuestions).map(([chapter, questions]) => {
                   const chapterCompletedCount = questions.filter(q => completedQs.includes(q.id)).length;
                   const progressPercentage = Math.round((chapterCompletedCount / questions.length) * 100);
@@ -147,33 +167,25 @@ const HighYieldBank: React.FC = () => {
                   
                   return (
                     <motion.button
-                      whileHover={{ scale: 1.01 }}
+                      whileHover={{ backgroundColor: 'rgba(13, 19, 38, 0.7)' }}
                       whileTap={{ scale: 0.99 }}
                       key={chapter}
                       onClick={() => setActiveChapter(chapter)}
-                      className="w-full flex items-center p-4 bg-[#0a0f1a] hover:bg-[#0d1326] border border-white/5 hover:border-blue-500/30 rounded-[1.25rem] transition-all group text-left gap-5 relative overflow-hidden"
+                      // Removed margins, added bottom border for separation, fixed width to 100%
+                      className="w-full flex items-center justify-between p-4 sm:p-6 bg-[#0a0f1a]/60 backdrop-blur-sm border-b border-white/5 transition-all group text-left gap-4"
                     >
-                      {/* Left Icon Block */}
-                      <div className={`w-14 h-14 rounded-2xl flex-shrink-0 flex items-center justify-center text-white font-black text-lg shadow-inner relative z-10 ${
-                        isFullyMastered 
-                          ? 'bg-gradient-to-br from-emerald-500 to-teal-700 shadow-emerald-500/20 border border-emerald-400/30' 
-                          : 'bg-gradient-to-br from-blue-600 to-indigo-800 shadow-blue-500/20 border border-blue-400/30'
-                      }`}>
-                        {getAbbreviation(chapter)}
-                      </div>
-                      
-                      {/* Title & Subtitle */}
-                      <div className="flex-1 min-w-0 z-10">
-                        <h3 className="text-white font-bold text-[15px] sm:text-[17px] truncate tracking-wide group-hover:text-blue-100 transition-colors">
+                      {/* Title & Subtitle - FIXED WRAPPING */}
+                      <div className="flex-1 pr-4">
+                        <h3 className="text-white font-bold text-base sm:text-lg whitespace-normal break-words leading-snug group-hover:text-blue-300 transition-colors">
                           {chapter}
                         </h3>
-                        <p className="text-xs text-slate-500 mt-1 font-medium">
+                        <p className="text-xs text-slate-400 mt-2 font-medium">
                           {questions.length} Questions • {chapterCompletedCount} Mastered
                         </p>
                       </div>
 
                       {/* Right Progress */}
-                      <div className="flex items-center gap-4 z-10">
+                      <div className="flex items-center gap-4 flex-shrink-0">
                         <div className="flex flex-col items-end gap-2 w-16">
                           <span className={`text-[11px] font-black tracking-wider leading-none ${isFullyMastered ? 'text-emerald-400' : 'text-slate-400'}`}>
                             {progressPercentage}%
@@ -187,7 +199,7 @@ const HighYieldBank: React.FC = () => {
                             />
                           </div>
                         </div>
-                        <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-blue-500/10 transition-colors">
+                        <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
                           <ChevronRight className="w-5 h-5 text-slate-500 group-hover:text-blue-400 transition-colors" />
                         </div>
                       </div>
@@ -207,23 +219,23 @@ const HighYieldBank: React.FC = () => {
               animate={{ opacity: 1, x: 0 }} 
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
-              className="space-y-6"
+              className="w-full"
             >
               {/* Top Navigation Ribbon */}
-              <div className="sticky top-0 z-30 bg-[#02040a]/80 backdrop-blur-xl pt-2 pb-4 border-b border-white/5 flex items-center gap-4 -mx-4 px-4 sm:-mx-6 sm:px-6">
+              <div className="sticky top-0 z-30 bg-[#02040a]/90 backdrop-blur-xl px-4 sm:px-8 pt-4 pb-4 border-b border-white/10 flex items-center gap-4 shadow-lg">
                 <button 
                   onClick={() => setActiveChapter(null)}
-                  className="p-2.5 bg-[#0a0f1a] hover:bg-white/10 rounded-xl transition-colors border border-white/10 group"
+                  className="p-2.5 bg-[#0a0f1a] hover:bg-white/10 rounded-xl transition-colors border border-white/10 group flex-shrink-0"
                 >
                   <ChevronLeft className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors" />
                 </button>
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-lg sm:text-xl font-bold text-white truncate">
+                <div className="flex-1">
+                  <h2 className="text-lg sm:text-xl font-bold text-white leading-tight break-words">
                     {activeChapter}
                   </h2>
-                  <div className="flex items-center gap-2 mt-0.5">
+                  <div className="flex items-center gap-2 mt-1">
                     <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(52,211,153,0.6)] animate-pulse" />
-                    <p className="text-xs text-slate-400 font-semibold tracking-wide">
+                    <p className="text-xs text-blue-400 font-bold tracking-wider uppercase">
                       {groupedQuestions[activeChapter].filter(q => completedQs.includes(q.id)).length} / {groupedQuestions[activeChapter].length} COMPLETED
                     </p>
                   </div>
@@ -231,7 +243,7 @@ const HighYieldBank: React.FC = () => {
               </div>
 
               {/* Questions List */}
-              <div className="grid gap-6 pb-12">
+              <div className="px-4 sm:px-8 py-8 grid gap-6 pb-20">
                 {groupedQuestions[activeChapter].map((q, index) => (
                   <QuestionCard 
                     key={q.id} 
@@ -266,10 +278,10 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, index, isComplete
   return (
     <motion.div 
       layout
-      className={`relative p-5 sm:p-7 rounded-[1.5rem] border transition-all duration-300 ${
+      className={`relative p-5 sm:p-7 rounded-[1.5rem] border backdrop-blur-md transition-all duration-300 ${
         isCompleted 
-          ? 'bg-[#060a14] border-emerald-500/20 shadow-[0_0_30px_rgba(52,211,153,0.03)]' 
-          : 'bg-[#0a0f1a] border-white/5 shadow-xl'
+          ? 'bg-[#060a14]/90 border-emerald-500/30 shadow-[0_0_40px_rgba(52,211,153,0.05)]' 
+          : 'bg-[#0a0f1a]/80 border-white/10 shadow-2xl'
       }`}
     >
       
@@ -279,11 +291,11 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, index, isComplete
           <span className={`inline-flex items-center justify-center h-9 w-9 rounded-xl font-black text-sm shadow-inner ${
             isCompleted 
               ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
-              : 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+              : 'bg-blue-600/30 text-blue-400 border border-blue-500/40 shadow-[0_0_15px_rgba(59,130,246,0.3)]'
           }`}>
             Q{index}
           </span>
-          <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-amber-500/10 border border-amber-500/20 text-amber-400">
+          <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-amber-500/10 border border-amber-500/30 text-amber-400">
             {question.target_year}
           </span>
         </div>
@@ -295,16 +307,16 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, index, isComplete
         >
           <div className={`absolute inset-0 rounded-full transition-transform duration-300 ${isCompleted ? 'scale-100 bg-emerald-500/20 blur-md' : 'scale-0'}`} />
           {isCompleted ? (
-            <CheckCircle2 className="w-8 h-8 text-emerald-400 relative z-10 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+            <CheckCircle2 className="w-8 h-8 text-emerald-400 relative z-10 drop-shadow-[0_0_10px_rgba(52,211,153,0.8)]" />
           ) : (
-            <Circle className="w-8 h-8 text-slate-600 group-hover:text-slate-400 relative z-10 transition-colors" />
+            <Circle className="w-8 h-8 text-slate-500 group-hover:text-blue-400 relative z-10 transition-colors" />
           )}
         </button>
       </div>
 
       {/* Question Text */}
       <h3 className={`text-base sm:text-lg font-medium mb-6 whitespace-pre-line leading-relaxed transition-colors ${
-        isCompleted ? 'text-slate-300' : 'text-slate-100'
+        isCompleted ? 'text-slate-300' : 'text-slate-50'
       }`}>
         {question.question_text}
       </h3>
@@ -315,9 +327,9 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, index, isComplete
           {!isRevealed && (
             <button 
               onClick={() => setIsRevealed(true)} 
-              className="flex items-center gap-2.5 py-2.5 px-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 font-bold hover:bg-blue-500/20 hover:text-blue-300 transition-all group"
+              className="flex items-center gap-2.5 py-3 px-5 rounded-xl bg-blue-600/20 border border-blue-500/40 text-blue-300 font-bold hover:bg-blue-500/30 hover:text-white hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all group"
             >
-              <Check className="w-4 h-4 group-hover:scale-110 transition-transform" /> 
+              <Check className="w-5 h-5 group-hover:scale-110 transition-transform" /> 
               Reveal Official Solution
             </button>
           )}
@@ -333,15 +345,14 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, index, isComplete
             exit={{ opacity: 0, height: 0, y: -10 }} 
             className="overflow-hidden"
           >
-            <div className="mt-6 p-5 rounded-2xl bg-[#050810] border border-white/5 relative">
-              {/* Decorative accent line */}
-              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-3/4 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-r-full" />
+            <div className="mt-6 p-5 rounded-2xl bg-[#050810]/90 border border-white/10 relative shadow-inner">
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-3/4 bg-gradient-to-b from-blue-400 to-indigo-600 rounded-r-full shadow-[0_0_10px_rgba(59,130,246,0.8)]" />
               
-              <div className="flex items-center gap-2 mb-3 text-blue-400 font-bold text-sm tracking-wide uppercase ml-2">
+              <div className="flex items-center gap-2 mb-3 text-blue-400 font-bold text-sm tracking-wide uppercase ml-3">
                 <BookOpen className="w-4 h-4" /> 
                 Official Solution & Analysis
               </div>
-              <p className="text-slate-300 leading-relaxed whitespace-pre-line text-[15px] ml-2">
+              <p className="text-slate-200 leading-relaxed whitespace-pre-line text-[15px] ml-3">
                 {question.explanation}
               </p>
             </div>
@@ -354,4 +365,4 @@ const QuestionCard: React.FC<QuestionCardProps> = ({ question, index, isComplete
 };
 
 export default HighYieldBank;
-                      
+          
