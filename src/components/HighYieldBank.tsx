@@ -1,45 +1,24 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, CheckCircle2, Circle, Eye, Calculator, Award, Sparkles } from 'lucide-react';
+import { 
+  BookOpen, Calculator, ChevronRight, ChevronLeft, Search, 
+  CheckCircle2, Circle, Award, Zap, BrainCircuit, Sparkles, Check
+} from 'lucide-react';
 import { scienceQuestions, Question } from '../data/scienceQuestions';
 // import { mathsQuestions } from '../data/mathsQuestions'; // Uncomment when ready
 
-// --- ANIMATED CRYSTAL BACKGROUND ---
-const CrystalBackground = () => (
-  <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 rounded-3xl">
-    {/* Ambient Glows */}
-    <motion.div animate={{ y: [0, -30, 0], opacity: [0.3, 0.5, 0.3] }} transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }} className="absolute top-0 left-1/4 w-96 h-96 bg-blue-600/20 rounded-full blur-[100px]" />
-    <motion.div animate={{ y: [0, 40, 0], opacity: [0.2, 0.4, 0.2] }} transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }} className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[100px]" />
-    
-    {/* Moving Crystals */}
-    <motion.div 
-      animate={{ y: [0, -50, 0], x: [0, 30, 0], rotate: [0, 180, 360] }} 
-      transition={{ duration: 25, repeat: Infinity, ease: "linear" }} 
-      className="absolute top-20 right-[10%] w-32 h-32 bg-gradient-to-br from-blue-500/10 to-cyan-400/5 backdrop-blur-md border border-white/5 shadow-[0_0_30px_rgba(56,189,248,0.15)]" 
-      style={{ clipPath: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)" }} 
-    />
-    <motion.div 
-      animate={{ y: [0, 60, 0], x: [0, -40, 0], rotate: [360, 180, 0] }} 
-      transition={{ duration: 30, repeat: Infinity, ease: "linear" }} 
-      className="absolute bottom-40 left-[5%] w-24 h-48 bg-gradient-to-br from-purple-500/10 to-fuchsia-400/5 backdrop-blur-md border border-white/5 shadow-[0_0_30px_rgba(192,132,252,0.15)]" 
-      style={{ clipPath: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)" }} 
-    />
-  </div>
-);
-
 const HighYieldBank: React.FC = () => {
   const [activeSubject, setActiveSubject] = useState<'Science' | 'Mathematics'>('Science');
+  const [activeChapter, setActiveChapter] = useState<string | null>(null);
   
   // LocalStorage state for completed questions
   const [completedQs, setCompletedQs] = useState<string[]>([]);
   
-  // Load progress on mount
   useEffect(() => {
     const saved = localStorage.getItem('outstand-completed-qs');
     if (saved) setCompletedQs(JSON.parse(saved));
   }, []);
 
-  // Save progress on change
   const toggleCompletion = (id: string) => {
     setCompletedQs((prev) => {
       const next = prev.includes(id) ? prev.filter(qId => qId !== id) : [...prev, id];
@@ -62,119 +41,211 @@ const HighYieldBank: React.FC = () => {
     }, {} as Record<string, Question[]>);
   }, [allQuestions, activeSubject]);
 
+  const getAbbreviation = (title: string) => {
+    const words = title.replace(/and|&/gi, '').split(' ').filter(Boolean);
+    if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+    return title.substring(0, 2).toUpperCase();
+  };
+
   return (
-    <div className="relative w-full min-h-[80vh] text-slate-200 py-8 px-2 sm:px-6 z-10 overflow-hidden bg-[#050810]/50 rounded-3xl border border-white/5 shadow-2xl">
-      <CrystalBackground />
+    <div className="relative w-full min-h-[85vh] bg-[#02040a] text-slate-200 py-6 sm:py-8 px-4 sm:px-6 rounded-[2rem] border border-white/5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] overflow-hidden">
       
-      <div className="relative z-10 w-full mx-auto">
+      {/* Background Ambient Glow */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-64 bg-blue-600/10 blur-[120px] pointer-events-none rounded-full" />
+
+      <div className="relative z-10 w-full max-w-4xl mx-auto">
         
-        {/* Header */}
-        <div className="text-center mb-10">
-          <motion.h1 
-            initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-            className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center gap-4 tracking-tight mb-4"
-          >
-            <Award className="w-10 h-10 sm:w-12 sm:h-12 text-blue-500" />
-            High-Yield Bank
-          </motion.h1>
-          <p className="text-base sm:text-lg text-slate-400 font-medium">
-            Master the most frequently asked CBSE Class 10 Board questions.
-          </p>
-        </div>
-
-        {/* Subject Toggle */}
-        <div className="flex justify-center mb-12">
-          <div className="flex p-1.5 space-x-2 bg-[#0a0f1a]/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.5)]">
-            <button
-              onClick={() => setActiveSubject('Science')}
-              className={`relative flex items-center gap-2.5 px-6 py-3 text-sm sm:text-base font-bold transition-all duration-300 rounded-xl ${
-                activeSubject === 'Science' ? 'text-white' : 'text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              {activeSubject === 'Science' && (
-                <motion.div layoutId="hybSubjectTab" className="absolute inset-0 bg-blue-600/20 border border-blue-500/50 rounded-xl shadow-[0_0_15px_rgba(59,130,246,0.2)]" />
-              )}
-              <BookOpen className="relative z-10 w-5 h-5" /> 
-              <span className="relative z-10">Science</span>
-            </button>
-            
-            <button
-              onClick={() => setActiveSubject('Mathematics')}
-              className={`relative flex items-center gap-2.5 px-6 py-3 text-sm sm:text-base font-bold transition-all duration-300 rounded-xl ${
-                activeSubject === 'Mathematics' ? 'text-white' : 'text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              {activeSubject === 'Mathematics' && (
-                <motion.div layoutId="hybSubjectTab" className="absolute inset-0 bg-purple-600/20 border border-purple-500/50 rounded-xl shadow-[0_0_15px_rgba(168,85,247,0.2)]" />
-              )}
-              <Calculator className="relative z-10 w-5 h-5" /> 
-              <span className="relative z-10">Mathematics</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Chapters */}
-        <div className="space-y-16">
-          {Object.entries(groupedQuestions).map(([chapter, questions]) => {
-            const chapterCompletedCount = questions.filter(q => completedQs.includes(q.id)).length;
-            const progressPercentage = Math.round((chapterCompletedCount / questions.length) * 100);
-            const isFullyCompleted = progressPercentage === 100;
-
-            return (
-              <motion.div 
-                key={chapter} 
-                initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }}
-                className="space-y-6"
-              >
-                {/* Chapter Header with Progress */}
-                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-white/10 pb-4">
-                  <div className="space-y-2">
-                    <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-wide">
-                      {chapter}
-                    </h2>
-                    <div className="flex items-center gap-3">
-                      <div className="h-1.5 w-32 sm:w-48 bg-slate-800 rounded-full overflow-hidden">
-                        <motion.div 
-                          initial={{ width: 0 }} animate={{ width: `${progressPercentage}%` }} transition={{ duration: 1, ease: "easeOut" }}
-                          className={`h-full rounded-full ${isFullyCompleted ? 'bg-emerald-400' : 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.6)]'}`}
-                        />
-                      </div>
-                      <span className={`text-sm font-bold ${isFullyCompleted ? 'text-emerald-400' : 'text-blue-400'}`}>
-                        {progressPercentage}% Mastered
-                      </span>
-                    </div>
-                  </div>
-                  
-                  {isFullyCompleted && (
-                    <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-lg text-sm font-bold animate-pulse">
-                      <Sparkles className="w-4 h-4" /> Sector Cleared
-                    </div>
-                  )}
-                </div>
-
-                {/* Question Grid */}
-                <div className="grid gap-6 lg:grid-cols-2">
-                  {questions.map((q, index) => (
-                    <QuestionCard 
-                      key={q.id} 
-                      question={q} 
-                      index={index + 1} 
-                      isCompleted={completedQs.includes(q.id)}
-                      onToggle={() => toggleCompletion(q.id)}
-                    />
-                  ))}
-                </div>
-              </motion.div>
-            );
-          })}
+        <AnimatePresence mode="wait">
           
-          {Object.keys(groupedQuestions).length === 0 && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-20 text-slate-500">
-              <Circle className="w-12 h-12 mb-4 text-slate-700 animate-pulse" />
-              <p className="text-lg font-medium">Archival data for {activeSubject} is compiling. Check back soon.</p>
+          {/* ========================================= */}
+          {/* LIST VIEW (The Outstand Chapter Menu)     */}
+          {/* ========================================= */}
+          {!activeChapter ? (
+            <motion.div 
+              key="list-view"
+              initial={{ opacity: 0, y: 15 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              exit={{ opacity: 0, y: -15, filter: "blur(4px)" }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="space-y-8"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-gradient-to-br from-blue-600/20 to-indigo-600/20 rounded-2xl border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.15)]">
+                    <Zap className="w-7 h-7 text-blue-400 fill-blue-500/20" />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-extrabold text-white tracking-tight">Question Bank</h1>
+                    <p className="text-sm text-slate-400 mt-1 font-medium flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> High-Yield Targets
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col items-end">
+                  <div className="flex items-center gap-2 px-4 py-2 bg-[#0a0f1a] rounded-xl border border-white/10 shadow-inner">
+                    <Award className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total XP</span>
+                    <span className="text-base font-black text-white">{completedQs.length * 10}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Subject Tabs */}
+              <div className="flex space-x-2 p-1.5 bg-[#0a0f1a] rounded-2xl border border-white/5 shadow-inner w-full sm:w-fit">
+                <button
+                  onClick={() => setActiveSubject('Science')}
+                  className={`relative flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-6 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${
+                    activeSubject === 'Science' 
+                      ? 'text-white' 
+                      : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                  }`}
+                >
+                  {activeSubject === 'Science' && (
+                    <motion.div layoutId="activeTabBg" className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border border-blue-500/30 rounded-xl shadow-[0_0_15px_rgba(59,130,246,0.1)]" />
+                  )}
+                  <BrainCircuit className={`w-4 h-4 relative z-10 ${activeSubject === 'Science' ? 'text-blue-400' : ''}`} /> 
+                  <span className="relative z-10">Science</span>
+                </button>
+                
+                <button
+                  onClick={() => setActiveSubject('Mathematics')}
+                  className={`relative flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-6 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${
+                    activeSubject === 'Mathematics' 
+                      ? 'text-white' 
+                      : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                  }`}
+                >
+                  {activeSubject === 'Mathematics' && (
+                    <motion.div layoutId="activeTabBg" className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border border-blue-500/30 rounded-xl shadow-[0_0_15px_rgba(59,130,246,0.1)]" />
+                  )}
+                  <Calculator className={`w-4 h-4 relative z-10 ${activeSubject === 'Mathematics' ? 'text-blue-400' : ''}`} /> 
+                  <span className="relative z-10">Mathematics</span>
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative group">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/10 to-blue-500/0 opacity-0 group-focus-within:opacity-100 transition-opacity rounded-2xl blur-md" />
+                <div className="relative flex items-center">
+                  <Search className="absolute left-4 w-5 h-5 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
+                  <input 
+                    type="text" 
+                    placeholder={`Search topics in ${activeSubject}...`} 
+                    className="w-full bg-[#0a0f1a] text-white rounded-2xl py-4 pl-12 pr-4 outline-none border border-white/10 focus:border-blue-500/50 transition-all placeholder:text-slate-600 font-medium shadow-inner"
+                  />
+                </div>
+              </div>
+
+              {/* Chapter Cards List */}
+              <div className="grid gap-3">
+                {Object.entries(groupedQuestions).map(([chapter, questions]) => {
+                  const chapterCompletedCount = questions.filter(q => completedQs.includes(q.id)).length;
+                  const progressPercentage = Math.round((chapterCompletedCount / questions.length) * 100);
+                  const isFullyMastered = progressPercentage === 100;
+                  
+                  return (
+                    <motion.button
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
+                      key={chapter}
+                      onClick={() => setActiveChapter(chapter)}
+                      className="w-full flex items-center p-4 bg-[#0a0f1a] hover:bg-[#0d1326] border border-white/5 hover:border-blue-500/30 rounded-[1.25rem] transition-all group text-left gap-5 relative overflow-hidden"
+                    >
+                      {/* Left Icon Block */}
+                      <div className={`w-14 h-14 rounded-2xl flex-shrink-0 flex items-center justify-center text-white font-black text-lg shadow-inner relative z-10 ${
+                        isFullyMastered 
+                          ? 'bg-gradient-to-br from-emerald-500 to-teal-700 shadow-emerald-500/20 border border-emerald-400/30' 
+                          : 'bg-gradient-to-br from-blue-600 to-indigo-800 shadow-blue-500/20 border border-blue-400/30'
+                      }`}>
+                        {getAbbreviation(chapter)}
+                      </div>
+                      
+                      {/* Title & Subtitle */}
+                      <div className="flex-1 min-w-0 z-10">
+                        <h3 className="text-white font-bold text-[15px] sm:text-[17px] truncate tracking-wide group-hover:text-blue-100 transition-colors">
+                          {chapter}
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-1 font-medium">
+                          {questions.length} Questions • {chapterCompletedCount} Mastered
+                        </p>
+                      </div>
+
+                      {/* Right Progress */}
+                      <div className="flex items-center gap-4 z-10">
+                        <div className="flex flex-col items-end gap-2 w-16">
+                          <span className={`text-[11px] font-black tracking-wider leading-none ${isFullyMastered ? 'text-emerald-400' : 'text-slate-400'}`}>
+                            {progressPercentage}%
+                          </span>
+                          <div className="w-full h-1.5 bg-[#1a1f2e] rounded-full overflow-hidden shadow-inner">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${progressPercentage}%` }}
+                              transition={{ duration: 1, ease: "easeOut" }}
+                              className={`h-full rounded-full ${isFullyMastered ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]' : 'bg-gradient-to-r from-blue-500 to-indigo-400'}`} 
+                            />
+                          </div>
+                        </div>
+                        <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-blue-500/10 transition-colors">
+                          <ChevronRight className="w-5 h-5 text-slate-500 group-hover:text-blue-400 transition-colors" />
+                        </div>
+                      </div>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          ) : (
+
+          /* ========================================= */
+          /* DETAIL VIEW (Inside a specific Chapter)   */
+          /* ========================================= */
+            <motion.div 
+              key="detail-view"
+              initial={{ opacity: 0, x: 20 }} 
+              animate={{ opacity: 1, x: 0 }} 
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="space-y-6"
+            >
+              {/* Top Navigation Ribbon */}
+              <div className="sticky top-0 z-30 bg-[#02040a]/80 backdrop-blur-xl pt-2 pb-4 border-b border-white/5 flex items-center gap-4 -mx-4 px-4 sm:-mx-6 sm:px-6">
+                <button 
+                  onClick={() => setActiveChapter(null)}
+                  className="p-2.5 bg-[#0a0f1a] hover:bg-white/10 rounded-xl transition-colors border border-white/10 group"
+                >
+                  <ChevronLeft className="w-5 h-5 text-slate-400 group-hover:text-white transition-colors" />
+                </button>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-lg sm:text-xl font-bold text-white truncate">
+                    {activeChapter}
+                  </h2>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(52,211,153,0.6)] animate-pulse" />
+                    <p className="text-xs text-slate-400 font-semibold tracking-wide">
+                      {groupedQuestions[activeChapter].filter(q => completedQs.includes(q.id)).length} / {groupedQuestions[activeChapter].length} COMPLETED
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Questions List */}
+              <div className="grid gap-6 pb-12">
+                {groupedQuestions[activeChapter].map((q, index) => (
+                  <QuestionCard 
+                    key={q.id} 
+                    question={q} 
+                    index={index + 1} 
+                    isCompleted={completedQs.includes(q.id)}
+                    onToggle={() => toggleCompletion(q.id)}
+                  />
+                ))}
+              </div>
             </motion.div>
           )}
-        </div>
+
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -190,126 +261,97 @@ interface QuestionCardProps {
 
 const QuestionCard: React.FC<QuestionCardProps> = ({ question, index, isCompleted, onToggle }) => {
   const [isRevealed, setIsRevealed] = useState(false);
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
-
   const isSubjective = question.options.length === 0;
-
-  const handleOptionClick = (option: string) => {
-    if (isRevealed) return; 
-    setSelectedOption(option);
-    setIsRevealed(true);
-    
-    // Auto-mark complete if objective is answered correctly (Optional behavior, currently user must manually toggle for full control)
-    // if (option === question.correct_answer && !isCompleted) onToggle();
-  };
 
   return (
     <motion.div 
       layout
-      className={`relative p-6 rounded-2xl border transition-all duration-300 overflow-hidden flex flex-col justify-between ${
+      className={`relative p-5 sm:p-7 rounded-[1.5rem] border transition-all duration-300 ${
         isCompleted 
-          ? 'bg-emerald-950/20 border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.05)]' 
-          : 'bg-[#0a0f1a]/80 backdrop-blur-md border-white/10 hover:border-blue-500/40 hover:shadow-[0_0_20px_rgba(59,130,246,0.1)]'
+          ? 'bg-[#060a14] border-emerald-500/20 shadow-[0_0_30px_rgba(52,211,153,0.03)]' 
+          : 'bg-[#0a0f1a] border-white/5 shadow-xl'
       }`}
     >
-      <div>
-        {/* Card Header */}
-        <div className="flex justify-between items-start mb-5">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-blue-950 border border-blue-800 text-blue-400 font-black text-sm shadow-[0_0_10px_rgba(59,130,246,0.2)]">
-              Q{index}
-            </span>
-            <span className="inline-flex items-center px-3 py-1 rounded-md text-xs font-bold uppercase tracking-widest bg-yellow-500/10 border border-yellow-500/20 text-yellow-500">
-              {question.target_year}
-            </span>
-          </div>
-
-          {/* Completion Toggle */}
-          <button 
-            onClick={onToggle}
-            className="group flex items-center justify-center transition-transform hover:scale-110 active:scale-95"
-            title="Mark as completed"
-          >
-            {isCompleted ? (
-              <CheckCircle2 className="w-7 h-7 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-            ) : (
-              <Circle className="w-7 h-7 text-slate-600 group-hover:text-blue-400 transition-colors" />
-            )}
-          </button>
+      
+      {/* Card Header */}
+      <div className="flex justify-between items-start mb-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className={`inline-flex items-center justify-center h-9 w-9 rounded-xl font-black text-sm shadow-inner ${
+            isCompleted 
+              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+              : 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+          }`}>
+            Q{index}
+          </span>
+          <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-amber-500/10 border border-amber-500/20 text-amber-400">
+            {question.target_year}
+          </span>
         </div>
 
-        {/* Question Text */}
-        <h3 className="text-lg lg:text-xl font-semibold text-slate-200 mb-6 whitespace-pre-line leading-relaxed">
-          {question.question_text}
-        </h3>
-
-        {/* Interaction Area (Objective vs Subjective) */}
-        {!isSubjective ? (
-          <div className="space-y-3 mb-6">
-            {question.options.map((option, i) => {
-              const isSelected = selectedOption === option;
-              const isCorrect = option === question.correct_answer;
-              
-              let buttonStyle = "bg-white/5 hover:bg-white/10 border-white/10 text-slate-300";
-              
-              if (isRevealed) {
-                if (isCorrect) buttonStyle = "bg-emerald-500/20 border-emerald-500/50 text-emerald-400";
-                else if (isSelected && !isCorrect) buttonStyle = "bg-red-500/20 border-red-500/50 text-red-400";
-                else buttonStyle = "bg-white/5 border-white/5 text-slate-500 opacity-50";
-              } else if (isSelected) {
-                buttonStyle = "bg-blue-500/20 border-blue-500/50 text-blue-400";
-              }
-
-              return (
-                <button
-                  key={i}
-                  onClick={() => handleOptionClick(option)}
-                  disabled={isRevealed}
-                  className={`w-full text-left px-5 py-3.5 rounded-xl border transition-all font-medium ${buttonStyle}`}
-                >
-                  {option}
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="mb-4">
-            {!isRevealed && (
-              <button
-                onClick={() => setIsRevealed(true)}
-                className="flex items-center justify-center w-full gap-2 py-3 bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/30 text-blue-400 font-bold rounded-xl transition-all"
-              >
-                <Eye className="w-5 h-5" /> Decrypt Solution
-              </button>
-            )}
-          </div>
-        )}
+        {/* Premium Checkbox */}
+        <button 
+          onClick={onToggle} 
+          className="relative group p-1"
+        >
+          <div className={`absolute inset-0 rounded-full transition-transform duration-300 ${isCompleted ? 'scale-100 bg-emerald-500/20 blur-md' : 'scale-0'}`} />
+          {isCompleted ? (
+            <CheckCircle2 className="w-8 h-8 text-emerald-400 relative z-10 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+          ) : (
+            <Circle className="w-8 h-8 text-slate-600 group-hover:text-slate-400 relative z-10 transition-colors" />
+          )}
+        </button>
       </div>
 
-      {/* Explanation Area (Animated) */}
+      {/* Question Text */}
+      <h3 className={`text-base sm:text-lg font-medium mb-6 whitespace-pre-line leading-relaxed transition-colors ${
+        isCompleted ? 'text-slate-300' : 'text-slate-100'
+      }`}>
+        {question.question_text}
+      </h3>
+
+      {/* Interaction Area (Subjective only based on provided data) */}
+      {isSubjective && (
+        <div className="mb-2">
+          {!isRevealed && (
+            <button 
+              onClick={() => setIsRevealed(true)} 
+              className="flex items-center gap-2.5 py-2.5 px-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 font-bold hover:bg-blue-500/20 hover:text-blue-300 transition-all group"
+            >
+              <Check className="w-4 h-4 group-hover:scale-110 transition-transform" /> 
+              Reveal Official Solution
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Explanation Area */}
       <AnimatePresence>
         {isRevealed && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
+          <motion.div 
+            initial={{ opacity: 0, height: 0, y: -10 }} 
+            animate={{ opacity: 1, height: 'auto', y: 0 }} 
+            exit={{ opacity: 0, height: 0, y: -10 }} 
             className="overflow-hidden"
           >
-            <div className="mt-4 pt-5 border-t border-white/10">
-              <div className="flex items-center gap-2 mb-3 text-blue-400 font-bold tracking-wide">
-                <CheckCircle2 className="w-5 h-5" /> 
-                {isSubjective ? "Official Solution & Analysis" : "Detailed Explanation"}
+            <div className="mt-6 p-5 rounded-2xl bg-[#050810] border border-white/5 relative">
+              {/* Decorative accent line */}
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-3/4 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-r-full" />
+              
+              <div className="flex items-center gap-2 mb-3 text-blue-400 font-bold text-sm tracking-wide uppercase ml-2">
+                <BookOpen className="w-4 h-4" /> 
+                Official Solution & Analysis
               </div>
-              <p className="text-slate-400 leading-relaxed whitespace-pre-line text-sm sm:text-base">
+              <p className="text-slate-300 leading-relaxed whitespace-pre-line text-[15px] ml-2">
                 {question.explanation}
               </p>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+
     </motion.div>
   );
 };
 
 export default HighYieldBank;
-                                                
+                      
