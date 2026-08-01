@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
-import { Target, Zap, BrainCircuit, ChevronRight, Shield, Swords, Skull, Check } from "lucide-react";
+import { Target, Zap, BrainCircuit, ChevronRight, Shield, Swords, Skull, Check, Award, Sparkles } from "lucide-react";
 import { useState, useMemo } from "react";
 import { useAppState } from "@/hooks/use-app-state";
 import { cn } from "@/lib/utils";
@@ -9,7 +9,8 @@ import confetti from 'canvas-confetti';
 import { supabase } from "@/integrations/supabase/client";
 import { useDpps } from "@/hooks/useDpps";
 import { useQueryClient } from '@tanstack/react-query';
-import { CombatZone } from "@/components/CombatZone"; // Adjust path if needed!
+import { CombatZone } from "@/components/CombatZone"; 
+import HighYieldBank from "@/components/HighYieldBank"; // Ensure this matches your component's path!
 
 export const Route = createFileRoute("/_authenticated/study")({
   component: StudyHubPage,
@@ -55,8 +56,11 @@ const triggerXpConfetti = () => {
 function StudyHubPage() {
   const { xp } = useAppState(); 
   const queryClient = useQueryClient();
-  const [activeFilter, setActiveFilter] = useState<"All" | Difficulty>("All");
   
+  // --- NEW STATE: Toggles between standard Directives and High-Yield Bank ---
+  const [activeTab, setActiveTab] = useState<"directives" | "bank">("directives");
+  
+  const [activeFilter, setActiveFilter] = useState<"All" | Difficulty>("All");
   const { data: activeDPPs = [], isLoading } = useDpps();
   const [activeQuizDpp, setActiveQuizDpp] = useState<DPP | null>(null);
 
@@ -65,7 +69,6 @@ function StudyHubPage() {
     return activeDPPs.filter((dpp: DPP) => dpp.difficulty === activeFilter);
   }, [activeFilter, activeDPPs]);
 
-  // Handle the completion coming BACK from the Combat Zone
   const handleQuizCompletion = async () => {
     if (!activeQuizDpp) return;
     
@@ -82,7 +85,7 @@ function StudyHubPage() {
       }
       
       queryClient.invalidateQueries({ queryKey: ['dpps'] });
-      setActiveQuizDpp(null); // Close modal
+      setActiveQuizDpp(null); 
       
     } catch (error) {
       console.error("Submission failed:", error);
@@ -96,7 +99,7 @@ function StudyHubPage() {
           initial="hidden"
           animate="show"
           variants={{ show: { transition: { staggerChildren: 0.1 } } }}
-          className="w-full max-w-4xl space-y-8 lg:space-y-12 pb-20"
+          className="w-full max-w-4xl space-y-8 lg:space-y-10 pb-20"
         >
           {/* Header Section */}
           <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
@@ -121,88 +124,167 @@ function StudyHubPage() {
             </div>
           </motion.div>
 
-          {/* Active DPPs */}
-          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }} className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h2 className="text-xl lg:text-2xl font-bold text-white flex items-center gap-3">
-                <Target className="text-blue-400 h-6 w-6 drop-shadow-[0_0_10px_rgba(96,165,250,0.6)]" /> 
-                Active Directives
-              </h2>
-              {/* Filter Tabs Here */}
-              <div className="flex p-1 bg-[#050810] border border-white/10 rounded-xl w-full sm:w-auto overflow-x-auto scrollbar-hide">
-                {(["All", "Easy", "Medium", "Hard"] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveFilter(tab)}
-                    className={cn(
-                      "relative px-4 py-2 text-sm font-bold transition-colors whitespace-nowrap rounded-lg flex-1 sm:flex-none",
-                      activeFilter === tab ? "text-white" : "text-slate-500 hover:text-slate-300"
-                    )}
-                  >
-                    {activeFilter === tab && (
-                      <motion.div layoutId="activeFilterTab" className="absolute inset-0 bg-blue-600/20 border border-blue-500/50 rounded-lg shadow-[0_0_10px_rgba(59,130,246,0.2)]" />
-                    )}
-                    <span className="relative z-10">{tab}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-4 min-h-[400px]">
-              <AnimatePresence mode="popLayout">
-                {isLoading ? (
-                   <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex justify-center p-12">
-                     <BrainCircuit className="h-8 w-8 text-blue-500 animate-spin" />
-                   </motion.div>
-                ) : filteredDPPs.length === 0 ? (
-                  <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center p-12 text-center border border-dashed border-white/10 rounded-2xl bg-white/[0.02]">
-                    <div className="bg-emerald-500/10 p-4 rounded-full mb-4 border border-emerald-500/20"><Check className="h-8 w-8 text-emerald-400" /></div>
-                    <h3 className="text-xl font-black text-white mb-2">Sector Cleared!</h3>
-                  </motion.div>
-                ) : (
-                  filteredDPPs.map((dpp: DPP) => {
-                    const config = DIFFICULTY_CONFIG[dpp.difficulty];
-                    const DiffIcon = config.icon;
-                    
-                    return (
-                      <motion.div 
-                        layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, x: -50 }}
-                        key={dpp.id} 
-                        className={cn("group relative overflow-hidden rounded-2xl bg-[#0a0f1a] border border-white/5 hover:bg-[#0c121e] transition-all duration-300 p-5 lg:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6", config.glow)}
-                      >
-                        <div className="flex-1 relative z-10 w-full">
-                          <div className="flex flex-wrap items-center gap-3 mb-3">
-                            <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-blue-400 bg-blue-950/40 px-3 py-1 rounded-md border border-blue-900/50">{dpp.subject}</span>
-                            <span className={cn("flex items-center gap-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-md border", config.color, config.bg, config.border)}>
-                              <DiffIcon className="h-3.5 w-3.5" /> {dpp.difficulty}
-                            </span>
-                          </div>
-                          <h3 className="text-lg lg:text-xl font-bold text-slate-200 group-hover:text-white transition-colors">{dpp.topic}</h3>
-                        </div>
-
-                        <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 border-white/5 pt-4 sm:pt-0 mt-2 sm:mt-0">
-                          <div className={cn("text-base lg:text-lg font-black", config.color)}>
-                            +{dpp.xp} <span className="text-xs text-slate-500 font-sans">XP</span>
-                          </div>
-                          <motion.button 
-                            whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                            onClick={() => setActiveQuizDpp(dpp)}
-                            className="flex items-center justify-center gap-2 h-10 lg:h-12 px-5 lg:px-6 rounded-xl font-bold bg-white text-black hover:bg-slate-200"
-                          >
-                            <span>Execute</span> <ChevronRight className="h-4 w-4" />
-                          </motion.button>
-                        </div>
-                      </motion.div>
-                    );
-                  })
+          {/* --- GLOWING TAB NAVIGATION --- */}
+          <motion.div 
+            variants={{ hidden: { opacity: 0, scale: 0.95 }, show: { opacity: 1, scale: 1 } }}
+            className="flex justify-center w-full relative z-20"
+          >
+            <div className="flex p-1.5 bg-[#050810]/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_0_30px_rgba(0,0,0,0.5)]">
+              {/* Directives Tab */}
+              <button
+                onClick={() => setActiveTab("directives")}
+                className={cn(
+                  "relative flex items-center gap-2.5 px-6 py-3.5 text-sm sm:text-base font-bold transition-all duration-300 rounded-xl",
+                  activeTab === "directives" ? "text-white" : "text-slate-500 hover:text-slate-300"
                 )}
-              </AnimatePresence>
+              >
+                {activeTab === "directives" && (
+                  <motion.div 
+                    layoutId="studyMainTab" 
+                    className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 border border-blue-400/50 rounded-xl shadow-[0_0_20px_rgba(56,189,248,0.25)]" 
+                  />
+                )}
+                <Target className={cn("relative z-10 w-5 h-5 transition-colors", activeTab === "directives" ? "text-blue-400" : "")} />
+                <span className="relative z-10 tracking-wide">Active Directives</span>
+              </button>
+              
+              {/* High-Yield Bank Tab */}
+              <button
+                onClick={() => setActiveTab("bank")}
+                className={cn(
+                  "relative flex items-center gap-2.5 px-6 py-3.5 text-sm sm:text-base font-bold transition-all duration-300 rounded-xl",
+                  activeTab === "bank" ? "text-white" : "text-slate-500 hover:text-slate-300"
+                )}
+              >
+                {activeTab === "bank" && (
+                  <motion.div 
+                    layoutId="studyMainTab" 
+                    className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-fuchsia-600/20 border border-purple-400/50 rounded-xl shadow-[0_0_20px_rgba(192,132,252,0.25)]" 
+                  />
+                )}
+                <Award className={cn("relative z-10 w-5 h-5 transition-colors", activeTab === "bank" ? "text-purple-400" : "")} />
+                <span className="relative z-10 tracking-wide flex items-center gap-1.5">
+                  High-Yield Bank 
+                  {activeTab === "bank" && <Sparkles className="w-3.5 h-3.5 text-fuchsia-400 animate-pulse" />}
+                </span>
+              </button>
             </div>
           </motion.div>
+
+          {/* --- ANIMATED CONTENT AREA --- */}
+          <div className="relative min-h-[500px]">
+            <AnimatePresence mode="wait">
+              
+              {/* DIRECTIVES VIEW */}
+              {activeTab === "directives" && (
+                <motion.div 
+                  key="directives"
+                  initial={{ opacity: 0, y: 15, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -15, scale: 0.98 }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  className="space-y-6"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <h2 className="text-xl lg:text-2xl font-bold text-white flex items-center gap-3">
+                      <Target className="text-blue-400 h-6 w-6 drop-shadow-[0_0_10px_rgba(96,165,250,0.6)]" /> 
+                      Daily Missions
+                    </h2>
+                    {/* Filter Tabs */}
+                    <div className="flex p-1 bg-[#050810] border border-white/10 rounded-xl w-full sm:w-auto overflow-x-auto scrollbar-hide">
+                      {(["All", "Easy", "Medium", "Hard"] as const).map((tab) => (
+                        <button
+                          key={tab}
+                          onClick={() => setActiveFilter(tab)}
+                          className={cn(
+                            "relative px-4 py-2 text-sm font-bold transition-colors whitespace-nowrap rounded-lg flex-1 sm:flex-none",
+                            activeFilter === tab ? "text-white" : "text-slate-500 hover:text-slate-300"
+                          )}
+                        >
+                          {activeFilter === tab && (
+                            <motion.div layoutId="activeFilterTab" className="absolute inset-0 bg-blue-600/20 border border-blue-500/50 rounded-lg shadow-[0_0_10px_rgba(59,130,246,0.2)]" />
+                          )}
+                          <span className="relative z-10">{tab}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <AnimatePresence mode="popLayout">
+                      {isLoading ? (
+                         <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex justify-center p-12">
+                           <BrainCircuit className="h-8 w-8 text-blue-500 animate-spin" />
+                         </motion.div>
+                      ) : filteredDPPs.length === 0 ? (
+                        <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center p-12 text-center border border-dashed border-white/10 rounded-2xl bg-white/[0.02]">
+                          <div className="bg-emerald-500/10 p-4 rounded-full mb-4 border border-emerald-500/20"><Check className="h-8 w-8 text-emerald-400" /></div>
+                          <h3 className="text-xl font-black text-white mb-2">Sector Cleared!</h3>
+                        </motion.div>
+                      ) : (
+                        filteredDPPs.map((dpp: DPP) => {
+                          const config = DIFFICULTY_CONFIG[dpp.difficulty];
+                          const DiffIcon = config.icon;
+                          
+                          return (
+                            <motion.div 
+                              layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, x: -50 }}
+                              key={dpp.id} 
+                              className={cn("group relative overflow-hidden rounded-2xl bg-[#0a0f1a] border border-white/5 hover:bg-[#0c121e] transition-all duration-300 p-5 lg:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6", config.glow)}
+                            >
+                              <div className="flex-1 relative z-10 w-full">
+                                <div className="flex flex-wrap items-center gap-3 mb-3">
+                                  <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-blue-400 bg-blue-950/40 px-3 py-1 rounded-md border border-blue-900/50">{dpp.subject}</span>
+                                  <span className={cn("flex items-center gap-1.5 text-[10px] sm:text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-md border", config.color, config.bg, config.border)}>
+                                    <DiffIcon className="h-3.5 w-3.5" /> {dpp.difficulty}
+                                  </span>
+                                </div>
+                                <h3 className="text-lg lg:text-xl font-bold text-slate-200 group-hover:text-white transition-colors">{dpp.topic}</h3>
+                              </div>
+
+                              <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 border-white/5 pt-4 sm:pt-0 mt-2 sm:mt-0">
+                                <div className={cn("text-base lg:text-lg font-black", config.color)}>
+                                  +{dpp.xp} <span className="text-xs text-slate-500 font-sans">XP</span>
+                                </div>
+                                <motion.button 
+                                  whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                                  onClick={() => setActiveQuizDpp(dpp)}
+                                  className="flex items-center justify-center gap-2 h-10 lg:h-12 px-5 lg:px-6 rounded-xl font-bold bg-white text-black hover:bg-slate-200 hover:shadow-[0_0_15px_rgba(255,255,255,0.4)] transition-all"
+                                >
+                                  <span>Execute</span> <ChevronRight className="h-4 w-4" />
+                                </motion.button>
+                              </div>
+                            </motion.div>
+                          );
+                        })
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* HIGH-YIELD BANK VIEW */}
+              {activeTab === "bank" && (
+                <motion.div 
+                  key="bank"
+                  initial={{ opacity: 0, y: 15, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -15, scale: 0.98 }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  className="w-full"
+                >
+                  {/* Optional: A wrapper to ensure the Bank component blends perfectly with the background */}
+                  <div className="p-1 rounded-3xl bg-gradient-to-b from-white/5 to-transparent shadow-2xl shadow-purple-900/10">
+                    <HighYieldBank />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </motion.div>
       </div>
 
-      {/* Render the extracted component here! */}
+      {/* Render the Combat Zone modal on top of everything if active */}
       <AnimatePresence>
         {activeQuizDpp && (
           <CombatZone 
@@ -214,5 +296,4 @@ function StudyHubPage() {
       </AnimatePresence>
     </>
   );
-  }
-              
+}
