@@ -3,6 +3,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useLocation, // 1. Added useLocation hook
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -16,7 +17,6 @@ import { AppShell } from "@/components/app-shell";
 import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 
-// 1. ADD THIS IMPORT RIGHT HERE
 import SidebarLayout from "@/components/layout/SidebarLayout"; 
 
 function NotFoundComponent() {
@@ -153,13 +153,28 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  
+  // 2. Extract current path
+  const location = useLocation();
+  const pathname = location.pathname;
+
+  // 3. Define conditions for routes that should NOT have a sidebar.
+  // Using startsWith ensures nested routes (e.g. /auth/login) are also covered.
+  const isNoSidebarRoute = 
+    pathname === "/" || 
+    pathname.startsWith("/auth") || 
+    pathname.startsWith("/onboarding");
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* 2. WRAP APPSHELL WITH SIDEBARLAYOUT */}
-      <SidebarLayout>
+      {/* 4. Conditionally render the SidebarLayout */}
+      {isNoSidebarRoute ? (
         <AppShell />
-      </SidebarLayout>
+      ) : (
+        <SidebarLayout>
+          <AppShell />
+        </SidebarLayout>
+      )}
       <Toaster />
     </QueryClientProvider>
   );
