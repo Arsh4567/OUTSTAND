@@ -17,6 +17,8 @@ import { useAuth, displayNameOf } from "@/hooks/use-auth";
 import { useAppState } from "@/hooks/use-app-state";
 import { levelFromXP } from "@/lib/habits";
 import { cn } from "@/lib/utils";
+// 1. Imported the settings sheet
+import { AppSettingsSheet } from "@/components/app-settings-sheet"; 
 
 // Added Study Hub to the sidebar items array
 const NAV_ITEMS = [
@@ -203,8 +205,8 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
                 })}
               </motion.div>
 
-              {/* Regain Protocol */}
-              <div className="p-4 mt-auto border-t border-white/5 relative z-10 bg-[#050810]/80 backdrop-blur-md">
+              {/* 2. Added flex-col and gap-3 to stack the Regain link and Settings securely at the bottom */}
+              <div className="p-4 mt-auto border-t border-white/5 relative z-10 bg-[#050810]/80 backdrop-blur-md flex flex-col gap-3">
                 <Link
                   to="/regain"
                   onClick={() => setIsOpen(false)}
@@ -217,6 +219,9 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
                     Regain Protocol
                   </span>
                 </Link>
+
+                {/* 3. Inserted the Settings component */}
+                <AppSettingsSheet />
               </div>
             </motion.div>
           </>
