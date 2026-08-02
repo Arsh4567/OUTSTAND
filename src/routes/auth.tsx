@@ -26,42 +26,65 @@ function AuthPage() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // 1. FIXED: If they are already logged in, send them to the dashboard
+  // 1. FIX: Added onAuthStateChange. This actively listens for successful 
+  // logins (including Google OAuth redirects) and routes them immediately.
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate({ to: "/dashboard", replace: true });
     });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        navigate({ to: "/dashboard", replace: true });
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [navigate]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
     setLoading(true);
+
+    // 2. FIX: Strip trailing spaces from the email input
+    const cleanEmail = email.trim();
+
     try {
       if (mode === "signup") {
         if (password.length < 6) {
           toast.error("Password must be at least 6 characters");
           return;
         }
-        const { error } = await supabase.auth.signUp({
-          email,
+        const { data, error } = await supabase.auth.signUp({
+          email: cleanEmail,
           password,
           options: {
-            // CHANGED: Redirect to onboarding after email confirm
             emailRedirectTo: `${window.location.origin}/onboarding`,
-            data: { display_name: name || email.split("@")[0] },
+            data: { display_name: name || cleanEmail.split("@")[0] },
           },
         });
-        if (error) throw error;
-        toast.success("Welcome to Outstand", { description: "Check your inbox to confirm your email." });
         
-        // CHANGED: Route to onboarding directly for new accounts
-        navigate({ to: "/onboarding", replace: true });
+        if (error) throw error;
+        
+        // 3. FIX: Only navigate to onboarding IF Supabase returned an active session.
+        // If email confirmation is required, session will be null, so we must keep them here.
+        if (data.session) {
+          navigate({ to: "/onboarding", replace: true });
+        } else {
+          toast.success("Welcome to Outstand", { description: "Check your inbox to confirm your email." });
+          // Clear the form to visually indicate success
+          setEmail("");
+          setPassword("");
+        }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ 
+          email: cleanEmail, 
+          password 
+        });
+        
         if (error) throw error;
         
-        // KEEPS: Existing users still go straight to the dashboard
         navigate({ to: "/dashboard", replace: true });
       }
     } catch (err) {
@@ -71,7 +94,6 @@ function AuthPage() {
     }
   };
 
-  // 2. FIXED: Changed to native Supabase OAuth for reliability
   const google = async () => {
     setLoading(true);
     try {
@@ -85,8 +107,6 @@ function AuthPage() {
       if (error) {
         toast.error("Google sign-in failed", { description: error.message });
       }
-      // Note: We don't need a navigate() here because Supabase redirects the whole page to Google, 
-      // and Google will redirect back to the `redirectTo` URL we provided above.
     } catch (err) {
       toast.error("An unexpected error occurred");
     } finally {
