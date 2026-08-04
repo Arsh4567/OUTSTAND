@@ -12,10 +12,11 @@ import {
   ChevronRight,
   Medal
 } from "lucide-react";
-import { useEffect, useState, useCallback, useMemo, useRef, memo } from "react";
+import React, { useEffect, useState, useCallback, memo } from "react";
 import { Button } from "@/components/ui/button";
 import { useOutstand } from "@/hooks/use-outstand";
 import { ChallengeCard } from "@/components/ChallengeCard";
+import type { OutstandChallenge } from "@/lib/challenges.types";
 
 // ============================================================================
 // ROUTING & TYPES
@@ -35,6 +36,31 @@ interface DailyMission {
   title: string;
   xp: number;
   completed: boolean;
+}
+
+interface UserStats {
+  streak: number;
+  xp: number;
+  level: number;
+  nextLevelXp: number;
+}
+
+interface GamificationHUDProps {
+  stats: UserStats;
+}
+
+interface FocusEngineProps {
+  challenge: OutstandChallenge | null;
+  isShuffling: boolean;
+  shuffleDisplay: { emoji: string; title: string };
+  completionStage: number;
+  running: boolean;
+  mins: string;
+  secs: string;
+  setRunning: (state: boolean) => void;
+  setRemaining: (time: number) => void;
+  generate: () => void;
+  complete: () => void;
 }
 
 const cinematicEase = [0.19, 1, 0.22, 1];
@@ -65,10 +91,12 @@ export function OutstandPage() {
   } = useOutstand();
 
   // Network State
-  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+  const [isOnline, setIsOnline] = useState<boolean>(
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
 
   // Gamification State
-  const [userStats, setUserStats] = useState({
+  const [userStats, setUserStats] = useState<UserStats>({
     streak: 12,
     xp: 1850,
     level: 4,
@@ -188,7 +216,7 @@ export function OutstandPage() {
 }
 
 // ============================================================================
-// SUB-COMPONENTS (Memoized for peak performance)
+// STRICTLY TYPED SUB-COMPONENTS (Memoized for peak performance)
 // ============================================================================
 
 const EnvironmentEffects = memo(({ completionStage }: { completionStage: number }) => (
@@ -213,7 +241,7 @@ const EnvironmentEffects = memo(({ completionStage }: { completionStage: number 
 EnvironmentEffects.displayName = "EnvironmentEffects";
 
 
-const GamificationHUD = memo(({ stats }: { stats: any }) => {
+const GamificationHUD = memo(({ stats }: GamificationHUDProps) => {
   const xpPercentage = Math.min(100, Math.round((stats.xp / stats.nextLevelXp) * 100));
   const isLevelUp = xpPercentage === 100;
 
@@ -280,7 +308,9 @@ const GamificationHUD = memo(({ stats }: { stats: any }) => {
 GamificationHUD.displayName = "GamificationHUD";
 
 
-const FocusEngine = memo(({ challenge, isShuffling, shuffleDisplay, completionStage, running, mins, secs, setRunning, setRemaining, generate, complete }: any) => {
+const FocusEngine = memo(({ 
+  challenge, isShuffling, shuffleDisplay, completionStage, running, mins, secs, setRunning, setRemaining, generate, complete 
+}: FocusEngineProps) => {
   return (
     <AnimatePresence mode="wait">
       {!challenge && !isShuffling ? (
@@ -343,7 +373,17 @@ const FocusEngine = memo(({ challenge, isShuffling, shuffleDisplay, completionSt
 
       ) : challenge ? (
         <motion.div key="active" initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", damping: 25, stiffness: 200, mass: 1 }} className="w-full">
-          <ChallengeCard challenge={challenge} completionStage={completionStage} running={running} mins={mins} secs={secs} setRunning={setRunning} setRemaining={setRemaining} generate={generate} complete={complete} />
+          <ChallengeCard 
+            challenge={challenge} 
+            completionStage={completionStage} 
+            running={running} 
+            mins={mins} 
+            secs={secs} 
+            setRunning={setRunning} 
+            setRemaining={setRemaining} 
+            generate={generate} 
+            complete={complete} 
+          />
         </motion.div>
       ) : null}
     </AnimatePresence>
@@ -393,7 +433,7 @@ const MissionBoard = memo(({ missions, onToggle }: { missions: DailyMission[], o
                     )}
                   </AnimatePresence>
                 </div>
-                <span className={`text-sm sm:text-base font-semibold transition-all ${mission.completed ? 'line-through text-muted-foreground' : ''}`}>
+             <span className={`text-sm sm:text-base font-semibold transition-all ${mission.completed ? 'line-through text-muted-foreground' : ''}`}>
                   {mission.title}
                 </span>
               </div>
@@ -427,4 +467,4 @@ const OfflineBanner = memo(({ isOnline }: { isOnline: boolean }) => (
     )}
   </AnimatePresence>
 ));
-OfflineBanner.displayName = "OfflineBanner";
+OfflineBanner.displayName = "OfflineBanner";   
