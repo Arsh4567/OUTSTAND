@@ -7,7 +7,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 // ============================================================================
 // 1. CONFIGURATION & TYPES
 // ============================================================================
-
+/*Legendary Level-Up Cinematic*/
 export enum VFXQuality { LOW, MEDIUM, HIGH, ULTRA }
 
 export interface VFXConfig {
