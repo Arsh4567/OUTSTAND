@@ -13,6 +13,7 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+   "three": "^0.164.0",
     "@ai-sdk/google": "latest",
     "@ai-sdk/openai-compatible": "latest",
     "@ai-sdk/react": "latest",
@@ -88,6 +89,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/three": "^0.164.0",
     "@eslint/js": "^9.32.0",
     "@lovable.dev/vite-tanstack-config": "2.7.1",
     "@types/canvas-confetti": "^1.9.0",
