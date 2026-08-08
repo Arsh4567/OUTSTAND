@@ -1,88 +1,67 @@
-import { useState, useCallback, useEffect } from 'react';
-import type { Quest, UserStats, Activity, Achievement } from '../types/dashboard';
+import { useState, useCallback, useMemo } from 'react';
+import type { UserGamificationState, LevelData, Quest, Activity, Protocol } from '../types/dashboard';
 
-// Formula: Level N requires (N * 500) XP
-const calculateLevelThreshold = (level: number) => level * 500;
+// Deterministic Level Formula: Each level requires 1000 XP
+const XP_PER_LEVEL = 1000;
+
+export function calculateLevelData(totalXP: number): LevelData {
+  const level = Math.floor(totalXP / XP_PER_LEVEL) + 1;
+  const currentLevelXP = totalXP % XP_PER_LEVEL;
+  const xpRequiredForNextLevel = XP_PER_LEVEL;
+  const progressPercentage = Math.min(Math.max((currentLevelXP / xpRequiredForNextLevel) * 100, 0), 100);
+
+  return { level, currentLevelXP, xpRequiredForNextLevel, progressPercentage };
+}
 
 export function useGamification() {
-  // In a real app, this initializes from your Supabase/API
-  const [stats, setStats] = useState<UserStats>({
-    level: 12,
-    totalXP: 32850,
-    currentLevelXP: 350,
-    nextLevelXP: calculateLevelThreshold(12),
+  // INTEGRATION POINT: Replace with useQuery/useMutation from your backend
+  const [gameState, setGamificationState] = useState<UserGamificationState>({
+    totalXP: 11450, // Starts at Level 12, 450/1000 XP
     streakDays: 14,
-    bestStreak: 21,
-    focusMinutesToday: 135, // 2h 15m
-    questsCompletedToday: 0,
+    focusMinutesToday: 0,
   });
 
-  const [quests, setQuests] = useState<Quest[]>([
-    { id: 'q1', title: 'Deep Work Block (60m)', category: 'Productivity', xpReward: 150, completed: false, difficulty: 'medium' },
-    { id: 'q2', title: 'Energy System Audit', category: 'Mindset', xpReward: 100, completed: false, difficulty: 'easy' },
-    { id: 'q3', title: 'Zero-Distraction Execution', category: 'Execution', xpReward: 250, completed: false, difficulty: 'hard' },
-  ]);
-
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [showLevelUp, setShowLevelUp] = useState(false);
 
-  const logActivity = useCallback((activity: Omit<Activity, 'id' | 'timestamp'>) => {
-    setActivities(prev => [{
-      ...activity,
-      id: crypto.randomUUID(),
-      timestamp: Date.now()
-    }, ...prev].slice(0, 10)); // Keep last 10
+  const logActivity = useCallback((type: Activity['type'], description: string, xpAwarded: number) => {
+    setActivities((prev) => [
+      { id: crypto.randomUUID(), timestamp: Date.now(), type, description, xpAwarded },
+      ...prev,
+    ].slice(0, 20)); // Keep last 20 for UI
   }, []);
 
-  const completeQuest = useCallback((questId: string) => {
-    setQuests(prev => prev.map(q => {
-      if (q.id === questId && !q.completed) {
-        // 1. Grant XP
-        setStats(current => {
-          let newXP = current.currentLevelXP + q.xpReward;
-          let newLevel = current.level;
-          let newNextLevelXP = current.nextLevelXP;
-          let leveledUp = false;
-
-          // 2. Handle Level Up
-          if (newXP >= newNextLevelXP) {
-            newXP = newXP - newNextLevelXP;
-            newLevel += 1;
-            newNextLevelXP = calculateLevelThreshold(newLevel);
-            leveledUp = true;
-          }
-
-          if (leveledUp) {
-            setShowLevelUp(true);
-            setTimeout(() => setShowLevelUp(false), 4000);
-            logActivity({ type: 'level_up', description: `Reached Level ${newLevel}!` });
-          }
-
-          return {
-            ...current,
-            level: newLevel,
-            currentLevelXP: newXP,
-            nextLevelXP: newNextLevelXP,
-            totalXP: current.totalXP + q.xpReward,
-            questsCompletedToday: current.questsCompletedToday + 1
-          };
-        });
-
-        // 3. Log Activity
-        logActivity({ type: 'quest_completed', description: q.title, xpGained: q.xpReward });
-        
-        // INTEGRATION POINT: supabase.from('quests').update({ completed: true }).eq('id', questId)
-        return { ...q, completed: true };
+  const awardXP = useCallback((amount: number, source: Activity['type'], description: string) => {
+    setGamificationState((prev) => {
+      const newTotal = prev.totalXP + amount;
+      
+      // Check for level up
+      const currentLevel = calculateLevelData(prev.totalXP).level;
+      const newLevel = calculateLevelData(newTotal).level;
+      
+      if (newLevel > currentLevel) {
+        logActivity('level_up', `Reached Level ${newLevel}!`, 0);
       }
-      return q;
+      
+      return { ...prev, totalXP: newTotal };
+    });
+    logActivity(source, description, amount);
+  }, [logActivity]);
+
+  const addFocusMinutes = useCallback((minutes: number) => {
+    setGamificationState((prev) => ({
+      ...prev,
+      focusMinutesToday: prev.focusMinutesToday + minutes,
     }));
-  }, [logActivity]);
+    awardXP(minutes * 5, 'focus_session', `Completed ${minutes}m Focus Session`);
+  }, [awardXP]);
 
-  const addFocusTime = useCallback((minutes: number) => {
-    setStats(prev => ({ ...prev, focusMinutesToday: prev.focusMinutesToday + minutes }));
-    logActivity({ type: 'focus_session', description: `Completed ${minutes}m focus block`, xpGained: minutes * 2 });
-    // INTEGRATION POINT: Sync focus time to backend
-  }, [logActivity]);
+  const levelData = useMemo(() => calculateLevelData(gameState.totalXP), [gameState.totalXP]);
 
-  return { stats, quests, activities, showLevelUp, completeQuest, addFocusTime };
-          }
+  return {
+    gameState,
+    levelData,
+    activities,
+    awardXP,
+    addFocusMinutes,
+  };
+}
