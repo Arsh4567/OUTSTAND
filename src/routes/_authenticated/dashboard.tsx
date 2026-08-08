@@ -44,6 +44,9 @@ function DashboardHQ() {
   const [isPortalActive, setIsPortalActive] = useState(false);
   const [isPortalFullyOpen, setIsPortalFullyOpen] = useState(false);
   const portalRef = useRef<any>(null);
+  
+  // NEW: Ref to mount the WebGL Canvas
+  const portalContainerRef = useRef<HTMLDivElement>(null);
 
   // 1. Fetch Real User Data & Name
   useEffect(() => {
@@ -144,9 +147,10 @@ function DashboardHQ() {
 
   // 4. Portal Engine Lifecycle
   useEffect(() => {
-    if (isPortalActive) {
-      // Instantiate the 3D Portal Effect from your file
+    // Only initialize if the portal is active AND the container DOM element exists
+    if (isPortalActive && portalContainerRef.current) {
       portalRef.current = new PortalEngine({
+        container: portalContainerRef.current, // <-- Hooking up the DOM element
         quality: Quality.ULTRA,
         onOpen: () => {
           // Triggered when cinematic tear finishes
@@ -182,7 +186,6 @@ function DashboardHQ() {
     );
   }
 
-  // --- ENERGETIC ICON MAPPING ---
   const getIconForHabit = (difficulty: string) => {
     switch(difficulty) {
       case 'hard': return <Sword className="w-8 h-8 text-amber-500 drop-shadow-[0_0_10px_rgba(245,158,11,0.6)]" />;
@@ -198,10 +201,16 @@ function DashboardHQ() {
       {/* 3D PORTAL OVERLAY */}
       {/* ========================================================================= */}
       {isPortalActive && (
-        <div className="fixed inset-0 z-[10000] flex flex-col">
+        <div className="fixed inset-0 z-[10000] flex flex-col bg-black/90">
           
+          {/* NEW: Canvas Container for PortalEngine */}
+          <div 
+            ref={portalContainerRef} 
+            className="absolute inset-0 z-[10000] pointer-events-none overflow-hidden" 
+          />
+
           {/* Close Button (z-index higher than the WebGL canvas) */}
-          <div className="absolute top-6 right-6 z-[10001]">
+          <div className="absolute top-6 right-6 z-[10002]">
             <button 
               onClick={closePortal}
               className="bg-black/60 backdrop-blur-xl border border-white/20 p-3 rounded-full hover:bg-red-500/20 hover:border-red-500 transition-all focus:outline-none shadow-[0_0_20px_rgba(0,0,0,0.5)]"
@@ -236,7 +245,7 @@ function DashboardHQ() {
       {/* ========================================================================= */}
       {/* MAIN DASHBOARD */}
       {/* ========================================================================= */}
-      <div className="max-w-5xl mx-auto space-y-12 pb-24">
+      <div className="max-w-5xl mx-auto space-y-12 pb-24 relative z-10">
         
         {/* 1. HEADER (Welcome Left, XP/Streak Top Right) */}
         <header className="flex justify-between items-start animate-in fade-in slide-in-from-top-4 duration-700">
@@ -250,13 +259,11 @@ function DashboardHQ() {
           </div>
 
           <div className="flex flex-col items-end gap-3">
-            {/* Streak */}
             <div className="flex items-center gap-2 bg-slate-900/80 backdrop-blur-xl border border-white/10 px-4 py-2 rounded-2xl shadow-xl hover:scale-105 transition-transform">
               <Flame className="w-5 h-5 text-amber-500 drop-shadow-[0_0_12px_rgba(245,158,11,0.8)]" />
               <span className="text-xl font-black text-white">{streak}</span>
             </div>
 
-            {/* Xp Badge */}
             <div className="hover:scale-105 transition-transform">
               <XpBadge xp={totalXp} level={level} pct={xpPct} variantId="dash-header" />
             </div>
@@ -329,7 +336,6 @@ function DashboardHQ() {
                         ) : habit.completed ? (
                           <CheckCircle2 className="w-10 h-10 text-emerald-500 drop-shadow-[0_0_20px_rgba(16,185,129,0.5)]" />
                         ) : (
-                          // Premium Icons based on difficulty
                           getIconForHabit(habit.quest.difficulty)
                         )}
                       </div>
@@ -368,7 +374,6 @@ function DashboardHQ() {
             onClick={() => setIsPortalActive(true)}
             className="w-full relative overflow-hidden rounded-[3rem] bg-slate-950 border border-violet-500/30 p-1 shadow-[0_0_50px_rgba(139,92,246,0.15)] group transition-all duration-300 hover:scale-[1.02] active:scale-95 focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-500"
           >
-            {/* Ambient Animated Glow inside the button */}
             <div className="absolute inset-0 bg-gradient-to-r from-violet-600 via-fuchsia-600 to-cyan-600 opacity-30 group-hover:opacity-60 transition-opacity duration-700 blur-2xl" />
             
             <div className="bg-[#050012]/90 backdrop-blur-3xl rounded-[2.8rem] p-12 flex flex-col items-center justify-center relative z-10">
@@ -388,4 +393,5 @@ function DashboardHQ() {
       </div>
     </div>
   );
-            }
+                            }
+                                     
