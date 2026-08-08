@@ -7,44 +7,55 @@ import { toast } from 'sonner';
 // Your existing components & files
 import { XpBadge } from '../../components/xp-badge';
 import { QUOTES } from '../../lib/quotes';
-import { Quality } from '../../lib/portal-effect'; // Importing your portal types
-import { NeonCity } from '../../components/dashboard/NeonCity';
+import { PortalEngine, Quality } from '../../lib/portal-effect';
 
-// @ts-ignore - Safely grabbing the Outstand route component
+// Safely grabbing the Outstand route component
+// @ts-ignore
 import { Route as OutstandRoute } from './outstand';
 
-import { Flame, Target, CheckCircle2, Circle, Quote, Zap, X, Loader2 } from 'lucide-react';
+import { 
+  Flame, CheckCircle2, Quote, Zap, X, Loader2, 
+  Sword, Shield, Crosshair, Target
+} from 'lucide-react';
+
 import type { DailyQuest } from '../../types/dashboard';
 
 export const Route = createFileRoute('/_authenticated/dashboard')({
   component: DashboardHQ,
 });
 
+// Smooth animations
+const ease = [0.22, 1, 0.36, 1];
+
 function DashboardHQ() {
   const [isLoading, setIsLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>("Commander");
-  const [habits, setHabits] = useState<DailyQuest[]>([]);
   
-  // Real stats mapped directly to your XpBadge and Streak
+  // Stats & Habits
   const [totalXp, setTotalXp] = useState(0);
   const [level, setLevel] = useState(1);
   const [xpPct, setXpPct] = useState(0);
   const [streak, setStreak] = useState(0);
+  const [habits, setHabits] = useState<DailyQuest[]>([]);
+  const [mutatingIds, setMutatingIds] = useState<Set<string>>(new Set());
 
   // Portal State
-  const [isPortalOpen, setIsPortalOpen] = useState(false);
-  const portalCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [isPortalActive, setIsPortalActive] = useState(false);
+  const [isPortalFullyOpen, setIsPortalFullyOpen] = useState(false);
+  const portalRef = useRef<any>(null);
 
-  // 1. Fetch Real User Data & Habits
+  // 1. Fetch Real User Data & Name
   useEffect(() => {
     const loadDashboard = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
         const uid = session.user.id;
+        setUserId(uid);
 
-        // Get Real Name from Onboarding
-        const rawName = session.user.user_metadata?.full_name || session.user.user_metadata?.first_name;
+        // Fetch REAL name from onboarding
+        const rawName = session.user.user_metadata?.full_name || session.user.user_metadata?.first_name || session.user.user_metadata?.username;
         if (rawName) setUserName(rawName.split(' ')[0]);
 
         const localDate = new Date().toLocaleDateString('en-CA');
@@ -59,7 +70,6 @@ function DashboardHQ() {
           setLevel(statsRes.data.level || 1);
           setStreak(statsRes.data.streak_days || 0);
           
-          // Math for your XpBadge pct prop
           const currentLevelXp = statsRes.data.current_level_xp || 0;
           const nextLevelXp = statsRes.data.next_level_xp || 1000;
           setXpPct(Math.min(100, Math.max(0, (currentLevelXp / nextLevelXp) * 100)));
@@ -93,177 +103,242 @@ function DashboardHQ() {
     loadDashboard();
   }, []);
 
+  // Realtime Supabase Subscription
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase.channel(`dashboard_${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_stats', filter: `user_id=eq.${userId}` }, () => { /* re-fetch logic here if needed */ })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId]);
+
   // 2. Random Daily Quote
   const dailyQuote = useMemo(() => {
     if (Array.isArray(QUOTES) && QUOTES.length > 0) {
       return QUOTES[Math.floor(Math.random() * QUOTES.length)];
     }
-    return { quote: "Discipline equals freedom.", author: "Jocko Willink", application: "Keep executing." };
+    return { quote: "Discipline equals freedom.", author: "Jocko Willink", application: "Execute." };
   }, []);
 
   // 3. Mark Habit Complete
   const handleCompleteHabit = async (habitId: string) => {
     const habit = habits.find(h => h.id === habitId);
-    if (!habit || habit.completed) return;
+    if (!habit || habit.completed || mutatingIds.has(habitId)) return;
+
+    setMutatingIds(prev => new Set(prev).add(habitId));
 
     // Optimistic UI Update
     setHabits(prev => prev.map(h => h.id === habitId ? { ...h, completed: true } : h));
 
     const { error } = await supabase.rpc('complete_daily_quest', { p_daily_quest_id: habitId });
+    
     if (error) {
       setHabits(prev => prev.map(h => h.id === habitId ? { ...h, completed: false } : h));
       toast.error("Execution verification failed.");
     } else {
-      toast.success("Habit Executed!");
-      // Briefly boost local XP for UI feel (real refresh will happen via realtime)
+      toast.success("Habit Executed! XP Awarded.");
       setTotalXp(prev => prev + habit.quest.xp_reward);
+    }
+    setMutatingIds(prev => { const next = new Set(prev); next.delete(habitId); return next; });
+  };
+
+  // 4. Portal Engine Lifecycle
+  useEffect(() => {
+    if (isPortalActive) {
+      // Instantiate the 3D Portal Effect from your file
+      portalRef.current = new PortalEngine({
+        quality: Quality.ULTRA,
+        onOpen: () => {
+          // Triggered when cinematic tear finishes
+          setIsPortalFullyOpen(true);
+        }
+      });
+      portalRef.current.open();
+    }
+
+    return () => {
+      // Cleanup WebGL on close
+      if (portalRef.current) {
+        portalRef.current.dispose();
+        portalRef.current = null;
+      }
+    };
+  }, [isPortalActive]);
+
+  const closePortal = () => {
+    setIsPortalActive(false);
+    setIsPortalFullyOpen(false);
+    if (portalRef.current) {
+      portalRef.current.dispose();
+      portalRef.current = null;
     }
   };
 
-  // 4. Portal Initialization Hook
-  useEffect(() => {
-    if (isPortalOpen && portalCanvasRef.current) {
-      // @TODO: Initialize your THREE.js portal effect here
-      // Example: 
-      // const portal = new PortalEffect(portalCanvasRef.current, { quality: Quality.ULTRA });
-      // return () => portal.dispose();
-    }
-  }, [isPortalOpen]);
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center">
+        <Loader2 className="w-12 h-12 text-fuchsia-500 animate-spin" />
+      </div>
+    );
+  }
 
-  if (isLoading) return <div className="min-h-screen bg-slate-950" />;
+  // --- ENERGETIC ICON MAPPING ---
+  const getIconForHabit = (difficulty: string) => {
+    switch(difficulty) {
+      case 'hard': return <Sword className="w-8 h-8 text-amber-500 drop-shadow-[0_0_10px_rgba(245,158,11,0.6)]" />;
+      case 'medium': return <Shield className="w-8 h-8 text-fuchsia-500 drop-shadow-[0_0_10px_rgba(217,70,239,0.6)]" />;
+      default: return <Crosshair className="w-8 h-8 text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,0.6)]" />;
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-[#050012] text-slate-100 p-4 md:p-8 font-sans overflow-x-hidden">
       
-      {/* --- PORTAL OVERLAY (Activates on "Enter Portal" click) --- */}
-      <AnimatePresence>
-        {isPortalOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-slate-950 flex flex-col overflow-y-auto"
-          >
-            {/* The Canvas for src/lib/portal-effect.ts */}
-            <div className="absolute inset-0 z-0 opacity-50 pointer-events-none mix-blend-screen">
-              <canvas ref={portalCanvasRef} className="w-full h-full" />
-            </div>
-            
-            <div className="relative z-10 flex-1 flex flex-col">
-              <div className="p-6 flex justify-end">
-                <button 
-                  onClick={() => setIsPortalOpen(false)}
-                  className="bg-slate-900/80 border border-white/10 p-3 rounded-full hover:bg-red-500/20 hover:border-red-500 hover:text-red-400 transition-all focus:outline-none"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-              <div className="flex-1 p-4 md:p-8">
+      {/* ========================================================================= */}
+      {/* 3D PORTAL OVERLAY */}
+      {/* ========================================================================= */}
+      {isPortalActive && (
+        <div className="fixed inset-0 z-[10000] flex flex-col">
+          
+          {/* Close Button (z-index higher than the WebGL canvas) */}
+          <div className="absolute top-6 right-6 z-[10001]">
+            <button 
+              onClick={closePortal}
+              className="bg-black/60 backdrop-blur-xl border border-white/20 p-3 rounded-full hover:bg-red-500/20 hover:border-red-500 transition-all focus:outline-none shadow-[0_0_20px_rgba(0,0,0,0.5)]"
+            >
+              <X className="w-6 h-6 text-white" />
+            </button>
+          </div>
+          
+          {/* Render Outstand Component Once Portal is Open */}
+          <AnimatePresence>
+            {isPortalFullyOpen && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9, y: 50 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ duration: 0.8, ease }}
+                className="relative z-[10001] flex-1 overflow-y-auto px-4 md:px-8 pb-20 pt-24"
+              >
                 {OutstandRoute.options.component ? (
                   <OutstandRoute.options.component />
                 ) : (
-                  <div className="text-center text-violet-400 font-black tracking-widest mt-20">
-                    OUTSTAND MODULE LOADING...
+                  <div className="text-center text-violet-400 font-black tracking-widest text-2xl mt-32 drop-shadow-[0_0_15px_rgba(139,92,246,0.8)]">
+                    MODULE LOADING...
                   </div>
                 )}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
 
+      {/* ========================================================================= */}
+      {/* MAIN DASHBOARD */}
+      {/* ========================================================================= */}
       <div className="max-w-5xl mx-auto space-y-12 pb-24">
         
-        {/* 1. HEADER: Real Name & Top-Right Streak/XP */}
-        <header className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-700 ease-out">
-          <div>
-            <h1 className="text-3xl md:text-5xl font-black text-white tracking-tight leading-tight">
-              Welcome to Outstand,<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-fuchsia-400 drop-shadow-[0_0_15px_rgba(34,211,238,0.4)]">
-                {userName}
-              </span>
+        {/* 1. HEADER (Welcome Left, XP/Streak Top Right) */}
+        <header className="flex justify-between items-start animate-in fade-in slide-in-from-top-4 duration-700">
+          <div className="pt-2">
+            <h1 className="text-2xl md:text-3xl font-bold text-slate-400 tracking-tight">
+              Welcome to Outstand,
             </h1>
+            <h2 className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-amber-400 drop-shadow-[0_0_20px_rgba(217,70,239,0.3)] leading-tight mt-1">
+              {userName}
+            </h2>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col items-end gap-3">
             {/* Streak */}
-            <div className="flex items-center gap-2 bg-slate-900/80 backdrop-blur-xl border border-white/10 px-4 py-2.5 rounded-2xl shadow-xl">
-              <Flame className="w-6 h-6 text-amber-500 drop-shadow-[0_0_12px_rgba(245,158,11,0.8)]" />
+            <div className="flex items-center gap-2 bg-slate-900/80 backdrop-blur-xl border border-white/10 px-4 py-2 rounded-2xl shadow-xl hover:scale-105 transition-transform">
+              <Flame className="w-5 h-5 text-amber-500 drop-shadow-[0_0_12px_rgba(245,158,11,0.8)]" />
               <span className="text-xl font-black text-white">{streak}</span>
             </div>
 
-            {/* YOUR XpBadge EXACTLY AS REQUESTED */}
-            <XpBadge xp={totalXp} level={level} pct={xpPct} variantId="dash-header" />
+            {/* Xp Badge */}
+            <div className="hover:scale-105 transition-transform">
+              <XpBadge xp={totalXp} level={level} pct={xpPct} variantId="dash-header" />
+            </div>
           </div>
         </header>
 
-        {/* 2. DAILY QUOTES */}
-        <section className="relative px-8 py-10 rounded-[2rem] bg-slate-900/40 border border-white/5 backdrop-blur-xl shadow-2xl flex flex-col md:flex-row items-center gap-8 group animate-in fade-in zoom-in-95 duration-700 delay-100 ease-out">
-          <div className="absolute top-0 left-0 w-2 h-full bg-gradient-to-b from-cyan-400 to-fuchsia-500 rounded-l-[2rem] shadow-[0_0_20px_rgba(34,211,238,0.5)]" />
-          <Quote className="w-16 h-16 text-cyan-400/20 shrink-0 transform -rotate-12 group-hover:rotate-0 group-hover:text-cyan-400/40 transition-all duration-500" />
+        {/* 2. ENERGETIC DAILY QUOTE */}
+        <motion.section 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.1, ease }}
+          className="relative px-8 py-10 rounded-[2.5rem] bg-gradient-to-br from-indigo-950/40 to-[#0a0020] border border-cyan-500/20 shadow-[0_20px_50px_-20px_rgba(34,211,238,0.2)] group"
+        >
+          <div className="absolute top-0 left-0 w-2 h-full bg-gradient-to-b from-cyan-400 to-fuchsia-500 rounded-l-[2.5rem] shadow-[0_0_30px_rgba(34,211,238,0.6)]" />
+          <Quote className="absolute -top-6 right-6 w-24 h-24 text-cyan-400/10 transform -rotate-12 group-hover:rotate-0 group-hover:text-cyan-400/20 transition-all duration-700" />
+          
           <div>
             <p className="text-xl md:text-2xl font-bold text-slate-200 italic tracking-wide leading-relaxed drop-shadow-md">
               "{dailyQuote.quote}"
             </p>
-            <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-              <span className="text-sm font-black uppercase tracking-[0.3em] text-fuchsia-400">
-                — {dailyQuote.author}
+            <div className="mt-6 flex flex-col sm:flex-row sm:items-center gap-4">
+              <span className="text-sm font-black uppercase tracking-[0.3em] text-cyan-400 bg-cyan-950/50 px-4 py-1.5 rounded-full border border-cyan-500/30">
+                {dailyQuote.author}
               </span>
-              <span className="hidden sm:block w-1.5 h-1.5 rounded-full bg-slate-700" />
-              <span className="text-xs font-bold text-slate-400 tracking-wide">
-                {dailyQuote.application}
-              </span>
+              {dailyQuote.application && (
+                <span className="text-sm font-medium text-slate-400">
+                  {dailyQuote.application}
+                </span>
+              )}
             </div>
           </div>
-        </section>
+        </motion.section>
 
-        {/* 3. CITY */}
-        <section className="animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-200 ease-out">
-          <NeonCity level={level} completionPercent={habits.length > 0 ? (habits.filter(h => h.completed).length / habits.length) * 100 : 0} />
-        </section>
-
-        {/* 4. ENERGETIC HABITS */}
-        <section className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300 ease-out">
+        {/* 3. YOUR HABITS (With Energetic Icons & Micro-transitions) */}
+        <motion.section 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.2, ease }}
+          className="space-y-6"
+        >
           <h2 className="text-3xl font-black text-white tracking-tight flex items-center gap-4">
-            <Target className="w-8 h-8 text-cyan-400" /> 
-            Your Habits
+            <Target className="w-8 h-8 text-fuchsia-500" /> 
+            Daily Execution
           </h2>
 
           <div className="grid gap-4">
             {habits.length === 0 ? (
-              <div className="text-center py-16 text-slate-500 text-sm font-black uppercase tracking-widest border-2 border-dashed border-slate-800 rounded-[2rem] bg-slate-900/20">
-                No habits assigned.
+              <div className="text-center py-16 text-slate-500 text-sm font-black uppercase tracking-widest border-2 border-dashed border-slate-800 rounded-[2.5rem] bg-slate-900/20">
+                Grid clear. No active missions.
               </div>
             ) : (
-              habits.map((habit, idx) => {
-                // Vibrant alternating colors
-                const accent = idx % 2 === 0 ? 'cyan' : 'fuchsia';
+              habits.map((habit) => {
+                const isMutating = mutatingIds.has(habit.id);
                 
                 return (
                   <button
                     key={habit.id}
-                    disabled={habit.completed}
+                    disabled={habit.completed || isMutating}
                     onClick={() => handleCompleteHabit(habit.id)}
-                    className={`w-full text-left p-6 sm:p-8 rounded-[2rem] border transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-6 group focus-visible:outline-none ${
+                    className={`w-full text-left p-6 md:p-8 rounded-[2rem] border transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-6 group focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-500 focus-visible:ring-offset-4 focus-visible:ring-offset-black ${
                       habit.completed
                         ? 'bg-slate-950/40 border-slate-800/50 text-slate-600 cursor-default'
-                        : `bg-slate-900/60 backdrop-blur-xl border-white/10 hover:border-${accent}-400/50 hover:bg-slate-800 hover:shadow-[0_10px_40px_-15px_rgba(var(--tw-color-${accent}-400),0.3)] cursor-pointer active:scale-95`
+                        : `bg-slate-900/60 backdrop-blur-xl border-white/10 hover:border-cyan-500/40 hover:bg-slate-800 hover:shadow-[0_15px_40px_-10px_rgba(34,211,238,0.25)] cursor-pointer active:scale-95`
                     }`}
                   >
                     <div className="flex items-center gap-6">
-                      <div className="shrink-0 transition-transform duration-500 group-hover:scale-110">
-                        {habit.completed ? (
-                          <CheckCircle2 className="w-9 h-9 text-emerald-500 drop-shadow-[0_0_15px_rgba(16,185,129,0.5)]" />
+                      <div className="shrink-0 transition-transform duration-500 group-hover:scale-110 group-active:scale-90">
+                        {isMutating ? (
+                          <Loader2 className="w-10 h-10 text-cyan-400 animate-spin" />
+                        ) : habit.completed ? (
+                          <CheckCircle2 className="w-10 h-10 text-emerald-500 drop-shadow-[0_0_20px_rgba(16,185,129,0.5)]" />
                         ) : (
-                          <Circle className={`w-9 h-9 text-slate-600 group-hover:text-${accent}-400 transition-colors duration-300`} />
+                          // Premium Icons based on difficulty
+                          getIconForHabit(habit.quest.difficulty)
                         )}
                       </div>
                       <div>
-                        <p className={`font-black text-2xl tracking-tight transition-colors duration-300 ${habit.completed ? 'line-through opacity-50 text-slate-600' : 'text-white'}`}>
+                        <p className={`font-black text-2xl tracking-tight transition-colors duration-300 ${habit.completed ? 'line-through opacity-50 text-slate-600' : 'text-white group-hover:text-cyan-50'}`}>
                           {habit.quest.title}
                         </p>
-                        <p className="text-xs font-bold text-slate-500 uppercase tracking-[0.2em] mt-2">
-                          {habit.quest.category}
+                        <p className="text-xs font-black text-slate-500 uppercase tracking-[0.2em] mt-2">
+                          {habit.quest.category} <span className="mx-2">•</span> {habit.quest.difficulty}
                         </p>
                       </div>
                     </div>
@@ -271,7 +346,7 @@ function DashboardHQ() {
                     <span className={`text-lg font-black px-6 py-3 rounded-2xl border shrink-0 transition-all duration-300 ${
                       habit.completed 
                         ? 'bg-slate-950 border-slate-800 text-slate-700' 
-                        : `bg-${accent}-500/10 border-${accent}-500/30 text-${accent}-400 shadow-[0_0_20px_rgba(var(--tw-color-${accent}-400),0.15)] group-hover:shadow-[0_0_30px_rgba(var(--tw-color-${accent}-400),0.4)]`
+                        : `bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.15)] group-hover:shadow-[0_0_30px_rgba(34,211,238,0.4)] group-hover:bg-cyan-500/20`
                     }`}>
                       +{habit.quest.xp_reward} XP
                     </span>
@@ -280,26 +355,37 @@ function DashboardHQ() {
               })
             )}
           </div>
-        </section>
+        </motion.section>
 
-        {/* 5. OUTSTAND PORTAL BUTTON */}
-        <section className="pt-10 pb-20 animate-in fade-in duration-1000 delay-500">
+        {/* 4. THE PORTAL BUTTON */}
+        <motion.section 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.3, ease }}
+          className="pt-10 pb-20"
+        >
           <button
-            onClick={() => setIsPortalOpen(true)}
-            className="w-full relative overflow-hidden rounded-[2.5rem] bg-slate-950 border border-violet-500/30 p-1 shadow-[0_0_50px_rgba(139,92,246,0.2)] group transition-all duration-300 hover:scale-[1.02] active:scale-95 focus:outline-none"
+            onClick={() => setIsPortalActive(true)}
+            className="w-full relative overflow-hidden rounded-[3rem] bg-slate-950 border border-violet-500/30 p-1 shadow-[0_0_50px_rgba(139,92,246,0.15)] group transition-all duration-300 hover:scale-[1.02] active:scale-95 focus:outline-none focus-visible:ring-4 focus-visible:ring-violet-500"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-violet-600 via-fuchsia-600 to-cyan-600 opacity-30 group-hover:opacity-60 transition-opacity duration-700 blur-xl" />
-            <div className="bg-black/90 backdrop-blur-2xl rounded-[2.3rem] p-12 flex flex-col items-center justify-center relative z-10">
-              <div className="w-20 h-20 rounded-full bg-violet-500/10 border border-violet-500/30 flex items-center justify-center mb-6 group-hover:shadow-[0_0_40px_rgba(139,92,246,0.6)] transition-all duration-500">
-                <Zap className="w-10 h-10 text-violet-400 group-hover:scale-110 transition-transform duration-500" />
+            {/* Ambient Animated Glow inside the button */}
+            <div className="absolute inset-0 bg-gradient-to-r from-violet-600 via-fuchsia-600 to-cyan-600 opacity-30 group-hover:opacity-60 transition-opacity duration-700 blur-2xl" />
+            
+            <div className="bg-[#050012]/90 backdrop-blur-3xl rounded-[2.8rem] p-12 flex flex-col items-center justify-center relative z-10">
+              <div className="w-24 h-24 rounded-full bg-violet-500/10 border border-violet-500/30 flex items-center justify-center mb-6 group-hover:shadow-[0_0_50px_rgba(139,92,246,0.6)] transition-all duration-500">
+                <Zap className="w-12 h-12 text-violet-400 group-hover:scale-125 transition-transform duration-500 drop-shadow-[0_0_15px_rgba(139,92,246,0.8)]" />
               </div>
-              <h3 className="text-3xl sm:text-4xl font-black text-white uppercase tracking-[0.2em] mb-2 drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">Enter Portal</h3>
-              <p className="text-slate-400 font-bold tracking-widest text-sm uppercase">Initialize Outstand Sequence</p>
+              <h3 className="text-4xl sm:text-5xl font-black text-white uppercase tracking-[0.2em] mb-3 drop-shadow-[0_0_20px_rgba(255,255,255,0.4)]">
+                Enter Portal
+              </h3>
+              <p className="text-violet-300/80 font-black tracking-widest text-sm uppercase">
+                Initialize Outstand Sequence
+              </p>
             </div>
           </button>
-        </section>
+        </motion.section>
 
       </div>
     </div>
   );
-                      }
+            }
