@@ -1,432 +1,389 @@
-import { useMemo, useState, useEffect } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Plus, Play, Zap, ChevronDown, ChevronUp, Droplets, BookOpen, Brain, Activity, Flame, Trophy, Target, Quote } from "lucide-react";
-import { toast } from "sonner";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState, useEffect, useMemo } from 'react';
+import { createFileRoute } from '@tanstack/react-router';
+import { 
+  Trophy, Flame, Zap, Target, Activity, ShieldCheck, 
+  Sparkles, ChevronRight, Play, CheckCircle2, 
+  TrendingUp, Clock, History, CircleDashed, Square
+} from 'lucide-react';
+import { useGamification } from '../../hooks/use-gamification';
+import type { TabType, Quest, UserStats, Activity as ActivityType } from '../../types/dashboard';
 
-// Components
-import { AddHabitDialog, HabitCard } from "@/components/habit-card";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import RegainTrigger from "@/components/dashboard/RegainTrigger";
-
-// Hooks & Libs
-import { useAppState } from "@/hooks/use-app-state";
-import { useAuth, displayNameOf } from "@/hooks/use-auth";
-import { useDailyLog } from "@/hooks/use-dopamine";
-import { todayISO } from "@/lib/habits";
-import { dailyChallenge } from "@/lib/Index";
-import { scoreColor } from "@/lib/dopamine";
-import { QUOTES } from "@/lib/quotes";
-import { supabase } from "@/integrations/supabase/client";
-
-export const Route = createFileRoute("/_authenticated/dashboard")({
-  component: Dashboard,
+export const Route = createFileRoute('/_authenticated/dashboard')({
+  component: UnifiedDashboard,
 });
 
-// Premium easing curve for buttery smooth animations
-const smoothEase = [0.16, 1, 0.3, 1];
-
-function Dashboard() {
-  const { habits = [], toggleToday, addHabit, updateHabit, deleteHabit, xp = 0, bestStreak = 0 } = useAppState() ?? {};
-  const { user, profile } = useAuth() ?? {};
-  const { log } = useDailyLog() ?? {};
-  const navigate = useNavigate();
-
-  // === ONBOARDING INTERCEPTOR ===
-  useEffect(() => {
-    const checkOnboardingStatus = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session) {
-        const { data: userProfile } = await supabase
-          .from('profiles')
-          .select('has_completed_onboarding')
-          .eq('id', session.user.id)
-          .single();
-
-        if (userProfile && !userProfile.has_completed_onboarding) {
-          navigate({ to: "/onboarding", replace: true });
-        }
-      }
-    };
-    checkOnboardingStatus();
-  }, [navigate]);
-  // ==============================
-
-  const [showAllHabits, setShowAllHabits] = useState(false);
-  const [dismissedWizard, setDismissedWizard] = useState(false);
-  const [quoteExpanded, setQuoteExpanded] = useState(false); // NEW: State for expanding long quotes
-
-  const today = todayISO();
-  const name = user ? displayNameOf(user, profile) : "Hustler";
-
-  // Memoized stats
-  const stats = useMemo(() => {
-    const completed = habits.filter((h) => h?.history?.includes(today)).length;
-    const total = habits.length;
-    return { completed, total, pct: total ? Math.round((completed / total) * 100) : 0 };
-  }, [habits, today]);
-
-  // Determine today's quote based on a simple date hash
-  const dailyQuote = useMemo(() => {
-    if (!QUOTES || QUOTES.length === 0) return null;
-    const hash = today.split('-').reduce((acc, part) => acc + parseInt(part, 10), 0);
-    return QUOTES[hash % QUOTES.length];
-  }, [today]);
-
-  const score = log?.score ?? 50;
-  const color = scoreColor(score);
-  const challenge = dailyChallenge(today) ?? { id: "daily-default", title: "Stay Consistent", description: "Complete all your daily tasks." };
-
-  const displayedHabits = showAllHabits ? habits : habits.slice(0, 4);
-  const showWizard = habits.length === 0 && !dismissedWizard;
-
-  // Animation Variants
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.08, ease: smoothEase } }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 30, filter: "blur(10px)" },
-    show: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.8, ease: smoothEase } }
-  };
-
-  const quickStartHabits = [
-    { name: "Hydrate (3L)", emoji: "💧", icon: <Droplets className="h-5 w-5" />, reason: "Baseline energy and cognitive function.", color: "primary" },
-    { name: "Deep Work (60m)", emoji: "🧠", icon: <Brain className="h-5 w-5" />, reason: "Uninterrupted focus for maximum output.", color: "accent" },
-    { name: "Read 10 Pages", emoji: "📖", icon: <BookOpen className="h-5 w-5" />, reason: "Continuous learning and mental clarity.", color: "success" }
-  ];
-    return (
-    <>
-      <motion.div 
-        variants={containerVariants}
-        initial="hidden"
-        animate="show"
-        className="mx-auto max-w-7xl space-y-6 pb-24 pt-6 px-4 sm:px-6 relative overflow-hidden"
-      >
-        {/* HYPER-ENERGETIC BACKGROUND AMBIENT ORBS (Pink, Cyan, Violet for high energy) */}
-        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-fuchsia-600/15 blur-[160px] rounded-full pointer-events-none -z-10" />
-        <div className="absolute top-1/3 right-10 w-[400px] h-[400px] bg-cyan-500/15 blur-[140px] rounded-full pointer-events-none -z-10" />
-        <div className="absolute bottom-10 left-10 w-[450px] h-[450px] bg-violet-600/15 blur-[150px] rounded-full pointer-events-none -z-10" />
-
-        {/* HERO SECTION */}
-        <motion.header variants={itemVariants} className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-4">
-          <div className="space-y-1">
-            <h1 className="text-4xl md:text-5xl font-display font-black tracking-tight text-white">
-              Welcome back,<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-400 via-violet-400 to-cyan-400 drop-shadow-[0_0_25px_rgba(217,70,239,0.4)]">
-                {name}.
-              </span>
-            </h1>
-            <p className="text-slate-300 text-sm md:text-base font-medium max-w-md leading-relaxed pt-2">
-              {stats.pct >= 80 
-                ? "Incredible momentum today. Let's finish strong." 
-                : "Your potential is waiting. Turn your intentions into action."}
-            </p>
+// --- COMPONENT: HEADER ---
+function DashboardHeader({ stats }: { stats: UserStats }) {
+  return (
+    <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-8 bg-slate-900/60 border border-slate-800/80 backdrop-blur-xl p-6 rounded-2xl shadow-xl">
+      <div className="flex items-center gap-5">
+        <div className="relative group">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 transition-transform group-hover:scale-105">
+            <Trophy className="w-8 h-8 text-white" aria-hidden="true" />
           </div>
-          <div className="flex w-full md:w-auto gap-3">
-             <Button variant="outline" className="flex-1 md:flex-none h-12 rounded-2xl border-fuchsia-500/20 bg-fuchsia-950/20 hover:bg-fuchsia-900/30 text-white transition-all active:scale-95 shadow-sm" onClick={() => navigate({ to: "/dopamine" })}>
-               <Activity className="mr-2 h-4 w-4 text-fuchsia-400" /> Log Dopamine
-             </Button>
-             <Button className="flex-1 md:flex-none h-12 bg-gradient-to-r from-fuchsia-600 to-violet-600 hover:from-fuchsia-500 hover:to-violet-500 rounded-2xl shadow-[0_0_25px_rgba(217,70,239,0.4)] hover:shadow-[0_0_35px_rgba(217,70,239,0.6)] text-white transition-all active:scale-95 border border-fuchsia-400/30 font-bold" onClick={() => navigate({ to: "/focus" })}>
-               <Play className="mr-2 h-4 w-4 fill-current text-cyan-200" /> Start Focus
-             </Button>
-          </div>
-        </motion.header>
-
-        {/* REGAIN ESCAPE HATCH */}
-        <motion.div variants={itemVariants} className="w-full">
-          <RegainTrigger />
-        </motion.div>
-
-        {/* BENTO BOX GRID LAYOUT */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-          
-          {/* STATS BENTO ROW */}
-          <motion.div variants={itemVariants} className="md:col-span-12 grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            <StatCard 
-              icon={<Target className="text-cyan-400 h-5 w-5" />}
-              label="Today's Progress" 
-              value={`${stats.completed}/${stats.total}`} 
-              sub={`${stats.pct}% Completion Rate`}
-              accent="#22d3ee" // Cyan
-            />
-            <StatCard 
-              icon={<Flame className="text-rose-400 h-5 w-5" />}
-              label="Active Streak" 
-              value={`${bestStreak} Days`} 
-              sub="Personal Best"
-              accent="#f43f5e" // High-energy Rose 
-            />
-            <StatCard 
-              icon={<Trophy className="text-amber-400 h-5 w-5" />}
-              label="Lifetime XP" 
-              value={String(xp)} 
-              sub="Growth metric"
-              accent="#fbbf24" // Amber 
-            />
-            <StatCard 
-              icon={<Zap className="text-fuchsia-400 h-5 w-5" />}
-              label="Dopamine Score" 
-              value={String(score)} 
-              sub={(color as any)?.label || "Balanced"} 
-              accent={(color as any)?.hex || "#e879f9"} 
-            />
-          </motion.div>
-
-          {/* MAIN HABITS BENTO */}
-          <motion.div variants={itemVariants} className="md:col-span-12 lg:col-span-8 rounded-[2rem] border border-violet-500/20 bg-slate-950/40 backdrop-blur-3xl p-6 sm:p-8 shadow-2xl flex flex-col h-full relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-600/10 blur-[100px] rounded-full pointer-events-none -translate-y-1/2 translate-x-1/3" />
-            
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 relative z-10">
-              <div>
-                <h2 className="text-2xl font-display font-bold text-white flex items-center gap-2">
-                  Daily Matrix <span className="inline-block w-2 h-2 rounded-full bg-fuchsia-500 animate-pulse" />
-                </h2>
-                <p className="text-slate-400 text-sm mt-1">Consistency compounds. Tick them off before midnight.</p>
-              </div>
-              <AddHabitDialog
-                onAdd={(d) => { addHabit(d); toast.success("Habit initialized in the matrix."); }}
-                trigger={
-                  <Button variant="outline" size="sm" className="h-10 rounded-xl border-cyan-500/30 bg-cyan-950/30 hover:bg-cyan-900/40 hover:text-white transition-all text-cyan-200 backdrop-blur-md shadow-sm">
-                    <Plus className="mr-2 h-4 w-4 text-cyan-400" /> Add Habit
-                  </Button>
-                }
-              />
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative z-10 flex-grow">
-              <AnimatePresence mode="popLayout">
-                {displayedHabits.length > 0 ? (
-                  displayedHabits.map((h, i) => {
-                    const isCompleted = h?.history?.includes(today);
-                    
-                    return (
-                      <motion.div
-                        key={h.id}
-                        initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                        transition={{ delay: i * 0.05, duration: 0.4, ease: smoothEase }}
-                        // 🟢 GREEN / RED LOGIC APPLIED HERE
-                        className={cn(
-                          "rounded-2xl transition-all duration-500 border bg-slate-900/50 backdrop-blur-sm",
-                          isCompleted 
-                            ? "border-emerald-500/60 shadow-[0_0_20px_rgba(16,185,129,0.15)] bg-emerald-950/20" 
-                            : "border-rose-500/40 shadow-[0_0_15px_rgba(244,63,94,0.1)] bg-rose-950/10 hover:border-rose-400/70"
-                        )}
-                      >
-                        <HabitCard 
-                          habit={h} 
-                          onToggle={() => toggleToday(h.id)} 
-                          onEdit={(d) => updateHabit(h.id, d)} 
-                          onDelete={() => deleteHabit(h.id)} 
-                        />
-                      </motion.div>
-                    );
-                  })
-                ) : (
-                  <div className="col-span-full flex flex-col items-center justify-center py-12 text-center border border-dashed border-violet-500/30 rounded-3xl bg-violet-950/10">
-                    <Target className="h-10 w-10 text-violet-400 mb-3 animate-pulse" />
-                    <p className="text-slate-300 text-sm font-medium">Your matrix is empty.</p>
-                    <p className="text-slate-500 text-xs mt-1">Add a habit to start building momentum.</p>
-                  </div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {habits.length > 4 && (
-              <motion.div className="mt-8 pt-4 border-t border-violet-500/10 relative z-10" layout>
-                <Button 
-                  variant="ghost" 
-                  className="w-full text-slate-300 hover:text-white hover:bg-violet-500/10 rounded-xl transition-all h-12" 
-                  onClick={() => setShowAllHabits(!showAllHabits)}
-                >
-                  {showAllHabits ? (
-                    <><ChevronUp className="mr-2 h-4 w-4 text-violet-400" /> Collapse Matrix</>
-                  ) : (
-                    <><ChevronDown className="mr-2 h-4 w-4 text-violet-400" /> Reveal all {habits.length} habits</>
-                  )}
-                </Button>
-              </motion.div>
-            )}
-          </motion.div>
-
-          {/* SIDEBAR BENTO */}
-          <motion.div variants={itemVariants} className="md:col-span-12 lg:col-span-4 flex flex-col gap-6">
-            
-            {/* Quote of the Day Card - WITH SEE MORE EXPANSION */}
-            {dailyQuote && (
-              <div className="rounded-[2rem] border border-cyan-500/20 bg-slate-950/40 p-6 sm:p-7 shadow-2xl backdrop-blur-xl relative overflow-hidden group flex flex-col transition-all duration-500">
-                <div className="absolute -top-6 -right-6 text-cyan-500/[0.04] group-hover:text-cyan-500/[0.08] transition-colors duration-500 pointer-events-none">
-                  <Quote className="w-32 h-32 rotate-12" />
-                </div>
-                
-                <div className="relative z-10 flex flex-col h-full">
-                  <div className="flex items-center gap-2 text-cyan-400 text-[10px] font-bold uppercase tracking-[0.25em] mb-4">
-                    <Quote className="h-3 w-3" /> Daily Insight
-                  </div>
-                  
-                  <div className="flex-grow flex flex-col justify-center">
-                    <blockquote 
-                      className={cn(
-                        "text-[1.05rem] font-medium text-slate-100 leading-relaxed transition-all duration-300", 
-                        !quoteExpanded && dailyQuote.quote.length > 100 && "line-clamp-3"
-                      )}
-                    >
-                      "{dailyQuote.quote}"
-                    </blockquote>
-                    
-                    {/* Expand Toggle */}
-                    {dailyQuote.quote.length > 100 && (
-                      <button 
-                        onClick={() => setQuoteExpanded(!quoteExpanded)}
-                        className="text-cyan-400 hover:text-cyan-300 text-xs font-bold mt-2 text-left transition-colors flex items-center gap-1"
-                      >
-                        {quoteExpanded ? "See less" : "See more"}
-                      </button>
-                    )}
-                  </div>
-                  
-                  <div className="flex flex-col border-t border-cyan-500/10 pt-4 mt-6">
-                    <span className="text-sm font-bold text-white tracking-tight">{dailyQuote.author}</span>
-                    <span className="text-xs text-slate-400 mt-1">
-                      <span className="font-semibold text-cyan-400">Action: </span> 
-                      {dailyQuote.application}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Daily Challenge Card - WITH DEEP LINK ROUTING */}
-            <div className="rounded-[2rem] border border-fuchsia-500/30 bg-gradient-to-br from-violet-950/60 via-fuchsia-950/30 to-slate-950 p-6 sm:p-7 shadow-2xl backdrop-blur-3xl group transition-all relative overflow-hidden flex flex-col">
-               <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-fuchsia-500/10 via-violet-500/10 to-transparent pointer-events-none" />
-               <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-fuchsia-600/20 blur-[60px] rounded-full pointer-events-none group-hover:bg-fuchsia-500/40 transition-colors duration-700" />
-
-               <div className="relative z-10">
-                 <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
-                   <div className="flex items-center gap-2 text-fuchsia-300 text-[10px] font-bold uppercase tracking-[0.25em] bg-fuchsia-500/15 px-3 py-1.5 rounded-full border border-fuchsia-400/30 shadow-sm">
-                      <Zap className="h-3 w-3 text-fuchsia-400 animate-pulse" /> Daily Challenge
-                   </div>
-                   <span className="text-xs font-mono text-fuchsia-400/70 tracking-widest">OUTSTAND</span>
-                 </div>
-                 
-                 <h3 className="text-2xl font-display font-bold text-white group-hover:text-fuchsia-200 transition-colors leading-tight">
-                   {challenge.title}
-                 </h3>
-                 <p className="text-sm font-medium text-slate-300 mt-3 leading-relaxed line-clamp-3">
-                   {challenge.description}
-                 </p>
-               </div>
-
-               <div className="relative z-10 mt-6 pt-2">
-                 <Button 
-                    className="w-full h-12 rounded-xl transition-all bg-gradient-to-r from-fuchsia-600 to-violet-600 hover:from-fuchsia-500 hover:to-violet-500 text-white shadow-[0_0_20px_rgba(217,70,239,0.3)] active:scale-95 border border-fuchsia-400/40 font-bold" 
-                    // 🟢 ROUTING LINK FIXED HERE! Passing the challenge ID in search params
-                    onClick={() => navigate({ 
-                      to: "/outstand", 
-                      search: { challengeId: challenge.id || challenge.title.toLowerCase().replace(/\s+/g, '-') } 
-                    })}
-                  >
-                   Accept Challenge
-                 </Button>
-               </div>
-            </div>
-          </motion.div>
-
+          <span className="absolute -bottom-2 -right-2 bg-emerald-500 text-slate-950 text-xs font-extrabold px-2 py-0.5 rounded-full border-2 border-slate-900">
+            Lvl {stats.level}
+          </span>
         </div>
-      </motion.div>
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-black tracking-tight text-white">Commander</h1>
+            <span className="bg-indigo-500/10 text-indigo-400 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-indigo-500/20">
+              Elite Tier
+            </span>
+          </div>
+          <p className="text-slate-400 text-sm mt-1">System operational. Ready for execution.</p>
+        </div>
+      </div>
 
-      {/* ONBOARDING WIZARD OVERLAY */}
-      <AnimatePresence>
-        {showWizard && (
-          <motion.div
-            initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
-            animate={{ opacity: 1, backdropFilter: "blur(12px)" }}
-            exit={{ opacity: 0, backdropFilter: "blur(0px)", transition: { duration: 0.4 } }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 30, opacity: 0 }}
-              animate={{ scale: 1, y: 0, opacity: 1 }}
-              exit={{ scale: 0.95, y: 10, opacity: 0 }}
-              transition={{ type: "spring", bounce: 0.3, duration: 0.7 }}
-              className="w-full max-w-lg rounded-[2.5rem] border border-cyan-500/30 bg-slate-900/95 p-8 md:p-10 shadow-[0_0_90px_rgba(6,182,212,0.25)] backdrop-blur-2xl relative overflow-hidden"
-            >
-               <div className="absolute -top-24 -right-24 w-72 h-72 bg-cyan-600/25 blur-[90px] rounded-full pointer-events-none" />
-               <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-violet-600/25 blur-[90px] rounded-full pointer-events-none" />
-
-               <div className="relative z-10">
-                 <h2 className="text-3xl font-display font-black tracking-tight text-white mb-2">Establish your baseline.</h2>
-                 <p className="text-slate-300 mb-8 text-sm leading-relaxed">
-                   Your dashboard is empty. Select a high-leverage habit below to initialize your tracking matrix and build immediate momentum.
-                 </p>
-<div className="space-y-3">
-                   {quickStartHabits.map((habit) => (
-                     <motion.button
-                       key={habit.name}
-                       whileHover={{ scale: 1.02, backgroundColor: "rgba(6,182,212,0.08)" }}
-                       whileTap={{ scale: 0.98 }}
-                       onClick={() => {
-                         addHabit({ name: habit.name, emoji: habit.emoji, color: habit.color as any });
-                         toast.success(`${habit.name} initialized.`);
-                       }}
-                       className="w-full flex items-center gap-4 rounded-2xl border border-cyan-500/20 bg-cyan-950/20 p-4 text-left transition-all hover:border-cyan-400/50 group shadow-lg"
-                     >
-                       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-cyan-950/80 border border-cyan-500/30 shadow-inner group-hover:shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all text-cyan-200 group-hover:text-cyan-300">
-                         {habit.icon}
-                       </div>
-                       <div>
-                         <div className="font-bold text-white group-hover:text-cyan-300 transition-colors tracking-tight text-sm md:text-base">{habit.name}</div>
-                         <div className="text-xs text-slate-400 mt-0.5">{habit.reason}</div>
-                       </div>
-                       <Plus className="ml-auto h-5 w-5 text-cyan-400 group-hover:text-cyan-300 transition-colors" />
-                     </motion.button>
-                   ))}
-                 </div>
-
-                 <Button 
-                   variant="ghost" 
-                   onClick={() => setDismissedWizard(true)} 
-                   className="w-full mt-6 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl tracking-wide text-sm h-12"
-                 >
-                   Skip and build my own
-                 </Button>
-               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
+      <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+        <div className="bg-slate-950/80 border border-slate-800/80 px-4 py-3 rounded-xl flex items-center gap-3 min-w-[140px]">
+          <Flame className="w-5 h-5 text-amber-500" aria-hidden="true" />
+          <div>
+            <div className="text-xs text-slate-400 font-medium uppercase tracking-wider">Streak</div>
+            <div className="text-lg font-bold text-white">{stats.streakDays} Days</div>
+          </div>
+        </div>
+        <div className="bg-slate-950/80 border border-slate-800/80 px-4 py-3 rounded-xl flex items-center gap-3 min-w-[140px]">
+          <Zap className="w-5 h-5 text-cyan-400" aria-hidden="true" />
+          <div>
+            <div className="text-xs text-slate-400 font-medium uppercase tracking-wider">Total XP</div>
+            <div className="text-lg font-bold text-white">{stats.totalXP.toLocaleString()}</div>
+          </div>
+        </div>
+      </div>
+    </header>
   );
 }
 
-// Updated StatCard for the Bento Layout with Energetic Accents
-function StatCard({ icon, label, value, sub, accent }: { icon: React.ReactNode; label: string; value: string; sub: string; accent?: string }) {
+// --- COMPONENT: TABS ---
+function DashboardTabs({ activeTab, onTabChange }: { activeTab: TabType, onTabChange: (t: TabType) => void }) {
+  const tabs = [
+    { id: 'overview', label: 'Overview', icon: Activity, color: 'indigo' },
+    { id: 'focus', label: 'Focus Center', icon: Sparkles, color: 'cyan' },
+    { id: 'protocols', label: 'Protocols', icon: Target, color: 'violet' }
+  ] as const;
+
   return (
-    <motion.div 
-      whileHover={{ y: -4, backgroundColor: "rgba(30, 58, 138, 0.15)" }}
-      className="rounded-[1.5rem] border border-violet-500/20 bg-slate-950/40 p-5 sm:p-6 backdrop-blur-xl transition-all duration-300 relative overflow-hidden group flex flex-col justify-between h-full shadow-lg"
-    >
-      <div 
-        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" 
-        style={{ background: `radial-gradient(circle 140px at top right, ${accent ? accent + '20' : 'rgba(139,92,246,0.1)'}, transparent)` }} 
-      />
+    <div className="flex items-center gap-2 mb-8 border-b border-slate-800 pb-px overflow-x-auto" role="tablist" aria-label="Dashboard Views">
+      {tabs.map(tab => {
+        const Icon = tab.icon;
+        const isActive = activeTab === tab.id;
+        return (
+          <button
+            key={tab.id}
+            role="tab"
+            aria-selected={isActive}
+            aria-controls={`${tab.id}-panel`}
+            onClick={() => onTabChange(tab.id as TabType)}
+            className={`px-5 py-3 font-semibold text-sm rounded-t-xl transition-all flex items-center gap-2 border-b-2 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-${tab.color}-500 ${
+              isActive
+                ? `border-${tab.color}-500 text-${tab.color}-400 bg-${tab.color}-500/10`
+                : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/40'
+            }`}
+          >
+            <Icon className="w-4 h-4" aria-hidden="true" />
+            {tab.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// --- COMPONENT: QUEST PANEL ---
+function DailyQuestPanel({ quests, onComplete }: { quests: Quest[], onComplete: (id: string) => void }) {
+  const completed = quests.filter(q => q.completed).length;
+  
+  return (
+    <section className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-md flex flex-col h-full">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <Target className="w-5 h-5 text-indigo-400" aria-hidden="true" />
+          Daily Missions
+        </h2>
+        <span className="text-xs text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20 font-medium">
+          {completed}/{quests.length} Completed
+        </span>
+      </div>
+
+      <div className="space-y-3 flex-grow">
+        {quests.map((quest) => (
+          <button
+            key={quest.id}
+            disabled={quest.completed}
+            onClick={() => onComplete(quest.id)}
+            className={`w-full text-left group p-4 rounded-xl border transition-all flex items-center justify-between focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+              quest.completed
+                ? 'bg-emerald-950/20 border-emerald-500/30 text-slate-300 opacity-75 cursor-default'
+                : 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900 text-slate-200 cursor-pointer'
+            }`}
+          >
+            <div className="flex items-center gap-4">
+              <div className={`w-6 h-6 shrink-0 rounded-lg flex items-center justify-center transition-colors ${
+                quest.completed ? 'bg-emerald-500 text-slate-950' : 'border-2 border-slate-700 group-hover:border-indigo-500'
+              }`} aria-hidden="true">
+                {quest.completed && <CheckCircle2 className="w-4 h-4 font-bold" />}
+              </div>
+              <div>
+                <p className={`font-semibold text-sm ${quest.completed ? 'line-through text-slate-500' : 'text-white'}`}>
+                  {quest.title}
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs text-slate-400">{quest.category}</span>
+                  <span className="w-1 h-1 rounded-full bg-slate-700" />
+                  <span className="text-xs text-slate-400 capitalize">{quest.difficulty}</span>
+                </div>
+              </div>
+            </div>
+            <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border shrink-0 ml-4 ${
+              quest.completed ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' : 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20'
+            }`}>
+              +{quest.xpReward} XP
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// --- COMPONENT: REAL FOCUS TIMER ---
+function FocusCenter({ onComplete }: { onComplete: (mins: number) => void }) {
+  const [isActive, setIsActive] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(25 * 60); // 25 mins
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (isActive && timeLeft > 0) {
+      interval = setInterval(() => setTimeLeft(t => t - 1), 1000);
+    } else if (timeLeft === 0 && isActive) {
+      setIsActive(false);
+      onComplete(25);
+      setTimeLeft(25 * 60); // reset
+    }
+    return () => clearInterval(interval);
+  }, [isActive, timeLeft, onComplete]);
+
+  const toggleTimer = () => setIsActive(!isActive);
+  const resetTimer = () => { setIsActive(false); setTimeLeft(25 * 60); };
+
+  const mins = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+  const secs = (timeLeft % 60).toString().padStart(2, '0');
+  const progress = ((25 * 60 - timeLeft) / (25 * 60)) * 100;
+
+  return (
+    <div className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-8 backdrop-blur-md max-w-2xl mx-auto text-center">
+      <span className="text-xs font-semibold uppercase tracking-wider text-cyan-400 bg-cyan-500/10 px-3 py-1 rounded-full border border-cyan-500/20">
+        Deep Work Protocol
+      </span>
+      <h2 className="text-3xl font-black text-white mt-6 mb-2">Eliminate Distraction</h2>
+      <p className="text-slate-400 text-sm mb-8">Maintain unbroken focus. Minimize context switching.</p>
       
-      <div className="relative z-10 flex items-start justify-between w-full mb-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900/60 border border-slate-700/50 shadow-inner group-hover:scale-110 transition-transform">
-          {icon}
+      <div className="relative w-64 h-64 mx-auto mb-8 flex items-center justify-center">
+        {/* SVG Progress Circle */}
+        <svg className="absolute inset-0 w-full h-full transform -rotate-90">
+          <circle cx="128" cy="128" r="120" className="stroke-slate-800" strokeWidth="8" fill="none" />
+          <circle 
+            cx="128" cy="128" r="120" 
+            className="stroke-cyan-400 transition-all duration-1000 ease-linear" 
+            strokeWidth="8" fill="none" 
+            strokeDasharray={2 * Math.PI * 120}
+            strokeDashoffset={2 * Math.PI * 120 * (1 - progress / 100)}
+          />
+        </svg>
+        <div className="text-6xl font-black text-white font-mono tabular-nums tracking-tighter">
+          {mins}:{secs}
         </div>
       </div>
-      <div className="relative z-10">
-        <div className="text-[10px] sm:text-xs uppercase tracking-[0.2em] text-slate-400 font-bold">{label}</div>
-        <div className="font-display text-2xl sm:text-3xl font-black tracking-tight mt-1 drop-shadow-sm" style={{ color: accent || 'white' }}>{value}</div>
-        <div className="text-[10px] sm:text-xs font-medium text-slate-400 mt-1">{sub}</div>
+
+      <div className="flex items-center justify-center gap-4">
+        <button 
+          onClick={toggleTimer}
+          className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-8 py-3 rounded-xl text-lg transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-cyan-300"
+        >
+          {isActive ? <Square className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current" />}
+          {isActive ? 'Pause' : 'Commence'}
+        </button>
+        <button 
+          onClick={resetTimer}
+          className="bg-slate-800 hover:bg-slate-700 text-white font-bold px-4 py-3 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-slate-500"
+          aria-label="Reset Timer"
+        >
+          <RotateCcw className="w-5 h-5" />
+        </button>
       </div>
-    </motion.div>
+    </div>
   );
-            }
-                                                      
+}
+
+// --- MAIN DASHBOARD ROUTE COMPONENT ---
+function UnifiedDashboard() {
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
+  
+  // Custom Hook replaces static state
+  const { stats, quests, activities, showLevelUp, completeQuest, addFocusTime } = useGamification();
+
+  // Derived Progress Calculations
+  const progressPercent = useMemo(() => {
+    return Math.min(Math.max((stats.currentLevelXP / stats.nextLevelXP) * 100, 0), 100);
+  }, [stats.currentLevelXP, stats.nextLevelXP]);
+
+  const dailyCompletion = useMemo(() => {
+    if (quests.length === 0) return 0;
+    const done = quests.filter(q => q.completed).length;
+    return Math.round((done / quests.length) * 100);
+  }, [quests]);
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans selection:bg-indigo-500 selection:text-white relative overflow-hidden">
+      
+      {/* Level Up Overlay (Micro-interaction) */}
+      <div 
+        aria-live="polite"
+        className={`fixed inset-0 z-50 pointer-events-none flex items-center justify-center transition-opacity duration-500 ${showLevelUp ? 'opacity-100' : 'opacity-0'}`}
+      >
+        <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" />
+        <div className="relative bg-gradient-to-br from-indigo-600 to-violet-600 p-8 rounded-3xl text-center transform transition-transform duration-500 scale-100 shadow-2xl shadow-indigo-500/50 border border-white/20">
+          <Sparkles className="w-16 h-16 text-yellow-300 mx-auto mb-4 animate-bounce" />
+          <h2 className="text-4xl font-black text-white tracking-tight mb-2">LEVEL UP!</h2>
+          <p className="text-indigo-100 text-lg font-medium">You are now Level {stats.level}</p>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto">
+        <DashboardHeader stats={stats} />
+        <DashboardTabs activeTab={activeTab} onTabChange={setActiveTab} />
+
+        <main>
+          {activeTab === 'overview' && (
+            <div id="overview-panel" role="tabpanel" aria-labelledby="overview-tab" className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              
+              {/* LEFT COLUMN */}
+              <div className="lg:col-span-2 space-y-6 flex flex-col">
+                
+                {/* Analytics / Today's Progress */}
+                <section className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-md">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Today's Protocol</span>
+                      <h2 className="text-lg font-bold text-white mt-1">Execution Velocity</h2>
+                    </div>
+                    <span className="text-3xl font-black text-emerald-400 tabular-nums">{dailyCompletion}%</span>
+                  </div>
+                  
+                  {/* Progress Bar */}
+                  <div className="w-full bg-slate-950 rounded-full h-4 mb-5 border border-slate-800 overflow-hidden" role="progressbar" aria-valuenow={dailyCompletion} aria-valuemin={0} aria-valuemax={100}>
+                    <div 
+                      className="bg-gradient-to-r from-emerald-500 to-cyan-400 h-full rounded-full transition-all duration-1000 ease-out" 
+                      style={{ width: `${dailyCompletion}%` }}
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-4 text-sm border-t border-slate-800/80 pt-5">
+                    <div>
+                      <div className="text-slate-400 text-xs mb-1">Missions</div>
+                      <div className="text-white font-bold">{stats.questsCompletedToday} / {quests.length}</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-400 text-xs mb-1">Focus Time</div>
+                      <div className="text-white font-bold">{Math.floor(stats.focusMinutesToday / 60)}h {stats.focusMinutesToday % 60}m</div>
+                    </div>
+                    <div>
+                      <div className="text-slate-400 text-xs mb-1">Productivity Score</div>
+                      <div className="text-emerald-400 font-bold">A+</div>
+                    </div>
+                  </div>
+                </section>
+
+                <DailyQuestPanel quests={quests} onComplete={completeQuest} />
+              </div>
+
+              {/* RIGHT COLUMN */}
+              <div className="space-y-6">
+                
+                {/* XP Progression Card */}
+                <section className="bg-gradient-to-br from-indigo-950/40 via-slate-900/60 to-slate-900/80 border border-indigo-500/30 rounded-2xl p-6 backdrop-blur-md shadow-xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <ShieldCheck className="w-24 h-24" />
+                  </div>
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2 mb-1 relative z-10">
+                    Next Level Target
+                  </h2>
+                  <p className="text-sm text-slate-400 mb-6 relative z-10">
+                    <span className="text-white font-bold">{stats.nextLevelXP - stats.currentLevelXP} XP</span> required for Level {stats.level + 1}
+                  </p>
+                  
+                  <div className="w-full bg-slate-950 rounded-full h-3 mb-3 border border-slate-800 overflow-hidden relative z-10" role="progressbar" aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100}>
+                    <div 
+                      className="bg-gradient-to-r from-indigo-500 to-cyan-400 h-full rounded-full transition-all duration-1000 ease-out"
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs font-semibold text-slate-400 relative z-10">
+                    <span className="tabular-nums">{stats.currentLevelXP.toLocaleString()} XP</span>
+                    <span className="tabular-nums">{stats.nextLevelXP.toLocaleString()} XP</span>
+                  </div>
+                </section>
+
+                {/* Activity Feed */}
+                <section className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-md flex-grow">
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
+                    <History className="w-5 h-5 text-slate-400" />
+                    Action Ledger
+                  </h2>
+                  
+                  {activities.length === 0 ? (
+                    <div className="text-center py-8 text-slate-500 text-sm">
+                      <CircleDashed className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      No recent activity.<br/>Start executing protocols.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {activities.map((act) => (
+                        <div key={act.id} className="flex gap-3 animate-in slide-in-from-left-2 duration-300">
+                          <div className="w-2 h-2 mt-1.5 rounded-full bg-indigo-500 shrink-0" />
+                          <div>
+                            <p className="text-sm text-slate-300">{act.description}</p>
+                            <div className="flex items-center gap-2 mt-1 text-xs">
+                              {act.xpGained && <span className="text-indigo-400 font-bold">+{act.xpGained} XP</span>}
+                              <span className="text-slate-600">
+                                {new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'focus' && (
+            <div id="focus-panel" role="tabpanel" aria-labelledby="focus-tab" className="animate-in fade-in duration-500">
+              <FocusCenter onComplete={addFocusTime} />
+            </div>
+          )}
+
+          {activeTab === 'protocols' && (
+            <div id="protocols-panel" role="tabpanel" aria-labelledby="protocols-tab" className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-8 backdrop-blur-md animate-in fade-in duration-500 text-center">
+              <Target className="w-12 h-12 text-violet-500 mx-auto mb-4" />
+              <h2 className="text-2xl font-black text-white mb-2">Protocol Architecture</h2>
+              <p className="text-slate-400 max-w-md mx-auto mb-6">
+                Define your foundational habits and high-stakes routines here. 
+                <br/>(Integration ready for backend Protocol schema)
+              </p>
+              <button disabled className="bg-slate-800 text-slate-500 px-6 py-3 rounded-xl font-bold cursor-not-allowed border border-slate-700">
+                System Offline (Awaiting Database Sync)
+              </button>
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+  }
+                                                   
