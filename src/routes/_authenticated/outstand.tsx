@@ -84,16 +84,15 @@ const triggerHaptic = (type: "light" | "success" | "heavy") => {
 // ============================================================================
 
 export function OutstandPage() {
- const searchParams = useSearch({ strict: false }) as OutstandSearch;
+  const searchParams = useSearch({ strict: false }) as OutstandSearch;
   const challengeId = searchParams?.challengeId;
 
   const {
     challenge, running, setRunning, setRemaining, isShuffling,
-  const {
-    challenge, running, setRunning, setRemaining, isShuffling,
     shuffleDisplay, completionStage, generate, complete, mins, secs, loadChallenge,
   } = useOutstand();
-
+  
+  
   // Network State
   const [isOnline, setIsOnline] = useState<boolean>(
     typeof navigator !== 'undefined' ? navigator.onLine : true
