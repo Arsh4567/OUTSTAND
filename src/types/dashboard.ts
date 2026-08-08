@@ -1,42 +1,29 @@
 export type TabId = 'overview' | 'focus' | 'protocols';
 
-export type QuestDifficulty = 'easy' | 'medium' | 'hard';
-export type QuestCategory = 'Productivity' | 'Mindset' | 'Execution';
+export interface UserStats {
+  total_xp: number;
+  level: number;
+  current_level_xp: number;
+  streak_days: number;
+  focus_minutes_today: number;
+}
 
-export interface Quest {
+export interface DailyQuest {
   id: string;
-  title: string;
-  category: QuestCategory;
-  difficulty: QuestDifficulty;
-  xpReward: number;
   completed: boolean;
+  quests: {
+    id: string;
+    title: string;
+    category: string;
+    difficulty: 'easy' | 'medium' | 'hard';
+    xp_reward: number;
+  };
 }
 
 export interface Activity {
   id: string;
-  timestamp: number;
   type: 'quest_completed' | 'focus_session' | 'protocol_completed' | 'level_up';
   description: string;
-  xpAwarded: number;
-}
-
-export interface Protocol {
-  id: string;
-  title: string;
-  steps: { id: string; label: string; completed: boolean }[];
-  completed: boolean;
-  xpReward: number;
-}
-
-export interface UserGamificationState {
-  totalXP: number;
-  streakDays: number;
-  focusMinutesToday: number;
-}
-
-export interface LevelData {
-  level: number;
-  currentLevelXP: number;
-  xpRequiredForNextLevel: number;
-  progressPercentage: number;
+  xp_awarded: number;
+  created_at: string;
 }
