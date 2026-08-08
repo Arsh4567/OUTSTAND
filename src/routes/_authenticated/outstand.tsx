@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Zap, 
@@ -84,7 +84,11 @@ const triggerHaptic = (type: "light" | "success" | "heavy") => {
 // ============================================================================
 
 export function OutstandPage() {
- const { challengeId } = Route.useSearch({ strict: false });
+ const searchParams = useSearch({ strict: false }) as OutstandSearch;
+  const challengeId = searchParams?.challengeId;
+
+  const {
+    challenge, running, setRunning, setRemaining, isShuffling,
   const {
     challenge, running, setRunning, setRemaining, isShuffling,
     shuffleDisplay, completionStage, generate, complete, mins, secs, loadChallenge,
