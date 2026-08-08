@@ -1,18 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { supabase } from '../../integrations/supabase/client';
 import { toast } from 'sonner';
 
-// Corrected Named Imports
 import { XpBadge } from '../../components/xp-badge';
 import { NeonCity } from '../../components/dashboard/NeonCity';
 import { QUOTES } from '../../lib/quotes';
 
-// @ts-ignore - Safely grabbing the Outstand route component
-import { Route as OutstandRoute } from './outstand';
-
-// Cleaned up unused imports - exactly what is needed for this file
-import { Flame, Loader2, AlertCircle, Wifi, WifiOff, CheckCircle2, Circle } from 'lucide-react';
+import { Flame, Loader2, AlertCircle, Wifi, WifiOff, CheckCircle2, Circle, Target, ChevronRight } from 'lucide-react';
 import type { UserStats, DailyQuest } from '../../types/dashboard';
 
 export const Route = createFileRoute('/_authenticated/dashboard')({
@@ -30,7 +25,7 @@ function DashboardHQ() {
   const [habits, setHabits] = useState<DailyQuest[]>([]);
   const [mutatingIds, setMutatingIds] = useState<Set<string>>(new Set());
 
-  // Random Daily Quote using the correct QUOTES array
+  // Random Daily Quote
   const dailyQuote = useMemo(() => {
     if (Array.isArray(QUOTES) && QUOTES.length > 0) {
       return QUOTES[Math.floor(Math.random() * QUOTES.length)];
@@ -45,9 +40,8 @@ function DashboardHQ() {
       const uid = session.user.id;
       setUserId(uid);
 
-      // Get user metadata for the name
       const name = session.user.user_metadata?.full_name || session.user.user_metadata?.username || "Commander";
-      setUserName(name.split(' ')[0]); // Use first name for cleaner UI
+      setUserName(name.split(' ')[0]);
 
       const localDate = new Date().toLocaleDateString('en-CA');
 
@@ -76,7 +70,7 @@ function DashboardHQ() {
             quest: {
               id: qData.id,
               title: qData.title,
-              category: qData.category, // Relies on proper DB types
+              category: qData.category,
               difficulty: qData.difficulty,
               xp_reward: qData.xp_reward
             }
@@ -127,7 +121,6 @@ function DashboardHQ() {
     setMutatingIds(prev => { const next = new Set(prev); next.delete(habitId); return next; });
   };
 
-  // Math for City Glow and XP Badge
   const completedCount = habits.filter(h => h.completed).length;
   const completionPercent = habits.length === 0 ? 0 : Math.round((completedCount / habits.length) * 100);
   const xpProgressPercent = stats ? Math.min(100, Math.max(0, (stats.current_level_xp / stats.next_level_xp) * 100)) : 0;
@@ -160,7 +153,7 @@ function DashboardHQ() {
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans selection:bg-cyan-500/30 selection:text-cyan-100 overflow-x-hidden">
       <div className="max-w-4xl mx-auto space-y-12 pb-24">
         
-        {/* 1. WELCOME HEADER & STATS */}
+        {/* 1. WELCOME HEADER */}
         <header className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-700 ease-out">
           <div>
             <h1 className="text-3xl md:text-5xl font-black text-white tracking-tight leading-tight">
@@ -171,26 +164,18 @@ function DashboardHQ() {
             </h1>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Connection Indicator */}
+          <div className="flex items-center gap-4">
             <div className="hidden md:flex items-center gap-2 text-[10px] font-black uppercase tracking-widest bg-slate-900/50 border border-white/5 px-3 py-2 rounded-xl" aria-live="polite">
               {connectionStatus === 'connected' ? <Wifi className="w-3.5 h-3.5 text-emerald-400" /> : <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />}
             </div>
             
-            {/* Streak Badge */}
-            <div className="flex items-center gap-2 bg-slate-900/80 backdrop-blur-md border border-white/10 px-4 py-2.5 rounded-full shadow-lg transition-transform hover:-translate-y-0.5">
+            <div className="flex items-center gap-2 bg-slate-900/80 backdrop-blur-md border border-white/10 px-4 py-2.5 rounded-2xl shadow-lg transition-transform hover:-translate-y-0.5">
               <Flame className="w-5 h-5 text-amber-500 drop-shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
-              <span className="text-base font-black text-white">{stats.streak_days}</span>
+              <span className="text-lg font-black text-white">{stats.streak_days}</span>
             </div>
 
-            {/* Premium XP Badge Integration (Properly passing all 4 props) */}
             <div className="transition-transform hover:-translate-y-0.5">
-              <XpBadge 
-                xp={stats.total_xp} 
-                level={stats.level} 
-                pct={xpProgressPercent} 
-                variantId="dash-header" 
-              />
+              <XpBadge xp={stats.total_xp} level={stats.level} pct={xpProgressPercent} variantId="dash-header" />
             </div>
           </div>
         </header>
@@ -271,26 +256,36 @@ function DashboardHQ() {
           </div>
         </section>
 
-        {/* 5. OUTSTAND INTEGRATION */}
+        {/* 5. OUTSTAND GATEWAY (Router-Safe Integration) */}
         <section className="pt-8 animate-in fade-in duration-1000 delay-500">
           <div className="mb-6 flex items-center gap-3">
              <div className="w-2 h-8 bg-violet-500 rounded-full shadow-[0_0_10px_#8b5cf6]" />
-             <h2 className="text-2xl font-black text-white tracking-tight">Outstand Challenges</h2>
+             <h2 className="text-2xl font-black text-white tracking-tight">Outstand Mastery</h2>
           </div>
           
-          <div className="bg-slate-900/30 rounded-3xl border border-violet-500/20 shadow-[0_0_40px_rgba(139,92,246,0.05)] overflow-hidden">
-            {OutstandRoute.options.component ? (
-               <OutstandRoute.options.component />
-            ) : (
-               <div className="p-12 text-center text-slate-500 font-bold uppercase tracking-widest">
-                 Outstand Module Initializing...
+          <Link 
+            to="/outstand"
+            className="group relative block w-full overflow-hidden rounded-3xl bg-slate-900/40 border border-violet-500/20 hover:border-violet-500/50 transition-all duration-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="p-8 sm:p-10 flex flex-col sm:flex-row items-center justify-between gap-6 relative z-10">
+               <div className="flex items-center gap-6">
+                  <div className="w-16 h-16 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center shadow-[0_0_15px_rgba(139,92,246,0.2)] group-hover:scale-110 transition-transform duration-500">
+                     <Target className="w-8 h-8 text-violet-400" />
+                  </div>
+                  <div>
+                     <h3 className="text-2xl font-black text-white tracking-tight mb-1 group-hover:text-violet-300 transition-colors">Elite Challenges</h3>
+                     <p className="text-sm text-slate-400 font-medium">Access high-yield assignments to accelerate your progression.</p>
+                  </div>
                </div>
-            )}
-          </div>
+               <div className="shrink-0 bg-violet-600 text-white px-6 py-3.5 rounded-xl font-bold flex items-center gap-2 group-hover:bg-violet-500 transition-colors shadow-[0_0_20px_rgba(139,92,246,0.4)] group-active:scale-[0.98]">
+                  Enter Portal <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+               </div>
+            </div>
+          </Link>
         </section>
 
       </div>
     </div>
   );
-        }
-      
+}
