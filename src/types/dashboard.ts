@@ -1,43 +1,42 @@
-export type TabType = 'overview' | 'focus' | 'protocols';
+export type TabId = 'overview' | 'focus' | 'protocols';
 
-export type QuestCategory = 'Productivity' | 'Mindset' | 'Execution' | 'Health';
-export type Difficulty = 'easy' | 'medium' | 'hard';
+export type QuestDifficulty = 'easy' | 'medium' | 'hard';
+export type QuestCategory = 'Productivity' | 'Mindset' | 'Execution';
 
 export interface Quest {
   id: string;
   title: string;
-  description?: string;
   category: QuestCategory;
+  difficulty: QuestDifficulty;
   xpReward: number;
   completed: boolean;
-  difficulty: Difficulty;
 }
 
 export interface Activity {
   id: string;
   timestamp: number;
-  type: 'quest_completed' | 'level_up' | 'focus_session' | 'achievement';
+  type: 'quest_completed' | 'focus_session' | 'protocol_completed' | 'level_up';
   description: string;
-  xpGained?: number;
+  xpAwarded: number;
 }
 
-export interface Achievement {
+export interface Protocol {
   id: string;
   title: string;
-  description: string;
-  icon: string;
-  unlocked: boolean;
-  progress: number;
-  totalRequired: number;
+  steps: { id: string; label: string; completed: boolean }[];
+  completed: boolean;
+  xpReward: number;
 }
 
-export interface UserStats {
-  level: number;
+export interface UserGamificationState {
   totalXP: number;
-  currentLevelXP: number;
-  nextLevelXP: number;
   streakDays: number;
-  bestStreak: number;
   focusMinutesToday: number;
-  questsCompletedToday: number;
+}
+
+export interface LevelData {
+  level: number;
+  currentLevelXP: number;
+  xpRequiredForNextLevel: number;
+  progressPercentage: number;
 }
