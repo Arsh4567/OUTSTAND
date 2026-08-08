@@ -84,7 +84,7 @@ const triggerHaptic = (type: "light" | "success" | "heavy") => {
 // ============================================================================
 
 export function OutstandPage() {
-  const { challengeId } = Route.useSearch();
+ const { challengeId } = Route.useSearch({ strict: false });
   const {
     challenge, running, setRunning, setRemaining, isShuffling,
     shuffleDisplay, completionStage, generate, complete, mins, secs, loadChallenge,
