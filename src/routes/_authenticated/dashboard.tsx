@@ -24,14 +24,7 @@ import type { DailyQuest } from '../../types/dashboard';
 export const Route = createFileRoute('/_authenticated/dashboard')({
   component: DashboardHQ,
 });
-export default function Dashboard() {
-  return (
-    <div className="p-8 bg-[#02040a] min-h-screen">
-      <h1 className="text-3xl font-bold text-white mb-8">My City</h1>
-      <CityEngine />
-    </div>
-  );
-}
+
 // Smooth animations
 const ease = [0.22, 1, 0.36, 1];
 
@@ -52,8 +45,6 @@ function DashboardHQ() {
   const [isPortalActive, setIsPortalActive] = useState(false);
   const [isPortalFullyOpen, setIsPortalFullyOpen] = useState(false);
   const portalRef = useRef<any>(null);
-  
-  // NEW: Ref to mount the WebGL Canvas
   const portalContainerRef = useRef<HTMLDivElement>(null);
 
   // 1. Fetch Real User Data & Name
@@ -65,7 +56,6 @@ function DashboardHQ() {
         const uid = session.user.id;
         setUserId(uid);
 
-        // Fetch REAL name from onboarding
         const rawName = session.user.user_metadata?.full_name || session.user.user_metadata?.first_name || session.user.user_metadata?.username;
         if (rawName) setUserName(rawName.split(' ')[0]);
 
@@ -138,7 +128,6 @@ function DashboardHQ() {
 
     setMutatingIds(prev => new Set(prev).add(habitId));
 
-    // Optimistic UI Update
     setHabits(prev => prev.map(h => h.id === habitId ? { ...h, completed: true } : h));
 
     const { error } = await supabase.rpc('complete_daily_quest', { p_daily_quest_id: habitId });
@@ -155,13 +144,11 @@ function DashboardHQ() {
 
   // 4. Portal Engine Lifecycle
   useEffect(() => {
-    // Only initialize if the portal is active AND the container DOM element exists
-    if (isPortalActive && portalContainerRef.current) {
+    if (isPortalActive && portalContainerRef.current && !portalRef.current) {
       portalRef.current = new PortalEngine({
-        container: portalContainerRef.current, // <-- Hooking up the DOM element
+        container: portalContainerRef.current, 
         quality: Quality.ULTRA,
         onOpen: () => {
-          // Triggered when cinematic tear finishes
           setIsPortalFullyOpen(true);
         }
       });
@@ -169,7 +156,6 @@ function DashboardHQ() {
     }
 
     return () => {
-      // Cleanup WebGL on close
       if (portalRef.current) {
         portalRef.current.dispose();
         portalRef.current = null;
@@ -211,14 +197,14 @@ function DashboardHQ() {
       {isPortalActive && (
         <div className="fixed inset-0 z-[10000] flex flex-col bg-black/90">
           
-          {/* NEW: Canvas Container for PortalEngine */}
+          {/* FIX: Removed pointer-events-none and adjusted z-index so WebGL works */}
           <div 
             ref={portalContainerRef} 
-            className="absolute inset-0 z-[10000] pointer-events-none overflow-hidden" 
+            className="absolute inset-0 z-0 overflow-hidden" 
           />
 
-          {/* Close Button (z-index higher than the WebGL canvas) */}
-          <div className="absolute top-6 right-6 z-[10002]">
+          {/* Close Button */}
+          <div className="absolute top-6 right-6 z-50">
             <button 
               onClick={closePortal}
               className="bg-black/60 backdrop-blur-xl border border-white/20 p-3 rounded-full hover:bg-red-500/20 hover:border-red-500 transition-all focus:outline-none shadow-[0_0_20px_rgba(0,0,0,0.5)]"
@@ -235,7 +221,7 @@ function DashboardHQ() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ duration: 0.8, ease }}
-                className="relative z-[10001] flex-1 overflow-y-auto px-4 md:px-8 pb-20 pt-24"
+                className="relative z-10 flex-1 overflow-y-auto px-4 md:px-8 pb-20 pt-24"
               >
                 {OutstandRoute.options.component ? (
                   <OutstandRoute.options.component />
@@ -278,11 +264,26 @@ function DashboardHQ() {
           </div>
         </header>
 
-        {/* 2. ENERGETIC DAILY QUOTE */}
+        {/* 2. MY CITY (Integrated 3D Module) */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.15, ease }}
+          className="relative w-full rounded-[2.5rem] border border-white/10 shadow-2xl overflow-hidden bg-black"
+        >
+          <div className="absolute top-6 left-8 z-10 pointer-events-none">
+            <h2 className="text-3xl font-black text-white tracking-tight drop-shadow-md">My City</h2>
+            <p className="text-slate-400 text-sm font-medium mt-1 drop-shadow-md">Your progress visualizer</p>
+          </div>
+          {/* Render the actual City Engine */}
+          <CityEngine />
+        </motion.section>
+
+        {/* 3. ENERGETIC DAILY QUOTE */}
         <motion.section 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.1, ease }}
+          transition={{ duration: 0.8, delay: 0.2, ease }}
           className="relative px-8 py-10 rounded-[2.5rem] bg-gradient-to-br from-indigo-950/40 to-[#0a0020] border border-cyan-500/20 shadow-[0_20px_50px_-20px_rgba(34,211,238,0.2)] group"
         >
           <div className="absolute top-0 left-0 w-2 h-full bg-gradient-to-b from-cyan-400 to-fuchsia-500 rounded-l-[2.5rem] shadow-[0_0_30px_rgba(34,211,238,0.6)]" />
@@ -305,11 +306,11 @@ function DashboardHQ() {
           </div>
         </motion.section>
 
-        {/* 3. YOUR HABITS (With Energetic Icons & Micro-transitions) */}
+        {/* 4. YOUR HABITS */}
         <motion.section 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2, ease }}
+          transition={{ duration: 0.8, delay: 0.3, ease }}
           className="space-y-6"
         >
           <h2 className="text-3xl font-black text-white tracking-tight flex items-center gap-4">
@@ -371,11 +372,11 @@ function DashboardHQ() {
           </div>
         </motion.section>
 
-        {/* 4. THE PORTAL BUTTON */}
+        {/* 5. THE PORTAL BUTTON */}
         <motion.section 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.3, ease }}
+          transition={{ duration: 0.8, delay: 0.4, ease }}
           className="pt-10 pb-20"
         >
           <button
@@ -401,5 +402,5 @@ function DashboardHQ() {
       </div>
     </div>
   );
-                            }
-                                     
+            }
+        
