@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { XpBadge } from '../../components/xp-badge';
 import { QUOTES } from '../../lib/quotes';
 import { PortalEngine, Quality } from '../../lib/portal-effect';
+import { CityEngine } from "@/components/city/CityEngine";
 
 // Safely grabbing the Outstand route component
 // @ts-ignore
@@ -23,7 +24,14 @@ import type { DailyQuest } from '../../types/dashboard';
 export const Route = createFileRoute('/_authenticated/dashboard')({
   component: DashboardHQ,
 });
-
+export default function Dashboard() {
+  return (
+    <div className="p-8 bg-[#02040a] min-h-screen">
+      <h1 className="text-3xl font-bold text-white mb-8">My City</h1>
+      <CityEngine />
+    </div>
+  );
+}
 // Smooth animations
 const ease = [0.22, 1, 0.36, 1];
 
