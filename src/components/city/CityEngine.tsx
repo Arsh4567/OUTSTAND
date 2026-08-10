@@ -1,154 +1,36 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrthographicCamera, OrbitControls, Environment } from '@react-three/drei';
+import { 
+  OrbitControls, 
+  Environment, 
+  useGLTF, 
+  PerspectiveCamera,
+  ContactShadows
+} from '@react-three/drei';
 
 // ==========================================
-// 1. DATA MODELS & CONFIG
+// 1. THE 3D MODEL LOADER
 // ==========================================
-type TileType = 'empty' | 'road' | 'building' | 'tree';
-type BuildingType = 'house_lv1' | 'house_lv2' | 'shop';
-
-interface CityTile {
-  id: string;
-  x: number;
-  z: number;
-  type: TileType;
-  buildingType?: BuildingType;
-  color?: string;
-  rotation?: number;
-}
-
-const INDIAN_COLORS = [
-  '#2dd4bf', // Teal (Very common in Indian plaster)
-  '#fcd34d', // Warm Ochre/Yellow
-  '#f472b6', // Faded Pink
-  '#f8fafc', // Whitewash
-  '#93c5fd', // Sky Blue
-];
-
-// ==========================================
-// 2. PROCEDURAL CITY GENERATOR
-// ==========================================
-function generateCityState(size: number): CityTile[] {
-  const tiles: CityTile[] = [];
-  const half = Math.floor(size / 2);
-
-  for (let x = -half; x <= half; x++) {
-    for (let z = -half; z <= half; z++) {
-      let type: TileType = 'empty';
-      let buildingType: BuildingType | undefined;
-      let color: string | undefined;
-      let rotation = 0;
-
-      // 1. Carve the Roads (Main cross intersection)
-      const isMainRoad = x === 0;
-      const isCrossRoad = z === 0;
-      
-      if (isMainRoad || isCrossRoad) {
-        type = 'road';
-      } 
-      // 2. Zone Buildings (Must be adjacent to a road)
-      else if (Math.abs(x) === 1 || Math.abs(z) === 1) {
-        // 60% chance to spawn a building on a valid lot
-        if (Math.random() > 0.4) {
-          type = 'building';
-          color = INDIAN_COLORS[Math.floor(Math.random() * INDIAN_COLORS.length)];
-          
-          // Face the road
-          if (x === 1) rotation = -Math.PI / 2;
-          else if (x === -1) rotation = Math.PI / 2;
-          else if (z === 1) rotation = 0;
-          else if (z === -1) rotation = Math.PI;
-
-          // Determine building type
-          const rand = Math.random();
-          if (rand > 0.8) buildingType = 'shop';
-          else if (rand > 0.4) buildingType = 'house_lv2';
-          else buildingType = 'house_lv1';
-        }
-      } 
-      // 3. Zone Greenery (Behind houses)
-      else {
-        if (Math.random() > 0.85) {
-          type = 'tree';
-        }
-      }
-
-      tiles.push({ id: `${x},${z}`, x, z, type, buildingType, color, rotation });
-    }
-  }
-  return tiles;
-}
-
-// ==========================================
-// 3. 3D COMPONENTS
-// ==========================================
-
-// Indian Signature: The Black Sintex Water Tank
-const WaterTank = ({ position }: { position: [number, number, number] }) => (
-  <mesh position={position} castShadow>
-    <cylinderGeometry args={[0.15, 0.15, 0.35, 16]} />
-    <meshStandardMaterial color="#111111" roughness={0.6} />
-  </mesh>
-);
-
-const Building = ({ tile }: { tile: CityTile }) => {
-  const isShop = tile.buildingType === 'shop';
-  const isLv2 = tile.buildingType === 'house_lv2';
+function DetailedHouse() {
+  // This line loads your exact downloaded file from the public folder
+  const { scene } = useGLTF('/models/modern_luxury_villa_house_building_with_pool.glb');
 
   return (
-    <group position={[tile.x, 0, tile.z]} rotation={[0, tile.rotation || 0, 0]}>
-      {/* Ground Floor */}
-      <mesh position={[0, 0.4, 0]} castShadow receiveShadow>
-        <boxGeometry args={[0.9, 0.8, 0.9]} />
-        <meshStandardMaterial color={tile.color} roughness={0.9} />
-      </mesh>
-
-      {/* Shop Awning (If it's a shop) */}
-      {isShop && (
-        <mesh position={[0, 0.5, 0.46]} castShadow>
-          <boxGeometry args={[0.9, 0.05, 0.4]} />
-          <meshStandardMaterial color="#ef4444" roughness={0.7} /> {/* Red Awning */}
-        </mesh>
-      )}
-
-      {/* Second Floor (If Level 2) */}
-      {isLv2 && (
-        <mesh position={[0, 1.1, -0.1]} castShadow receiveShadow>
-          <boxGeometry args={[0.9, 0.6, 0.7]} />
-          <meshStandardMaterial color={tile.color} roughness={0.9} />
-        </mesh>
-      )}
-
-      {/* Water Tank */}
-      <WaterTank position={[0.25, isLv2 ? 1.5 : 0.9, isLv2 ? -0.2 : 0]} />
-    </group>
+    <primitive 
+      object={scene} 
+      // SCALING TIP: If the house is too big, change this to 0.1 or 0.01. If too small, change to 10.
+      scale={1} 
+      // POSITION TIP: The middle number (Y-axis) moves it up and down. 
+      position={[0, 0, 0]} 
+    />
   );
-};
-
-const Tree = ({ position }: { position: [number, number, number] }) => (
-  <group position={position}>
-    {/* Trunk */}
-    <mesh position={[0, 0.3, 0]} castShadow>
-      <cylinderGeometry args={[0.05, 0.08, 0.6]} />
-      <meshStandardMaterial color="#78350f" />
-    </mesh>
-    {/* Leaves */}
-    <mesh position={[0, 0.8, 0]} castShadow>
-      <sphereGeometry args={[0.35, 7, 7]} />
-      <meshStandardMaterial color="#15803d" roughness={0.8} />
-    </mesh>
-  </group>
-);
+}
 
 // ==========================================
-// 4. MAIN ENGINE COMPONENT
+// 2. THE MAIN ENGINE
 // ==========================================
-export function CityEngine() {
+export function EstateEngine() {
   const [isMounted, setIsMounted] = useState(false);
-
-  // Generate the city data once (11x11 grid)
-  const cityTiles = useMemo(() => generateCityState(11), []);
 
   useEffect(() => {
     setIsMounted(true);
@@ -156,81 +38,75 @@ export function CityEngine() {
 
   if (!isMounted) {
     return (
-      <div className="w-full h-[500px] rounded-[2.5rem] overflow-hidden border border-white/10 bg-slate-900 animate-pulse flex items-center justify-center">
-        <span className="text-white/50 font-bold uppercase tracking-widest text-xs">Initializing City Grid...</span>
+      <div className="w-full h-[500px] md:h-[600px] rounded-[2.5rem] overflow-hidden border border-white/10 bg-[#0a0f1a] animate-pulse flex items-center justify-center">
+        <span className="text-white/50 font-bold uppercase tracking-widest text-xs">Loading Estate Engine...</span>
       </div>
     );
   }
 
   return (
-    <div className="w-full h-[500px] md:h-[600px] rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 bg-gradient-to-b from-[#87CEEB] to-[#e0f2fe] relative">
+    <div className="w-full h-[500px] md:h-[600px] rounded-[2.5rem] overflow-hidden shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)] border border-white/10 bg-gradient-to-b from-[#1e293b] to-[#0f172a] relative">
       
-      {/* Decorative Overlay Frame */}
-      <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_100px_rgba(0,0,0,0.2)] z-10" />
+      {/* Decorative Vignette Overlay for a premium UI feel */}
+      <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_100px_rgba(0,0,0,0.6)] z-10" />
 
       <Canvas shadows>
         
-        {/* CAMERA: Zoomed out slightly to fit the 11x11 grid */}
-        <OrthographicCamera 
+        {/* CAMERA: Adjusted slightly higher to see the pool and roof */}
+        <PerspectiveCamera 
           makeDefault 
-          position={[25, 25, 25]} 
-          zoom={25} 
-          near={-100} 
-          far={100}
+          position={[15, 12, 15]} 
+          fov={45} 
         />
         
         <OrbitControls 
-          enableRotate={false} 
           enablePan={true} 
           enableZoom={true} 
-          minZoom={15}
-          maxZoom={60}
+          minDistance={1} // Allows you to zoom all the way inside the rooms
+          maxDistance={50} // Allows you to zoom out and see the whole villa
+          maxPolarAngle={Math.PI / 2 - 0.05} // Stops the camera from going under the grass
         />
 
         {/* LIGHTING */}
-        <ambientLight intensity={0.5} />
+        <ambientLight intensity={0.6} />
+        
         <directionalLight 
           castShadow 
           position={[15, 20, 10]} 
-          intensity={1.2} 
+          intensity={2} 
+          shadow-bias={-0.0001}
           shadow-mapSize={[2048, 2048]}
-          shadow-camera-left={-10}
-          shadow-camera-right={10}
-          shadow-camera-top={10}
-          shadow-camera-bottom={-10}
         />
-        <Environment preset="city" />
+        
+        {/* This Environment tag adds realistic glass reflections and bounces light into the interior rooms */}
+        <Environment preset="apartment" /> 
 
-        {/* THE CITY GRID */}
-        <group position={[0, -0.5, 0]}>
+        <group position={[0, -1, 0]}>
           
-          {/* Main Base Plate (Dirt/Grass foundation) */}
-          <mesh position={[0, -0.1, 0]} receiveShadow>
-            <boxGeometry args={[11, 0.2, 11]} />
-            <meshStandardMaterial color="#86efac" roughness={1} /> {/* Light grassy green */}
+          {/* Ground Plane - Lowered slightly to -0.1 to prevent glitching with the villa's pool/floor */}
+          <mesh position={[0, -0.1, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[100, 100]} />
+            <meshStandardMaterial color="#0f172a" roughness={0.8} />
           </mesh>
 
-          {/* Render Tiles */}
-          {cityTiles.map((tile) => {
-            if (tile.type === 'road') {
-              return (
-                <mesh key={tile.id} position={[tile.x, 0.01, tile.z]} receiveShadow>
-                  <planeGeometry args={[1, 1]} />
-                  <meshStandardMaterial color="#475569" roughness={0.9} /> {/* Asphalt Grey */}
-                </mesh>
-              );
-            }
-            if (tile.type === 'building') {
-              return <Building key={tile.id} tile={tile} />;
-            }
-            if (tile.type === 'tree') {
-              return <Tree key={tile.id} position={[tile.x, 0, tile.z]} />;
-            }
-            return null; // Empty lot
-          })}
-        </group>
+          {/* Fake soft grounding shadow */}
+          <ContactShadows position={[0, -0.05, 0]} opacity={0.6} scale={25} blur={2.5} far={4} />
 
+          {/* Suspense waits for the GLB file to download before rendering it */}
+          <Suspense fallback={
+            <mesh position={[0, 1, 0]}>
+              <boxGeometry args={[2, 2, 2]} />
+              <meshBasicMaterial color="#38bdf8" wireframe />
+            </mesh>
+          }>
+            <DetailedHouse />
+          </Suspense>
+
+        </group>
       </Canvas>
     </div>
   );
-      }
+}
+
+// Preloads the specific model into the browser cache
+useGLTF.preload('/models/modern_luxury_villa_house_building_with_pool.glb');
