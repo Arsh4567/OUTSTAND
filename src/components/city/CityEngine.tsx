@@ -29,7 +29,7 @@ function DetailedHouse() {
 // ==========================================
 // 2. THE MAIN ENGINE
 // ==========================================
-export function EstateEngine() {
+export function CityEngine() {
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
