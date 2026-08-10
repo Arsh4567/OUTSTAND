@@ -13,9 +13,9 @@
     "format": "prettier --write ."
   },
   "dependencies": {
-    "@react-three/fiber": "^8.15.0",
-    "@react-three/drei": "^9.96.0",
-   "three": "^0.164.0",
+    "three": "^0.160.0",
+    "@react-three/fiber": "^9.0.0",
+    "@react-three/drei": "^10.0.0",
     "@ai-sdk/google": "latest",
     "@ai-sdk/openai-compatible": "latest",
     "@ai-sdk/react": "latest",
