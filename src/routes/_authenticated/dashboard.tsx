@@ -20,7 +20,6 @@ import {
   Compass,
 } from "lucide-react";
 import { supabase } from "../../integrations/supabase/client";
-import { CityEngine } from "@/components/city/CityEngine";
 import { OutstandPage } from "./outstand";
 import { XpBadge } from "../../components/xp-badge";
 import { QUOTES } from "../../lib/quotes";
@@ -323,51 +322,73 @@ function DashboardHQ() {
             </div>
           </div>
 
-          <div className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-6 shadow-xl backdrop-blur-2xl">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-400"><Activity className="h-4 w-4 text-emerald-300" /> Rhythm</div>
-            <div className="mt-7 flex items-end gap-2"><span className="text-5xl font-black tracking-tight text-white">{completedCount}</span><span className="pb-1 text-sm text-slate-500">done today</span></div>
-            <div className="mt-5 grid grid-cols-7 gap-1.5">
-              {Array.from({ length: 7 }).map((_, index) => (
-                <motion.div key={index} initial={{ opacity: 0, scaleY: 0.5 }} animate={{ opacity: 1, scaleY: 1 }} transition={{ delay: index * 0.04 }} className={`h-14 origin-bottom rounded-md ${index < Math.max(2, Math.min(7, completedCount + 2)) ? "bg-gradient-to-t from-cyan-500/50 to-cyan-300/80" : "bg-white/5"}`} />
+          <div className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 shadow-xl backdrop-blur-2xl sm:p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-slate-300"><Flame className="h-4 w-4 text-amber-300" /> Rhythm</div>
+              <Activity className="h-4 w-4 text-slate-600" />
+            </div>
+            <div className="mt-6 flex items-end gap-1.5">
+              {[32, 54, 42, 72, 58, 86, Math.max(18, completionPct)].map((height, index) => (
+                <motion.div key={index} initial={{ height: 0 }} animate={{ height: `${height}%` }} transition={{ duration: 0.55 + index * 0.05, delay: index * 0.04 }} className="w-full rounded-full bg-gradient-to-t from-cyan-400/25 to-cyan-300/75" />
               ))}
             </div>
-            <p className="mt-4 text-xs leading-5 text-slate-500">Consistency beats intensity. Keep the streak alive.</p>
+            <p className="mt-5 text-sm font-semibold text-white">{streak} day{streak === 1 ? "" : "s"} in a row</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">Consistency compounds faster than intensity.</p>
           </div>
 
-          <div className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-6 shadow-xl backdrop-blur-2xl">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-400"><Trophy className="h-4 w-4 text-amber-300" /> Level progress</div>
-            <div className="mt-6 flex items-center gap-4"><div className="grid h-16 w-16 place-items-center rounded-2xl border border-amber-300/15 bg-amber-300/5 text-2xl font-black text-amber-100">{level}</div><div><div className="text-lg font-black text-white">Level {level}</div><div className="text-xs text-slate-500">Keep stacking XP</div></div></div>
-            <div className="mt-7 h-2 rounded-full bg-white/5"><motion.div initial={{ width: 0 }} animate={{ width: `${xpPct}%` }} transition={{ duration: 0.8, ease }} className="h-full rounded-full bg-gradient-to-r from-amber-300 to-fuchsia-400" /></div>
-            <div className="mt-3 flex items-center justify-between text-[11px] uppercase tracking-widest text-slate-500"><span>Current</span><span>{Math.round(xpPct)}%</span></div>
+          <div className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 shadow-xl backdrop-blur-2xl sm:p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-slate-300"><Trophy className="h-4 w-4 text-fuchsia-300" /> Level path</div>
+              <span className="text-xs font-black text-fuchsia-200">Lv {level}</span>
+            </div>
+            <p className="mt-6 text-3xl font-black tracking-tight text-white">{Math.round(xpPct)}%</p>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/5">
+              <motion.div initial={{ width: 0 }} animate={{ width: `${xpPct}%` }} transition={{ duration: 0.8, ease }} className="h-full rounded-full bg-gradient-to-r from-fuchsia-400 to-cyan-400" />
+            </div>
+            <p className="mt-4 text-xs leading-5 text-slate-500">Keep stacking completed missions to reach the next level.</p>
           </div>
         </motion.section>
 
-        <div className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
-          <motion.section variants={fadeUp} initial="hidden" animate="show" className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.025] shadow-2xl backdrop-blur-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-5 sm:px-7">
-              <div><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.22em] text-fuchsia-200/80"><ShieldCheck className="h-4 w-4" /> Daily missions</div><h2 className="mt-2 text-xl font-black text-white">Your execution queue</h2></div>
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold text-slate-300">{completedCount}/{habits.length}</span>
+        <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+          <motion.section variants={fadeUp} initial="hidden" animate="show" className="rounded-[2rem] border border-white/10 bg-white/[0.03] p-5 shadow-xl backdrop-blur-2xl sm:p-6">
+            <div className="mb-5 flex items-end justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-cyan-200/80"><CheckCircle2 className="h-4 w-4" /> Daily missions</div>
+                <h2 className="mt-2 text-2xl font-black text-white">Finish strong.</h2>
+              </div>
+              <span className="text-xs font-bold text-slate-500">{completedCount}/{habits.length || 0} complete</span>
             </div>
-            <div className="space-y-3 p-4 sm:p-5">
+
+            <div className="space-y-3">
               {habits.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-6 py-12 text-center"><Compass className="mx-auto h-8 w-8 text-slate-600" /><p className="mt-3 text-sm font-semibold text-slate-400">No missions assigned yet.</p><p className="mt-1 text-xs text-slate-600">Your next sync will populate today’s queue.</p></div>
+                <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 p-8 text-center">
+                  <Compass className="mx-auto h-7 w-7 text-slate-600" />
+                  <p className="mt-3 text-sm font-bold text-slate-400">No missions assigned yet.</p>
+                  <p className="mt-1 text-xs text-slate-600">Your next session will populate this queue.</p>
+                </div>
               ) : (
-                habits.map((habit, index) => {
+                habits.map((habit) => {
                   const isMutating = mutatingIds.has(habit.id);
                   return (
-                    <motion.button
+                    <button
                       key={habit.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.04 }}
-                      disabled={habit.completed || isMutating}
                       onClick={() => handleCompleteHabit(habit.id)}
-                      className={`group flex w-full items-center gap-4 rounded-2xl border p-4 text-left transition duration-200 ${habit.completed ? "border-emerald-400/15 bg-emerald-400/[0.04]" : "border-white/8 bg-white/[0.02] hover:-translate-y-0.5 hover:border-cyan-300/20 hover:bg-white/[0.045]"}`}
+                      disabled={habit.completed || isMutating}
+                      className={`group flex w-full items-center gap-4 rounded-2xl border p-4 text-left transition duration-200 ${habit.completed ? "border-emerald-400/10 bg-emerald-400/[0.04]" : "border-white/10 bg-black/10 hover:-translate-y-0.5 hover:border-cyan-400/25 hover:bg-white/[0.045]"}`}
                     >
-                      <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl border ${habit.completed ? "border-emerald-300/20 bg-emerald-300/10" : "border-white/10 bg-black/20"}`}><CheckCircle2 className={`h-5 w-5 ${habit.completed ? "text-emerald-300" : "text-slate-500"}`} /></div>
-                      <div className="min-w-0 flex-1"><p className={`truncate text-sm font-bold ${habit.completed ? "text-slate-400 line-through" : "text-white"}`}>{habit.quest.title}</p><div className="mt-1 flex items-center gap-3 text-[11px] uppercase tracking-widest text-slate-500"><span>{habit.quest.category}</span><span>+{habit.quest.xp_reward} XP</span></div></div>
-                      {!habit.completed && <ArrowUpRight className="h-4 w-4 text-slate-600 transition group-hover:text-cyan-300" />}
-                    </motion.button>
+                      <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${habit.completed ? "bg-emerald-400/10 text-emerald-300" : "bg-cyan-400/10 text-cyan-300"}`}>
+                        {habit.completed ? <CheckCircle2 className="h-5 w-5" /> : <Zap className="h-5 w-5" />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={`truncate text-sm font-bold ${habit.completed ? "text-emerald-100/80 line-through" : "text-white"}`}>{habit.quest.title}</p>
+                        <div className="mt-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600">
+                          <span>{habit.quest.category}</span>
+                          <span>•</span>
+                          <span>+{habit.quest.xp_reward} XP</span>
+                        </div>
+                      </div>
+                      <ArrowUpRight className="h-4 w-4 text-slate-700 transition group-hover:text-cyan-300" />
+                    </button>
                   );
                 })
               )}
@@ -375,30 +396,46 @@ function DashboardHQ() {
           </motion.section>
 
           <div className="space-y-6">
-            <motion.section variants={fadeUp} initial="hidden" animate="show" className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-slate-950 via-slate-950/95 to-cyan-950/20 p-6 shadow-2xl">
-              <Quote className="absolute right-4 top-4 h-20 w-20 text-cyan-300/[0.07]" />
-              <div className="relative"><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.22em] text-cyan-200/75"><Quote className="h-4 w-4" /> Signal</div><p className="mt-5 text-lg font-bold leading-7 text-slate-100">“{dailyQuote.quote}”</p><div className="mt-4 flex flex-wrap items-center gap-3"><span className="rounded-full border border-cyan-400/15 bg-cyan-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-cyan-200">{dailyQuote.author}</span><span className="text-xs text-slate-500">{dailyQuote.application}</span></div></div>
+            <motion.section variants={fadeUp} initial="hidden" animate="show" className="rounded-[2rem] border border-white/10 bg-white/[0.03] p-6 shadow-xl backdrop-blur-2xl">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-fuchsia-200/80"><Quote className="h-4 w-4" /> Signal</div>
+              <p className="mt-5 text-xl font-bold leading-8 text-white">“{dailyQuote.quote}”</p>
+              <div className="mt-5 flex flex-wrap items-center gap-3 text-xs">
+                <span className="rounded-full border border-fuchsia-400/15 bg-fuchsia-400/10 px-3 py-1.5 font-black uppercase tracking-widest text-fuchsia-200">{dailyQuote.author}</span>
+                {dailyQuote.application && <span className="text-slate-500">{dailyQuote.application}</span>}
+              </div>
             </motion.section>
 
-            <motion.section variants={fadeUp} initial="hidden" animate="show" className="rounded-[2rem] border border-white/10 bg-white/[0.025] p-6 shadow-2xl backdrop-blur-2xl">
-              <div className="flex items-center justify-between"><div><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.22em] text-amber-200/80"><Clock3 className="h-4 w-4" /> Quick launch</div><h3 className="mt-2 text-lg font-black text-white">Start without thinking</h3></div><Sparkles className="h-5 w-5 text-amber-300/80" /></div>
+            <motion.section variants={fadeUp} initial="hidden" animate="show" className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-indigo-500/[0.07] to-cyan-400/[0.03] p-6 shadow-xl backdrop-blur-2xl">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-cyan-200/80"><ShieldCheck className="h-4 w-4" /> Quick launch</div>
               <div className="mt-5 grid grid-cols-2 gap-3">
-                <button onClick={() => setIsPortalActive(true)} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-left transition hover:border-cyan-300/20 hover:bg-cyan-300/[0.04]"><Focus className="h-5 w-5 text-cyan-300" /><div className="mt-3 text-sm font-bold text-white">Deep focus</div><div className="mt-1 text-[11px] text-slate-500">Open your focus space</div></button>
-                <button onClick={() => document.getElementById("daily-city")?.scrollIntoView({ behavior: "smooth" })} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-left transition hover:border-fuchsia-300/20 hover:bg-fuchsia-300/[0.04]"><Compass className="h-5 w-5 text-fuchsia-300" /><div className="mt-3 text-sm font-bold text-white">Open city</div><div className="mt-1 text-[11px] text-slate-500">See your progress world</div></button>
+                <button onClick={() => setIsPortalActive(true)} className="rounded-2xl border border-white/10 bg-black/15 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-400/25">
+                  <Focus className="h-5 w-5 text-cyan-300" />
+                  <p className="mt-3 text-sm font-black text-white">Focus portal</p>
+                  <p className="mt-1 text-xs text-slate-600">Start a deep session</p>
+                </button>
+                <div className="rounded-2xl border border-white/10 bg-black/10 p-4 text-left">
+                  <Clock3 className="h-5 w-5 text-fuchsia-300" />
+                  <p className="mt-3 text-sm font-black text-white">Today</p>
+                  <p className="mt-1 text-xs text-slate-600">{completedCount} missions cleared</p>
+                </div>
               </div>
             </motion.section>
           </div>
         </div>
 
-        <motion.section id="daily-city" variants={fadeUp} initial="hidden" animate="show" className="mt-6 overflow-hidden rounded-[2rem] border border-white/10 bg-black shadow-2xl">
-          <div className="flex flex-col gap-3 border-b border-white/10 bg-white/[0.02] px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
-            <div><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.22em] text-indigo-200/80"><Compass className="h-4 w-4" /> Your world</div><h2 className="mt-2 text-xl font-black text-white">My City</h2><p className="mt-1 text-sm text-slate-500">A visual layer for the work you’re actually doing.</p></div>
-            <div className="flex items-center gap-2 text-xs text-slate-500"><span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(110,231,183,0.8)]" /> Live progress</div>
+        <motion.section variants={fadeUp} initial="hidden" animate="show" className="mt-6 overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-white/[0.035] to-cyan-500/[0.025] p-6 shadow-xl backdrop-blur-2xl sm:p-7">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-slate-300"><Activity className="h-4 w-4 text-cyan-300" /> Momentum</div>
+              <h2 className="mt-2 text-2xl font-black text-white">Your dashboard should feel alive.</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">Everything here is designed to reduce friction: fewer decisions, stronger feedback, and a clear next action.</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-400/10 bg-emerald-400/[0.04] px-4 py-3 text-sm">
+              <p className="font-black text-emerald-200">Keep the chain going.</p>
+              <p className="mt-1 text-xs text-emerald-200/40">One completed action is enough for the next step.</p>
+            </div>
           </div>
-          <div className="min-h-[360px]"><CityEngine /></div>
         </motion.section>
-
-        <motion.footer variants={fadeUp} initial="hidden" animate="show" className="pt-3 text-center text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-600">Build momentum • protect your attention • outstand the ordinary</motion.footer>
       </main>
     </div>
   );
