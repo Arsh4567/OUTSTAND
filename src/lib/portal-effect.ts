@@ -12,12 +12,19 @@ export enum Quality { LOW, MEDIUM, HIGH, ULTRA }
 
 export interface PortalConfig {
   quality: Quality;
-  coreColors: number[];    // Inner void colors
-  edgeColors: number[];    // Outer glowing rim
-  duration: number;        // Total time open
+  coreColors: number[];
+  edgeColors: number[];
+  duration: number;
   particleCount: number;
   bloomIntensity: number;
   distortionStrength: number;
+
+  /**
+   * Optional existing DOM container.
+   * If supplied, the engine mounts its WebGL canvas here.
+   */
+  container?: HTMLDivElement;
+
   onOpen?: () => void;
   onClose?: () => void;
   soundHook?: (event: 'gather' | 'tear' | 'hum' | 'collapse') => void;
