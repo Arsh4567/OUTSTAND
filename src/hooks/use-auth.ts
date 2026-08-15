@@ -59,10 +59,6 @@ export function useAuth() {
           return;
         }
         setProfile(data ?? { id: user.id, display_name: null, full_name: null, avatar_url: null });
-      })
-      .catch((err) => {
-        console.error("Unhandled profile fetch error:", err);
-        setProfile({ id: user.id });
       });
   }, [user]);
 

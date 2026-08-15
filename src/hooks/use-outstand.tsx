@@ -70,7 +70,7 @@ export function useOutstand() {
     
     // Safely mapping the old color schema to the new dynamic themes if required
     // Defaulting to the Outstand Indigo hex if the color prop is missing
-    const challengeColor = challenge.theme?.gradientFrom || '#4f46e5'; 
+    const challengeColor = challenge.theme?.particleColors?.[0] || '#4f46e5'; 
     
     setRunning(false);
     setCompletionStage(1); 
