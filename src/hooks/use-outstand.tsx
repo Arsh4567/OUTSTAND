@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { MutableRefObject } from "react";
 import { toast } from "sonner";
 import { useAppState } from "@/hooks/use-app-state";
 import { useDailyLog } from "@/hooks/use-dopamine";
@@ -20,7 +21,7 @@ export function useOutstand() {
   const completionTimersRef = useRef<number[]>([]);
   const mountedRef = useRef(true);
 
-  const clearTimer = useCallback((ref: React.MutableRefObject<number | null>) => {
+  const clearTimer = useCallback((ref: MutableRefObject<number | null>) => {
     if (ref.current !== null) {
       window.clearInterval(ref.current);
       ref.current = null;
@@ -46,13 +47,11 @@ export function useOutstand() {
       const temp = CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)];
       setShuffleDisplay({ emoji: temp.emoji, title: temp.title });
       ticks += 1;
-
       if (ticks > 12) {
         clearTimer(shuffleRef);
         const next = randomChallenge(challenge?.title);
-        const duration = Math.max(1, Number(next.durationMinutes ?? 10)) * 60;
         setChallenge(next);
-        setRemaining(duration);
+        setRemaining(Math.max(1, Number(next.durationMinutes ?? 10)) * 60);
         setIsShuffling(false);
       }
     }, 80);
@@ -64,7 +63,6 @@ export function useOutstand() {
       console.warn(`Outstand challenge with ID "${id}" not found.`);
       return;
     }
-
     clearTimer(intervalRef);
     clearTimer(shuffleRef);
     clearCompletionTimers();
@@ -93,18 +91,15 @@ export function useOutstand() {
     return () => clearTimer(intervalRef);
   }, [clearTimer, running, remaining]);
 
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-      clearTimer(intervalRef);
-      clearTimer(shuffleRef);
-      clearCompletionTimers();
-    };
+  useEffect(() => () => {
+    mountedRef.current = false;
+    clearTimer(intervalRef);
+    clearTimer(shuffleRef);
+    clearCompletionTimers();
   }, [clearCompletionTimers, clearTimer]);
 
   const complete = useCallback(() => {
     if (!challenge || completionStage !== 0) return;
-
     const xpEarned = Math.max(0, Number(challenge.xp ?? 50));
     const challengeEmoji = challenge.emoji;
     const challengeColor = challenge.color || "#4f46e5";
@@ -116,7 +111,6 @@ export function useOutstand() {
     clearCompletionTimers();
     setRunning(false);
     setCompletionStage(1);
-
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([20, 100, 30, 80, 50, 50, 100]);
 
     void supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -152,19 +146,5 @@ export function useOutstand() {
     }, 2800));
   }, [addPositive, challenge, clearCompletionTimers, clearTimer, completionStage, recordOutstand]);
 
-  return {
-    challenge,
-    remaining,
-    running,
-    setRunning,
-    setRemaining,
-    isShuffling,
-    shuffleDisplay,
-    completionStage,
-    generate,
-    complete,
-    loadChallenge,
-    mins: Math.floor(remaining / 60),
-    secs: remaining % 60,
-  };
+  return { challenge, remaining, running, setRunning, setRemaining, isShuffling, shuffleDisplay, completionStage, generate, complete, loadChallenge, mins: Math.floor(remaining / 60), secs: remaining % 60 };
 }
