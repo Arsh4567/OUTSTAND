@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat, type UIMessage } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
 import { Bot, Trash2, X, PlusCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -68,18 +69,12 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
 
   const { messages, status, sendMessage, stop, error } = useChat({
     id: "outstand-assistant",
-    api: "/api/chat",
     initialMessages,
     generateId: generateSafeId,
-    body: { appContext: appContextRef.current },
-    fetch: async (url, options) => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) throw new Error("Your session has expired. Please sign in again.");
-
-      const headers = new Headers(options?.headers);
-      headers.set("Authorization", `Bearer ${session.access_token}`);
-      return fetch(url, { ...options, headers });
-    },
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      credentials: "same-origin",
+    }),
     onError: (err) => {
       console.error("AI SDK Error:", err);
       toast.error(err.message || "The assistant could not respond.");
@@ -91,10 +86,23 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
   const handleSubmit = async (event?: React.FormEvent) => {
     event?.preventDefault();
     const text = input.trim();
-    if (!text || isStreaming) return;
+    if (!text || isStreaming || serverAvailable === false) return;
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      toast.error("Your session has expired. Please sign in again.");
+      return;
+    }
+
     setInput("");
     try {
-      await sendMessage({ text });
+      await sendMessage(
+        { text },
+        {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          body: { appContext: appContextRef.current },
+        },
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : "Could not send message.";
       console.error("AI message error:", err);
@@ -214,7 +222,7 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
             className="resize-none border-white/10 bg-slate-900/50 text-white placeholder:text-slate-600 focus:border-indigo-500/50"
           />
           <PromptInputFooter className="justify-end pt-2">
-            <PromptInputSubmit status={isStreaming ? "streaming" : "idle"} onStop={() => stop()} disabled={!input.trim() && !isStreaming || serverAvailable === false} aria-label={isStreaming ? "Stop response" : "Send message"} />
+            <PromptInputSubmit status={isStreaming ? "streaming" : "idle"} onStop={() => stop()} disabled={(!input.trim() && !isStreaming) || serverAvailable === false} aria-label={isStreaming ? "Stop response" : "Send message"} />
           </PromptInputFooter>
         </PromptInput>
       </div>
@@ -291,8 +299,8 @@ export function ChatAssistant() {
       </motion.div>
 
       <Drawer open={open} onOpenChange={setOpen}>
-        <DrawerContent className="z-[90] h-[88vh] border-white/10 bg-slate-950/95 p-0 text-white backdrop-blur-2xl">
-          <ChatPanel key={historyKey} initialMessages={initialMessages} appContext={appContext} onClose={() => setOpen(false)} onClear={() => { setInitialMessages([]); setHistoryKey((key) => key + 1); }} />
+        <DrawerContent className="h-[90vh] border-white/10 bg-slate-950 p-0 text-white md:h-[80vh]">
+          <ChatPanel initialMessages={initialMessages} appContext={appContext} onClose={() => setOpen(false)} onClear={() => { setInitialMessages([]); setHistoryKey((key) => key + 1); }} />
         </DrawerContent>
       </Drawer>
     </>
