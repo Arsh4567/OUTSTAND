@@ -42,7 +42,7 @@ const NEGATIVES = [
 ];
 
 // Premium animation curve
-const smoothEase = [0.16, 1, 0.3, 1];
+const smoothEase = [0.16, 1, 0.3, 1] as const;
 
 // ==========================================
 // MAIN COMPONENT

@@ -31,7 +31,7 @@ function LandingPage() {
   // Animation configuration presets
   const fadeInUp = {
     hidden: { opacity: 0, y: 30 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } }
+    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" as const } }
   };
 
   const staggerContainer = {
@@ -122,7 +122,7 @@ function LandingPage() {
         <motion.div 
           initial={{ opacity: 0, y: 60, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ delay: 0.4, duration: 1, ease: "easeOut" }}
+          transition={{ delay: 0.4, duration: 1, ease: "easeOut" as const }}
           className="mt-28 relative rounded-3xl border border-white/10 bg-gradient-to-b from-white/5 to-transparent p-2 md:p-4 shadow-[0_0_50px_rgba(0,0,0,0.8)] backdrop-blur-sm group"
         >
           <div className="absolute inset-0 rounded-3xl bg-gradient-to-tr from-blue-500/10 via-transparent to-indigo-500/10 opacity-30 group-hover:opacity-60 transition-opacity duration-700" />
