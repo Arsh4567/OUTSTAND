@@ -1,5 +1,6 @@
--- Run this in Supabase SQL Editor after replacing YOUR_USER_UUID.
--- Safe to run repeatedly because user_stats is upserted by primary/unique user_id.
+-- Dashboard bootstrap for existing Supabase users.
+-- Run this entire script in Supabase SQL Editor.
+-- It creates a default user_stats row only when one is missing.
 
 insert into public.user_stats (
   user_id,
@@ -9,17 +10,16 @@ insert into public.user_stats (
   current_level_xp,
   next_level_xp
 )
-values (
-  'YOUR_USER_UUID'::uuid,
+select
+  u.id,
   0,
   1,
   0,
   0,
   1000
-)
-on conflict (user_id) do update set
-  total_xp = excluded.total_xp,
-  level = excluded.level,
-  streak_days = excluded.streak_days,
-  current_level_xp = excluded.current_level_xp,
-  next_level_xp = excluded.next_level_xp;
+from auth.users as u
+where not exists (
+  select 1
+  from public.user_stats as s
+  where s.user_id = u.id
+);
