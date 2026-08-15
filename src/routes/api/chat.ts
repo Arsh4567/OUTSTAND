@@ -9,7 +9,7 @@ const RequestSchema = z.object({
   appContext: z.unknown().optional(),
 });
 
-const UIMessageSchema = z.object({
+const MessageSchema = z.object({
   id: z.string().optional(),
   role: z.enum(["user", "assistant", "system"]),
   parts: z.array(z.object({ type: z.literal("text"), text: z.string() })).optional(),
@@ -19,10 +19,14 @@ const UIMessageSchema = z.object({
   ]).optional(),
 });
 
-function jsonError(message: string, status: number, details?: string) {
-  return new Response(JSON.stringify({ error: message, ...(details ? { details } : {}) }), {
+function json(data: unknown, status = 200, headers: HeadersInit = {}) {
+  return new Response(JSON.stringify(data), {
     status,
-    headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" },
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+      ...headers,
+    },
   });
 }
 
@@ -34,65 +38,78 @@ function env(...names: string[]) {
   return undefined;
 }
 
-function messageText(message: z.infer<typeof UIMessageSchema>) {
+function textFromMessage(message: z.infer<typeof MessageSchema>) {
   if (typeof message.content === "string") return message.content;
   if (Array.isArray(message.content)) return message.content.map((part) => part.text).join("");
   return (message.parts ?? []).map((part) => part.text).join("");
 }
 
-function buildSystemPrompt(appContext: unknown) {
-  const ctx = appContext && typeof appContext === "object" ? (appContext as Record<string, unknown>) : {};
+function systemPrompt(appContext: unknown) {
+  const ctx = appContext && typeof appContext === "object" ? appContext as Record<string, unknown> : {};
   const name = typeof ctx.name === "string" ? ctx.name : "friend";
   const xp = typeof ctx.xp === "number" ? ctx.xp : 0;
   const streak = typeof ctx.bestStreak === "number" ? ctx.bestStreak : 0;
-  const dopamineScore = typeof ctx.dopamineScore === "number" ? ctx.dopamineScore : 50;
+  const score = typeof ctx.dopamineScore === "number" ? ctx.dopamineScore : 50;
   const habits = Array.isArray(ctx.habits) ? ctx.habits : [];
-  const completedToday = Array.isArray(ctx.completedToday) ? ctx.completedToday : [];
+  const completed = Array.isArray(ctx.completedToday) ? ctx.completedToday : [];
+
   const habitSummary = habits
     .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
     .map((item) => {
       const id = typeof item.id === "string" ? item.id : "";
       const label = typeof item.name === "string" ? item.name : "Habit";
-      return `${label} ${completedToday.includes(id) ? "(done today)" : "(not done today)"}`;
+      return `${label} ${completed.includes(id) ? "(done today)" : "(not done today)"}`;
     })
     .join(", ");
 
-  return `You are Outstand Intelligence, a concise and supportive productivity coach.
+  return `You are Outstand Intelligence, a supportive productivity coach.
 User: ${name}
 XP: ${xp}
 Best streak: ${streak} days
-Dopamine score: ${dopamineScore}/100
+Dopamine score: ${score}/100
 Habits: ${habitSummary || "None yet"}
 
-Give practical, encouraging answers. Prefer one clear next step.`;
+Be concise, practical, encouraging, and give one clear next step.`;
 }
 
-function getSupabaseConfig() {
+function supabaseConfig() {
   return {
     url: env("SUPABASE_URL", "VITE_SUPABASE_URL"),
     key: env("SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_PUBLISHABLE_KEY", "SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY"),
   };
 }
 
-async function requireUser(request: Request) {
-  const authHeader = request.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    return { error: jsonError("Authentication required. Sign in and try again.", 401) } as const;
+async function authenticate(request: Request) {
+  const authorization = request.headers.get("Authorization");
+  if (!authorization?.startsWith("Bearer ")) {
+    return { error: json({ error: "Authentication required.", code: "AUTH_REQUIRED" }, 401) } as const;
   }
 
-  const { url, key } = getSupabaseConfig();
+  const { url, key } = supabaseConfig();
   if (!url || !key) {
-    return { error: jsonError("Supabase server configuration is missing.", 500, `SUPABASE_URL=${url ? "present" : "missing"}; SUPABASE_KEY=${key ? "present" : "missing"}`) } as const;
+    return {
+      error: json({
+        error: "Supabase server configuration is missing.",
+        code: "SUPABASE_CONFIG_MISSING",
+        details: `SUPABASE_URL=${url ? "present" : "missing"}; SUPABASE_KEY=${key ? "present" : "missing"}`,
+      }, 500),
+    } as const;
   }
 
   const client = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: authHeader } },
+    global: { headers: { Authorization: authorization } },
   });
 
   const { data, error } = await client.auth.getUser();
   if (error || !data.user) {
-    return { error: jsonError("Authentication failed.", 401, error?.message ?? "No authenticated Supabase user was returned.") } as const;
+    return {
+      error: json({
+        error: "Authentication failed.",
+        code: "AUTH_INVALID",
+        details: error?.message ?? "No authenticated user returned by Supabase.",
+      }, 401),
+    } as const;
   }
 
   return { client, userId: data.user.id } as const;
@@ -101,91 +118,175 @@ async function requireUser(request: Request) {
 export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
-      GET: async () => new Response("Outstand AI chat endpoint", { status: 200, headers: { "Cache-Control": "no-store" } }),
+      GET: async () => {
+        const { url, key } = supabaseConfig();
+        const gemini = env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY");
+        return json({
+          ok: true,
+          service: "outstand-ai",
+          supabaseConfigured: Boolean(url && key),
+          geminiConfigured: Boolean(gemini),
+          message: "Outstand AI endpoint is online.",
+        });
+      },
 
       POST: async ({ request }) => {
         try {
-          const auth = await requireUser(request);
+          const auth = await authenticate(request);
           if ("error" in auth) return auth.error;
 
-          const rawBody = await request.json().catch(() => null);
-          const parsed = RequestSchema.safeParse(rawBody);
-          if (!parsed.success) return jsonError("Invalid AI request payload.", 400, parsed.error.message);
+          const body = await request.json().catch(() => null);
+          const parsed = RequestSchema.safeParse(body);
+          if (!parsed.success) {
+            return json({
+              error: "Invalid AI request payload.",
+              code: "INVALID_PAYLOAD",
+              details: parsed.error.message,
+            }, 400);
+          }
 
           const uiMessages: UIMessage[] = parsed.data.messages.flatMap((raw) => {
-            const result = UIMessageSchema.safeParse(raw);
-            if (!result.success) return [];
-            const text = messageText(result.data).trim();
+            const parsedMessage = MessageSchema.safeParse(raw);
+            if (!parsedMessage.success) return [];
+            const text = textFromMessage(parsedMessage.data).trim();
             if (!text) return [];
-            return [{ id: result.data.id ?? crypto.randomUUID(), role: result.data.role, parts: [{ type: "text", text }] } as UIMessage];
+            return [{
+              id: parsedMessage.data.id ?? crypto.randomUUID(),
+              role: parsedMessage.data.role,
+              parts: [{ type: "text", text }],
+            } as UIMessage];
           });
 
-          if (!uiMessages.length) return jsonError("At least one valid chat message is required.", 400);
+          if (uiMessages.length === 0) {
+            return json({ error: "At least one valid chat message is required.", code: "EMPTY_MESSAGES" }, 400);
+          }
 
-          const { data: existingConversation, error: conversationLookupError } = await auth.client
+          let { data: conversation, error: conversationLookupError } = await auth.client
             .from("chat_conversations")
             .select("id")
             .eq("user_id", auth.userId)
             .maybeSingle();
 
-          if (conversationLookupError) return jsonError("Could not access your AI conversation.", 500, conversationLookupError.message);
+          if (conversationLookupError) {
+            return json({
+              error: "Could not access your AI conversation.",
+              code: conversationLookupError.code ?? "CONVERSATION_LOOKUP_FAILED",
+              details: conversationLookupError.message,
+            }, 500);
+          }
 
-          let conversation = existingConversation;
           if (!conversation) {
-            const { data: created, error: conversationCreateError } = await auth.client
+            const { data: created, error } = await auth.client
               .from("chat_conversations")
               .insert({ user_id: auth.userId })
               .select("id")
               .single();
-            if (conversationCreateError || !created) return jsonError("Could not create your AI conversation.", 500, conversationCreateError?.message);
+
+            if (error || !created) {
+              return json({
+                error: "Could not create your AI conversation.",
+                code: error?.code ?? "CONVERSATION_CREATE_FAILED",
+                details: error?.message,
+              }, 500);
+            }
             conversation = created;
           }
 
           const latestUser = [...uiMessages].reverse().find((message) => message.role === "user");
           if (latestUser) {
-            const content = latestUser.parts.filter((part) => part.type === "text").map((part) => part.text).join("").trim();
+            const content = latestUser.parts
+              .filter((part) => part.type === "text")
+              .map((part) => part.text)
+              .join("")
+              .trim();
+
             if (content) {
-              const { error } = await auth.client.from("chat_messages").insert({ conversation_id: conversation.id, user_id: auth.userId, role: "user", content });
-              if (error) return jsonError("Could not save your message.", 500, error.message);
+              const { error } = await auth.client.from("chat_messages").insert({
+                conversation_id: conversation.id,
+                user_id: auth.userId,
+                role: "user",
+                content,
+              });
+
+              if (error) {
+                return json({
+                  error: "Could not save your message.",
+                  code: error.code ?? "MESSAGE_SAVE_FAILED",
+                  details: error.message,
+                }, 500);
+              }
             }
           }
 
           const apiKey = env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY");
-          if (!apiKey) return jsonError("Gemini API configuration is missing.", 500, "Set GEMINI_API_KEY in Vercel.");
+          if (!apiKey) {
+            return json({
+              error: "Gemini API configuration is missing.",
+              code: "GEMINI_CONFIG_MISSING",
+              details: "Set GEMINI_API_KEY in the Vercel Production environment and redeploy.",
+            }, 500);
+          }
 
           const result = streamText({
             model: google("gemini-2.5-flash", { apiKey }),
-            system: buildSystemPrompt(parsed.data.appContext),
+            system: systemPrompt(parsed.data.appContext),
             messages: await convertToModelMessages(uiMessages),
             temperature: 0.7,
           });
 
-          result.text.then(async (text) => {
+          void result.text.then(async (text) => {
             if (!text.trim()) return;
-            const { error } = await auth.client.from("chat_messages").insert({ conversation_id: conversation!.id, user_id: auth.userId, role: "assistant", content: text });
-            if (error) console.error("Saving assistant message failed:", error);
-          }).catch((error) => console.error("Saving assistant response failed:", error));
+            const { error } = await auth.client.from("chat_messages").insert({
+              conversation_id: conversation.id,
+              user_id: auth.userId,
+              role: "assistant",
+              content: text,
+            });
+            if (error) console.error("AI assistant message persistence failed", error);
+          });
 
-          return result.toUIMessageStreamResponse({ headers: { "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" } });
+          return result.toUIMessageStreamResponse({
+            headers: { "Cache-Control": "no-cache, no-transform" },
+          });
         } catch (error) {
-          console.error("AI chat POST failed:", error);
-          return jsonError("AI request failed.", 500, error instanceof Error ? error.message : String(error));
+          console.error("Outstand AI request failed", error);
+          return json({
+            error: "AI request failed.",
+            code: "AI_REQUEST_FAILED",
+            details: error instanceof Error ? error.message : String(error),
+          }, 500);
         }
       },
 
       DELETE: async ({ request }) => {
         try {
-          const auth = await requireUser(request);
+          const auth = await authenticate(request);
           if ("error" in auth) return auth.error;
-          const { data: conversation, error: lookupError } = await auth.client.from("chat_conversations").select("id").eq("user_id", auth.userId).maybeSingle();
-          if (lookupError) return jsonError("Could not access your AI conversation.", 500, lookupError.message);
-          if (conversation?.id) {
-            const { error } = await auth.client.from("chat_messages").delete().eq("conversation_id", conversation.id);
-            if (error) return jsonError("Could not clear AI memory.", 500, error.message);
+
+          const { data: conversation, error: lookupError } = await auth.client
+            .from("chat_conversations")
+            .select("id")
+            .eq("user_id", auth.userId)
+            .maybeSingle();
+
+          if (lookupError) {
+            return json({ error: "Could not access your AI conversation.", code: lookupError.code, details: lookupError.message }, 500);
           }
+
+          if (conversation?.id) {
+            const { error } = await auth.client
+              .from("chat_messages")
+              .delete()
+              .eq("conversation_id", conversation.id);
+
+            if (error) {
+              return json({ error: "Could not clear AI memory.", code: error.code, details: error.message }, 500);
+            }
+          }
+
           return new Response(null, { status: 204 });
         } catch (error) {
-          return jsonError("Failed to clear AI memory.", 500, error instanceof Error ? error.message : String(error));
+          return json({ error: "Failed to clear AI memory.", code: "MEMORY_CLEAR_FAILED", details: error instanceof Error ? error.message : String(error) }, 500);
         }
       },
     },
