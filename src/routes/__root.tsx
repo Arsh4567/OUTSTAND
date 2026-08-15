@@ -8,6 +8,7 @@ import { AppShell } from "@/components/app-shell";
 import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import SidebarLayout from "@/components/layout/SidebarLayout";
+import { QuickActions } from "@/components/global/QuickActions";
 
 function NotFoundComponent() {
   return (
@@ -48,7 +49,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" },
       { name: "theme-color", content: "#050508" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
@@ -106,6 +107,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {isNoSidebarRoute ? <AppShell /> : <SidebarLayout><AppShell /></SidebarLayout>}
       <Toaster />
+      <QuickActions />
     </QueryClientProvider>
   );
 }
