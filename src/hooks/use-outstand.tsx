@@ -3,7 +3,9 @@ import type { MutableRefObject } from "react";
 import { toast } from "sonner";
 import { useAppState } from "@/hooks/use-app-state";
 import { useDailyLog } from "@/hooks/use-dopamine";
-import { CHALLENGES, randomChallenge, type OutstandChallenge } from "@/lib/Index";
+import { CHALLENGES } from "@/lib/challenges.data";
+import type { OutstandChallenge } from "@/lib/challenges.types";
+import { randomChallenge } from "@/lib/challenges.utils";
 import { supabase } from "@/integrations/supabase/client";
 
 export function useOutstand() {
@@ -100,9 +102,9 @@ export function useOutstand() {
 
   const complete = useCallback(() => {
     if (!challenge || completionStage !== 0) return;
-    const xpEarned = Math.max(0, Number(challenge.xp ?? 50));
+    const xpEarned = Math.max(0, Number(challenge.xpReward ?? 50));
     const challengeEmoji = challenge.emoji;
-    const challengeColor = challenge.color || "#4f46e5";
+    const challengeColor = challenge.theme.particleColors[0] || "#4f46e5";
     const challengeTitle = challenge.title;
     const challengeDuration = Math.max(1, Number(challenge.durationMinutes ?? 10));
 
