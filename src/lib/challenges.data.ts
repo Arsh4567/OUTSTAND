@@ -2,6 +2,7 @@ import type { ChallengeTheme, OutstandChallenge, ThemeName, ChallengeId } from "
 import { createChallengeBatch01 } from "./challenge-batch-01";
 import { createChallengeBatch02 } from "./challenge-batch-02";
 import { createChallengeBatch03 } from "./challenge-batch-03";
+import { createChallengeBatch04 } from "./challenge-batch-04";
 
 const id = (value: string) => value as ChallengeId;
 
@@ -37,4 +38,5 @@ export const CHALLENGES: OutstandChallenge[] = [
   ...createChallengeBatch01(CHALLENGE_THEMES),
   ...createChallengeBatch02(CHALLENGE_THEMES),
   ...createChallengeBatch03(CHALLENGE_THEMES),
+  ...createChallengeBatch04(CHALLENGE_THEMES),
 ];
