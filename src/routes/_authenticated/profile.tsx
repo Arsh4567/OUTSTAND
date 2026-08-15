@@ -1,148 +1,216 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
-import { Flame, Target, Timer, Trophy, Zap, Activity, TrendingUp, Hexagon } from "lucide-react";
+import { motion, MotionConfig, useMotionValue, useSpring, useTransform } from "framer-motion";
+import { Activity, Flame, Target, Timer, Trophy, TrendingUp, UserRound, Zap, ArrowUpRight, CalendarDays } from "lucide-react";
 
 import { useProfileState } from "@/hooks/use-profile-state";
 import { cn } from "@/lib/utils";
-
-// Extracted Components
-import { ProfileErrorBoundary } from "@/components/profile/ProfileErrorBoundary";
-import { SpotlightCard } from "@/components/profile/SpotlightCard";
-import { BigStat, MiniCard } from "@/components/profile/StatsCards";
-import { TrendChart } from "@/components/profile/TrendChart";
-import { ProfileHeader } from "@/components/profile/ProfileHeader";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({
     meta: [
       { title: "Profile — Outstand" },
-      { name: "description", content: "Your XP, level, streaks, focus, challenges, and progress." },
+      { name: "description", content: "Your Outstand identity, progress, momentum, habits, and achievements." },
     ],
   }),
-  component: () => (
-    <ProfileErrorBoundary>
-      <ProfilePage />
-    </ProfileErrorBoundary>
-  ),
+  component: ProfilePage,
 });
 
-const smoothEase = [0.22, 1, 0.36, 1];
-const containerVariants = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05, ease: smoothEase } } };
-const itemVariants = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.8, ease: smoothEase } } };
+const ease = [0.22, 1, 0.36, 1] as const;
+const card = "rounded-[2rem] border border-white/[0.08] bg-white/[0.035] shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur-2xl";
 
 function ProfilePage() {
   const state = useProfileState();
-
-  // 3D Parallax logic for Level Badge
   const x = useMotionValue(0);
   const y = useMotionValue(0);
-  const mouseXSpring = useSpring(x, { stiffness: 150, damping: 15 });
-  const mouseYSpring = useSpring(y, { stiffness: 150, damping: 15 });
-  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["15deg", "-15deg"]);
-  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-15deg", "15deg"]);
+  const springX = useSpring(x, { stiffness: 160, damping: 18 });
+  const springY = useSpring(y, { stiffness: 160, damping: 18 });
+  const rotateX = useTransform(springY, [-0.5, 0.5], ["10deg", "-10deg"]);
+  const rotateY = useTransform(springX, [-0.5, 0.5], ["-10deg", "10deg"]);
 
-  const handleBadgeMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    x.set((e.clientX - rect.left) / rect.width - 0.5);
-    y.set((e.clientY - rect.top) / rect.height - 0.5);
+  const onBadgeMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    x.set((event.clientX - rect.left) / rect.width - 0.5);
+    y.set((event.clientY - rect.top) / rect.height - 0.5);
   };
 
-  return (
-    <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-6 md:space-y-8 pb-24 max-w-7xl mx-auto px-4 sm:px-6">
-      
-      <ProfileHeader state={state} itemVariants={itemVariants} />
+  const resetBadge = () => { x.set(0); y.set(0); };
+  const completion = state.stats.productivity;
+  const initial = (state.name || "U").charAt(0).toUpperCase();
 
-      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6">
-        {/* Holographic Level Badge */}
-        <motion.div variants={itemVariants} className="xl:col-span-1 xl:row-span-2 perspective-[1000px]" onMouseMove={handleBadgeMouseMove} onMouseLeave={() => { x.set(0); y.set(0); }}>
-          <motion.div style={{ rotateX, rotateY, transformStyle: "preserve-3d" }} className="h-full relative p-8 rounded-[2rem] border border-white/10 bg-gradient-to-b from-indigo-900/40 to-black/60 shadow-[0_20px_50px_-15px_rgba(99,102,241,0.3)] backdrop-blur-3xl flex flex-col items-center justify-center group">
-            <motion.div style={{ transform: "translateZ(60px)" }} className="text-center w-full relative z-10">
-              <Hexagon className="h-32 w-32 mx-auto text-indigo-500/20 absolute left-1/2 -translate-x-1/2 -top-4 -z-10" strokeWidth={1} />
-              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400 mb-2">Current Rank</div>
-              <div className="font-mono text-7xl font-black text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.4)]">{state.level}</div>
-              <div className="mt-12 w-full text-left">
-                <div className="flex justify-between text-xs font-bold text-zinc-400 mb-3 tracking-wider">
-                  <span>PROGRESS</span>
-                  <span className="text-white"><span className="text-indigo-400">{state.into}</span> / {state.need}</span>
+  return (
+    <MotionConfig reducedMotion="user">
+      <motion.div
+        initial="hidden"
+        animate="show"
+        variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06 } } }}
+        className="mx-auto max-w-7xl space-y-6 px-4 pb-20 pt-2 sm:px-6 lg:space-y-8 lg:px-8"
+      >
+        <motion.section
+          variants={{ hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { duration: 0.65, ease } } }}
+          className="relative overflow-hidden rounded-[2.5rem] border border-white/10 bg-gradient-to-br from-cyan-400/[0.08] via-white/[0.035] to-fuchsia-500/[0.06] p-6 shadow-[0_30px_100px_rgba(0,0,0,0.35)] sm:p-8 lg:p-10"
+        >
+          <div className="pointer-events-none absolute inset-0">
+            <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
+            <div className="absolute -bottom-32 right-0 h-80 w-80 rounded-full bg-fuchsia-500/10 blur-3xl" />
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.018)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.018)_1px,transparent_1px)] bg-[size:32px_32px]" />
+          </div>
+
+          <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 flex-col gap-6 sm:flex-row sm:items-center">
+              <div className="relative shrink-0">
+                <div className="absolute -inset-2 rounded-[1.8rem] border border-cyan-300/20 bg-cyan-300/[0.03] blur-[1px]" />
+                <div className="relative grid h-24 w-24 place-items-center overflow-hidden rounded-[1.6rem] border border-white/10 bg-slate-950 shadow-2xl sm:h-28 sm:w-28">
+                  {state.isUploading ? (
+                    <Activity className="h-8 w-8 animate-pulse text-cyan-300" />
+                  ) : state.profile?.avatar_url ? (
+                    <img src={state.profile.avatar_url} alt="Profile" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="bg-gradient-to-br from-cyan-200 via-white to-fuchsia-300 bg-clip-text text-4xl font-black text-transparent">{initial}</span>
+                  )}
                 </div>
-                <div className="h-3 overflow-hidden rounded-full bg-black/60 border border-white/10 shadow-inner">
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${state.pct}%` }} transition={{ duration: 1.5, ease: smoothEase, delay: 0.2 }} className="h-full rounded-full bg-gradient-to-r from-indigo-600 to-cyan-400 shadow-[0_0_20px_rgba(99,102,241,0.8)] relative">
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
-                  </motion.div>
+                <span className="absolute bottom-2 right-2 h-3.5 w-3.5 rounded-full border-2 border-slate-950 bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.85)]" />
+              </div>
+
+              <div className="min-w-0 text-center sm:text-left">
+                <div className="mb-2 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                  <span className="rounded-full border border-cyan-300/15 bg-cyan-300/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-cyan-200">Outstand profile</span>
+                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">{state.getRankTitle(state.level)}</span>
+                </div>
+                <h1 className="truncate text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-5xl">{state.name || "Your profile"}</h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Your personal operating record — momentum, habits, focus, and the consistency you are building.</p>
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-3 sm:justify-start">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs text-slate-300"><UserRound className="h-3.5 w-3.5 text-cyan-300" /> ID {(state.user?.id || "unknown").slice(0, 8)}</div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-xs text-slate-300"><CalendarDays className="h-3.5 w-3.5 text-fuchsia-300" /> {state.bestStreak} day best streak</div>
                 </div>
               </div>
-            </motion.div>
-          </motion.div>
-        </motion.div>
-
-        {/* Hero Stats */}
-        <motion.div variants={itemVariants} className="md:col-span-2 xl:col-span-3 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          <BigStat icon={<Zap />} label="Total XP" value={String(state.xp)} color="text-yellow-400" glowColor="rgba(234,179,8,0.2)" />
-          <BigStat icon={<Activity />} label="Productivity" value={`${state.stats.productivity}%`} color="text-emerald-400" glowColor="rgba(52,211,153,0.2)" />
-          <BigStat icon={<Flame />} label="Best Streak" value={`${state.bestStreak}d`} color="text-orange-400" glowColor="rgba(249,115,22,0.2)" />
-          <BigStat icon={<Target />} label="Habits" value={String(state.stats.totalCompletions)} color="text-cyan-400" glowColor="rgba(6,182,212,0.2)" />
-        </motion.div>
-
-        <SpotlightCard className="md:col-span-3 xl:col-span-3 p-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-8 relative z-10">
-            <div>
-              <h2 className="font-display text-2xl font-black text-white tracking-tight">Dopamine Velocity</h2>
-              <p className="text-sm font-medium text-zinc-500 mt-1">7-day performance momentum mapping</p>
             </div>
-            <div className="text-right mt-4 sm:mt-0">
-              <div className="text-3xl font-black text-white">{state.stats.avg}<span className="text-sm text-zinc-500 ml-1">avg</span></div>
+
+            <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-row">
+              <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3 text-center sm:min-w-32">
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Level</div>
+                <div className="mt-1 text-2xl font-black text-white">{state.level}</div>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3 text-center sm:min-w-32">
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">XP</div>
+                <div className="mt-1 text-2xl font-black text-cyan-200">{state.xp}</div>
+              </div>
             </div>
           </div>
-          <div className="h-64 w-full">
-            <TrendChart logs={state.logs} />
-          </div>
-        </SpotlightCard>
-      </div>
+        </motion.section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <SpotlightCard className="lg:col-span-1 p-8 flex flex-col max-h-[500px]">
-          <h2 className="font-display text-xl font-black text-white flex items-center gap-2 mb-6"><Flame className="text-orange-500" /> Active Fire</h2>
-          <div className="flex-1 overflow-y-auto pr-2 space-y-3 no-scrollbar mask-image-bottom">
-            {state.habits.length === 0 && <div className="text-sm text-zinc-500 italic p-4 border border-dashed border-white/10 rounded-2xl text-center">Awaiting your first habit completion.</div>}
-            {state.habits.map((h, i) => {
-              const streakVal = state.streaks.find((s) => s?.id === h?.id)?.streak ?? 0;
-              return (
-                <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }} key={h.id} className="flex items-center justify-between p-4 rounded-2xl bg-black/40 border border-white/5 hover:bg-white/5 hover:border-white/10 transition-all group">
-                  <span className="flex items-center gap-4 min-w-0">
-                    <span className="text-3xl drop-shadow-lg group-hover:scale-110 transition-transform">{h.emoji}</span>
-                    <span className="truncate font-bold text-zinc-300 group-hover:text-white transition-colors">{h.name}</span>
-                  </span>
-                  <span className="shrink-0 flex items-center gap-1.5 rounded-full bg-orange-500/10 border border-orange-500/20 px-3 py-1 text-sm font-black text-orange-400 group-hover:bg-orange-500/20 group-hover:shadow-[0_0_20px_rgba(249,115,22,0.4)] transition-all">{streakVal}d</span>
-                </motion.div>
-              );
-            })}
-          </div>
-        </SpotlightCard>
+        <div className="grid gap-6 lg:grid-cols-[0.82fr_1.18fr]">
+          <motion.section
+            variants={{ hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { duration: 0.65, ease } } }}
+            className={cn(card, "relative overflow-hidden p-7 sm:p-8")}
+            onMouseMove={onBadgeMove}
+            onMouseLeave={resetBadge}
+          >
+            <motion.div style={{ rotateX, rotateY, transformStyle: "preserve-3d" }} className="relative flex min-h-[360px] flex-col justify-between">
+              <div className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-indigo-500/10 blur-3xl" />
+              <div className="relative z-10">
+                <div className="text-[10px] font-black uppercase tracking-[0.25em] text-indigo-300/80">Current level</div>
+                <div className="mt-2 text-7xl font-black tracking-tighter text-white">{state.level}</div>
+                <p className="mt-1 text-sm text-slate-500">{state.getRankTitle(state.level)} class</p>
+              </div>
 
-        <SpotlightCard className="lg:col-span-2 p-8">
-          <h2 className="font-display text-xl font-black text-white flex items-center gap-2 mb-2"><TrendingUp className="text-emerald-400" /> Consistency Matrix</h2>
-          <p className="text-sm font-medium text-zinc-500 mb-8">30-day habit completion density</p>
-          <div className="flex items-end gap-1 sm:gap-2 h-40 w-full">
-            {state.stats.dayStats.map((s, i) => (
-              <motion.div key={s.d} initial={{ height: 0 }} animate={{ height: "100%" }} transition={{ delay: i * 0.01, duration: 0.8, ease: smoothEase }} className="group/bar relative flex-1 flex flex-col justify-end">
-                <div className={cn("w-full rounded-md transition-all duration-300", s.ratio === 0 ? "bg-white/5 hover:bg-white/20" : s.ratio < 0.5 ? "bg-indigo-900 hover:bg-indigo-700" : s.ratio < 1 ? "bg-indigo-500 hover:bg-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.4)]" : "bg-emerald-400 hover:bg-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.6)] z-10", "group-hover/bar:scale-y-110 group-hover/bar:brightness-125 origin-bottom cursor-crosshair")} style={{ height: `${Math.max(15, s.ratio * 100)}%` }} />
-                <div className="pointer-events-none absolute -top-16 left-1/2 -translate-x-1/2 rounded-xl bg-black/90 backdrop-blur-xl border border-white/20 px-4 py-2.5 text-xs font-bold text-white opacity-0 shadow-2xl transition-all duration-300 group-hover/bar:opacity-100 group-hover/bar:-translate-y-2 whitespace-nowrap z-50">
-                  <div className="text-zinc-400 mb-1">{new Date(s.d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</div>
-                  <span className={s.done === s.total && s.total > 0 ? "text-emerald-400" : "text-white"}>{s.done} / {s.total} Habits</span>
+              <div className="relative z-10" style={{ transform: "translateZ(35px)" }}>
+                <div className="mb-3 flex items-center justify-between text-xs font-bold text-slate-400">
+                  <span>Progress to next level</span>
+                  <span className="text-white">{state.into} / {state.need}</span>
                 </div>
-              </motion.div>
+                <div className="h-3 overflow-hidden rounded-full border border-white/10 bg-black/40">
+                  <motion.div initial={{ width: 0 }} animate={{ width: `${state.pct}%` }} transition={{ duration: 1.2, ease }} className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-cyan-400 to-emerald-300 shadow-[0_0_24px_rgba(34,211,238,0.45)]" />
+                </div>
+                <div className="mt-3 text-xs text-slate-500">{state.need - state.into > 0 ? `${state.need - state.into} XP until the next level.` : "Level complete — keep the momentum moving."}</div>
+              </div>
+            </motion.div>
+          </motion.section>
+
+          <section className="grid gap-4 sm:grid-cols-2">
+            <StatCard icon={<Zap className="text-cyan-300" />} label="Total XP" value={String(state.xp)} note="Lifetime progress" />
+            <StatCard icon={<Activity className="text-emerald-300" />} label="Productivity" value={`${completion}%`} note="Current momentum" />
+            <StatCard icon={<Flame className="text-orange-300" />} label="Best streak" value={`${state.bestStreak}d`} note="Consistency peak" />
+            <StatCard icon={<Target className="text-fuchsia-300" />} label="Habit completions" value={String(state.stats.totalCompletions)} note="Actions completed" />
+          </section>
+        </div>
+
+        <section className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
+          <motion.section variants={{ hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { duration: 0.65, ease } } }} className={cn(card, "p-6 sm:p-8")}>
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.24em] text-cyan-300/80"><TrendingUp className="h-4 w-4" /> Momentum</div>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-white">Dopamine velocity</h2>
+                <p className="mt-1 text-sm text-slate-500">Your recent consistency signal over the last 7 days.</p>
+              </div>
+              <div className="text-right"><div className="text-3xl font-black text-white">{state.stats.avg}</div><div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Avg score</div></div>
+            </div>
+            <div className="mt-8 h-64 w-full overflow-hidden rounded-2xl border border-white/5 bg-black/15 p-3">
+              <SimpleTrend logs={state.logs} />
+            </div>
+          </motion.section>
+
+          <motion.section variants={{ hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { duration: 0.65, ease } } }} className={cn(card, "p-6 sm:p-8")}>
+            <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.24em] text-orange-300/80"><Flame className="h-4 w-4" /> Active fire</div>
+            <h2 className="mt-2 text-2xl font-black tracking-tight text-white">Your strongest habits</h2>
+            <div className="mt-6 space-y-3">
+              {state.habits.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-white/10 bg-black/10 p-5 text-center text-sm text-slate-500">Your first completed habit will appear here.</div>
+              ) : state.habits.slice(0, 5).map((habit) => {
+                const streak = state.streaks.find((item) => item?.id === habit.id)?.streak ?? 0;
+                return <div key={habit.id} className="flex items-center justify-between rounded-2xl border border-white/7 bg-black/15 px-4 py-3"><div className="flex min-w-0 items-center gap-3"><span className="text-xl">{habit.emoji}</span><span className="truncate text-sm font-bold text-slate-200">{habit.name}</span></div><span className="rounded-full border border-orange-400/15 bg-orange-400/10 px-2.5 py-1 text-xs font-black text-orange-200">{streak}d</span></div>;
+              })}
+            </div>
+          </motion.section>
+        </section>
+
+        <section className={cn(card, "p-6 sm:p-8")}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div><div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.24em] text-emerald-300/80"><TrendingUp className="h-4 w-4" /> Consistency</div><h2 className="mt-2 text-2xl font-black tracking-tight text-white">30-day action map</h2><p className="mt-1 text-sm text-slate-500">A visual record of how often your habits were completed.</p></div>
+            <div className="text-xs font-semibold text-slate-500">{state.stats.habitPct}% today</div>
+          </div>
+          <div className="mt-8 flex h-44 items-end gap-1 overflow-x-auto">
+            {state.stats.dayStats.map((item) => (
+              <div key={item.d} className="group relative flex h-full min-w-[8px] flex-1 items-end rounded-lg bg-white/[0.015]">
+                <div className={cn("w-full rounded-md transition-all duration-300", item.ratio === 0 ? "bg-white/5" : item.ratio < 0.5 ? "bg-indigo-900" : item.ratio < 1 ? "bg-indigo-500" : "bg-emerald-400") } style={{ height: `${Math.max(10, item.ratio * 100)}%` }} />
+                <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 translate-y-2 whitespace-nowrap rounded-xl border border-white/10 bg-slate-950/95 px-3 py-2 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all group-hover:translate-y-0 group-hover:opacity-100">{item.done}/{item.total} habits</div>
+              </div>
             ))}
           </div>
-        </SpotlightCard>
-      </div>
+        </section>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <MiniCard icon={<Timer className="text-indigo-400" />} label="Focus Sessions" value={String(state.stats.focusCompleted)} />
-        <MiniCard icon={<Activity className="text-emerald-400" />} label="Focus Minutes" value={String(state.stats.focusMinutes)} />
-        <MiniCard icon={<Zap className="text-yellow-400" />} label="Challenges" value={String(state.outstand.length)} />
-        <MiniCard icon={<Trophy className="text-purple-400" />} label="Total Built" value={String(state.habits.length)} />
-      </div>
-    </motion.div>
+        <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <MiniMetric icon={<Timer className="text-indigo-300" />} label="Focus sessions" value={String(state.stats.focusCompleted)} />
+          <MiniMetric icon={<Activity className="text-emerald-300" />} label="Focus minutes" value={String(state.stats.focusMinutes)} />
+          <MiniMetric icon={<Zap className="text-yellow-300" />} label="Challenges" value={String(state.outstand.length)} />
+          <MiniMetric icon={<Trophy className="text-purple-300" />} label="Habits built" value={String(state.habits.length)} />
+        </section>
+
+        <motion.section variants={{ hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { duration: 0.65, ease } } }} className="flex flex-col gap-4 rounded-[2rem] border border-white/[0.08] bg-gradient-to-r from-white/[0.04] to-transparent p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7">
+          <div><div className="text-sm font-black text-white">Keep building the system.</div><div className="mt-1 text-sm text-slate-500">Your profile is a record of what you repeat — not just what you plan.</div></div>
+          <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2.5 text-xs font-bold text-white transition hover:border-cyan-300/20 hover:bg-white/[0.08]">Back to top <ArrowUpRight className="h-4 w-4" /></button>
+        </motion.section>
+      </motion.div>
+    </MotionConfig>
   );
-        }
-                    
+}
+
+function StatCard({ icon, label, value, note }: { icon: React.ReactNode; label: string; value: string; note: string }) {
+  return <motion.div whileHover={{ y: -3 }} className={cn(card, "p-6 transition-all hover:border-white/[0.14]")}><div className="flex items-center justify-between"><div className="grid h-10 w-10 place-items-center rounded-xl border border-white/8 bg-white/[0.04]">{icon}</div><ArrowUpRight className="h-4 w-4 text-slate-700" /></div><div className="mt-6 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">{label}</div><div className="mt-1 text-3xl font-black tracking-tight text-white">{value}</div><div className="mt-1 text-xs text-slate-600">{note}</div></motion.div>;
+}
+
+function MiniMetric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-5"><div className="flex items-center gap-2">{icon}<span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">{label}</span></div><div className="mt-3 text-2xl font-black text-white">{value}</div></div>;
+}
+
+function SimpleTrend({ logs }: { logs: Array<{ date?: string; score?: number }> }) {
+  const values = logs.map((item) => Math.max(0, Math.min(100, item.score ?? 0)));
+  const points = values.length ? values : [0];
+  const maxX = Math.max(1, points.length - 1);
+  const d = points.map((value, index) => {
+    const x = (index / maxX) * 100;
+    const y = 100 - value;
+    return `${x},${y}`;
+  }).join(" ");
+
+  return <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full"><defs><linearGradient id="profileTrendFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="rgba(34,211,238,0.32)" /><stop offset="100%" stopColor="rgba(34,211,238,0)" /></linearGradient></defs><polyline points={`0,100 ${d} 100,100`} fill="url(#profileTrendFill)" stroke="none" /><polyline points={d} fill="none" stroke="currentColor" strokeWidth="1.7" vectorEffect="non-scaling-stroke" className="text-cyan-300" /></svg>;
+}
