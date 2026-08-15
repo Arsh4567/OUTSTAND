@@ -111,7 +111,7 @@ export function useProfileState() {
       return;
     }
     try {
-      const { error } = await supabase.from("profiles").update({ full_name: newName.trim() }).eq("id", user.id);
+      const { error } = await supabase.from("profiles").update({ display_name: newName.trim() }).eq("id", user.id);
       if (error) throw error;
       toast.success("Name updated successfully!");
       setIsEditingName(false);

@@ -421,7 +421,7 @@ export const CHALLENGES: OutstandChallenge[] = [
     dopamineYield: "Low",
     flavorText: "Wealth is what you don't spend.",
     theme: THEMES.Forest,
-    audio: { onComplete: "chime" }
+    audio: { onComplete: "success_chime" }
   },
   {
     id: "epic_fear_setting",
@@ -496,7 +496,7 @@ export const CHALLENGES: OutstandChallenge[] = [
     dopamineYield: "Low",
     flavorText: "Fatigue is often just dehydration in disguise.",
     theme: THEMES.Ocean,
-    audio: { onComplete: "chime" }
+    audio: { onComplete: "success_chime" }
   },
   {
     id: "rare_unfollow_purge",
@@ -658,6 +658,6 @@ export const CHALLENGES: OutstandChallenge[] = [
     dopamineYield: "Medium",
     flavorText: "Appreciation is the antidote to anxiety.",
     theme: THEMES.Sunset,
-    audio: { onComplete: "chime" }
+    audio: { onComplete: "success_chime" }
   },
 ];

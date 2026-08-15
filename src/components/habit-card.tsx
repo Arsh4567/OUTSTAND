@@ -32,9 +32,9 @@ const colorClasses: Record<string, { ring: string; bg: string; text: string; lig
 };
 
 // Premium Easing for Card
-const cardSpring = { type: "spring", stiffness: 300, damping: 20 };
+const cardSpring = { type: "spring" as const, stiffness: 300, damping: 20 };
 // Hyper-responsive Easing for Tactile Button
-const tactileSpring = { type: "spring", stiffness: 500, damping: 15 };
+const tactileSpring = { type: "spring" as const, stiffness: 500, damping: 15 };
 
 export function HabitCard({
   habit,

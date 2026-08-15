@@ -23,7 +23,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 // Premium easing curve for buttery smooth animations
-const smoothEase = [0.16, 1, 0.3, 1];
+const smoothEase = [0.16, 1, 0.3, 1] as const;
 
 function Dashboard() {
   const { habits = [], toggleToday, addHabit, updateHabit, deleteHabit, xp = 0, bestStreak = 0 } = useAppState() ?? {};
@@ -53,7 +53,7 @@ function Dashboard() {
 
   const score = log?.score ?? 50;
   const color = scoreColor(score);
-  const challenge = dailyChallenge(today) ?? { title: "Stay Consistent", description: "Complete all your daily tasks." };
+  const challenge = dailyChallenge() ?? { title: "Stay Consistent", description: "Complete all your daily tasks." };
 
   const displayedHabits = showAllHabits ? habits : habits.slice(0, 4);
   const showWizard = habits.length === 0 && !dismissedWizard;
