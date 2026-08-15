@@ -7,13 +7,22 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+
+# Build Outputs
 dist
 dist-ssr
 .output
 .vinxi
-.tanstack/**
+.tanstack/
 .nitro
+.cache
+
+# Environment Variables (CRITICAL)
+.env
+.env.*
+!.env.example
 *.local
 
 # Wrangler / Cloudflare

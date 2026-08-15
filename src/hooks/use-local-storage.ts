@@ -1,78 +1,65 @@
-// src/hooks/useLocalStorage.ts
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 
-export function useLocalStorage<T>(key: string, initialValue: T) {
-  // 1. TRAP THE INITIAL VALUE
-  const initialValueRef = useRef<T>(initialValue);
+export function useLocalStorage<T>(
+  key: string,
+  initialValue: T
+): [T, (value: T | ((val: T) => T)) => void] {
+  // 1. Initialize state with the initialValue.
+  // This guarantees the server and the first client render match exactly,
+  // preventing React hydration mismatch warnings.
+  const [storedValue, setStoredValue] = useState<T>(initialValue);
 
-  // 2. Read from the browser's storage safely
-  const readValue = useCallback((): T => {
-    if (typeof window === "undefined") return initialValueRef.current;
+  // 2. Read from localStorage once the component has mounted on the client.
+  useEffect(() => {
     try {
       const item = window.localStorage.getItem(key);
-      if (!item) return initialValueRef.current;
-
-      // Safely parse. If the data is fundamentally broken/null, fallback.
-      const parsed = JSON.parse(item);
-      return parsed !== null ? (parsed as T) : initialValueRef.current;
-    } catch (error) {
-      console.warn(`[Storage Warning] Error parsing key “${key}”. Resetting to default.`, error);
-      // If parsing fails (corrupted data), wipe it and return the default
-      window.localStorage.removeItem(key);
-      return initialValueRef.current;
-    }
-  }, [key]);
-
-  const [storedValue, setStoredValue] = useState<T>(readValue);
-
-  // 3. Write to storage AND broadcast a live signal
-  const setValue = useCallback((value: T | ((val: T) => T)) => {
-    try {
-      setStoredValue((prev) => {
-        const valueToStore = value instanceof Function ? value(prev) : value;
-        if (typeof window !== "undefined") {
-          window.localStorage.setItem(key, JSON.stringify(valueToStore));
-          window.dispatchEvent(new CustomEvent("local-storage-sync", { detail: { key } }));
-        }
-        return valueToStore;
-      });
-    } catch (error) {
-      console.error(`[Storage Error] Failed setting key “${key}”:`, error);
-    }
-  }, [key]);
-
-  // 4. Expose a way to completely delete the key (Crucial for resets)
-  const removeValue = useCallback(() => {
-    try {
-      if (typeof window !== "undefined") {
-        window.localStorage.removeItem(key);
-        window.dispatchEvent(new CustomEvent("local-storage-sync", { detail: { key } }));
+      if (item) {
+        setStoredValue(JSON.parse(item));
       }
-      setStoredValue(initialValueRef.current);
     } catch (error) {
-      console.error(`[Storage Error] Failed removing key “${key}”:`, error);
+      console.warn(`Error reading localStorage key "${key}":`, error);
     }
   }, [key]);
 
-  // 5. Listen for the live signal
-  useEffect(() => {
-    setStoredValue(readValue());
+  // 3. Create a memoized setter function to update both state and localStorage.
+  const setValue = useCallback(
+    (value: T | ((val: T) => T)) => {
+      try {
+        setStoredValue((prevValue) => {
+          // Allow value to be a function to mimic standard useState API
+          const valueToStore =
+            value instanceof Function ? value(prevValue) : value;
 
-    const handleStorageChange = (e: StorageEvent | CustomEvent) => {
-      if ((e as StorageEvent).key === key || (e as CustomEvent).detail?.key === key) {
-        setStoredValue(readValue());
+          // Save to local storage
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem(key, JSON.stringify(valueToStore));
+          }
+
+          return valueToStore;
+        });
+      } catch (error) {
+        console.warn(`Error setting localStorage key "${key}":`, error);
+      }
+    },
+    [key]
+  );
+
+  // 4. (Optional but recommended) Cross-tab synchronization.
+  // If the user updates settings in one tab, this updates the state in other open tabs.
+  useEffect(() => {
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === key && event.newValue !== null) {
+        try {
+          setStoredValue(JSON.parse(event.newValue));
+        } catch (error) {
+          console.warn(`Error parsing storage event for key "${key}":`, error);
+        }
       }
     };
 
     window.addEventListener("storage", handleStorageChange);
-    window.addEventListener("local-storage-sync", handleStorageChange as EventListener);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, [key]);
 
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-      window.removeEventListener("local-storage-sync", handleStorageChange as EventListener);
-    };
-  }, [key, readValue]);
-
-  // Return as a tuple with the new remove function
-  return [storedValue, setValue, removeValue] as const;
+  return [storedValue, setValue];
 }

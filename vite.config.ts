@@ -1,35 +1,41 @@
-// @lovable.dev/vite-tanstack-config already includes the following — do NOT add them manually
-// or the app will break with duplicate plugins:
-//   - tanstackStart, viteReact, tailwindcss, tsConfigPaths, nitro (build-only using cloudflare as a default target),
-//     componentTagger (dev-only), VITE_* env injection, @ path alias, React/TanStack dedupe,
-//     error logger plugins, and sandbox detection (port/host/strictPort).
-// You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
-import { defineConfig } from "@lovable.dev/vite-tanstack-config";
-import { loadEnv } from "vite";
+import { defineConfig, loadEnv } from "vite";
+// Corrected import path and function name for TanStack Start
+import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import tailwindcss from "@tailwindcss/vite";
 
-const env = {
-  ...loadEnv(process.env.NODE_ENV === "development" ? "development" : "production", process.cwd(), ""),
-  ...process.env,
-};
+export default defineConfig(({ mode }) => {
+  // 1. Safely load environment variables based on the current environment mode
+  const env = {
+    ...loadEnv(mode, process.cwd(), ""),
+    ...process.env,
+  };
 
-const supabaseUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL || "";
-const supabasePublishableKey =
-  env.VITE_SUPABASE_PUBLISHABLE_KEY || env.SUPABASE_PUBLISHABLE_KEY || "";
-const nitroPreset = env.NITRO_PRESET || (env.VERCEL ? "vercel" : undefined);
+  const supabaseUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL || "";
+  const supabasePublishableKey =
+    env.VITE_SUPABASE_PUBLISHABLE_KEY || env.SUPABASE_PUBLISHABLE_KEY || "";
+  
+  // 2. Handle Nitro Preset for Vercel deployments
+  const nitroPreset = env.NITRO_PRESET || (env.VERCEL ? "vercel" : undefined);
+  if (nitroPreset) {
+    process.env.NITRO_PRESET = nitroPreset;
+  }
 
-export default defineConfig({
-  nitro: {
-    preset: nitroPreset,
-  },
-  tanstackStart: {
-    // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-    // nitro/vite builds from this
-    server: { entry: "server" },
-  },
-  vite: {
+  return {
+    // 3. Register the required plugins for TanStack Start and Tailwind v4
+    plugins: [
+      // Updated function call
+      tanstackStart({
+        server: { 
+          // Redirects TanStack Start's bundled server entry to your custom error wrapper
+          entry: "server" 
+        },
+      }),
+      tailwindcss(),
+    ],
+    // 4. Inject environment variables directly into standard Vite's 'define' at the root level
     define: {
       "process.env.SUPABASE_URL": JSON.stringify(supabaseUrl),
       "process.env.SUPABASE_PUBLISHABLE_KEY": JSON.stringify(supabasePublishableKey),
     },
-  },
+  };
 });
