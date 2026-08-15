@@ -1,6 +1,7 @@
 import type { ChallengeTheme, OutstandChallenge, ThemeName, ChallengeId } from "./challenges.types";
 import { createChallengeBatch01 } from "./challenge-batch-01";
 import { createChallengeBatch02 } from "./challenge-batch-02";
+import { createChallengeBatch03 } from "./challenge-batch-03";
 
 const id = (value: string) => value as ChallengeId;
 
@@ -35,4 +36,5 @@ export const CHALLENGES: OutstandChallenge[] = [
   challenge({ id: "mastery-block", title: "Mastery Block", description: "Choose the skill that matters most this week and give it a protected 60-minute session with a measurable outcome.", emoji: "💎", category: "Focus", difficulty: "Master", rarity: "Divine", durationMinutes: 60, timeWindow: "Anytime", actionType: "Timer", xpReward: 800, coinsReward: 220, psychologicalProfile: { dopamineYield: "Surge", flavorText: "Do less. Go deeper. Finish stronger.", cognitiveLoad: 5 }, requirements: { minLevel: 5 }, theme: CHALLENGE_THEMES.Royal, audio: { onStart: "deep_hum", onComplete: "mythic_choir" }, haptics: { onStart: "heavy", onComplete: "cinematic_rumble" } }),
   ...createChallengeBatch01(CHALLENGE_THEMES),
   ...createChallengeBatch02(CHALLENGE_THEMES),
+  ...createChallengeBatch03(CHALLENGE_THEMES),
 ];
