@@ -12,43 +12,16 @@ import { useAuth, displayNameOf } from "@/hooks/use-auth";
 import { useDailyLog } from "@/hooks/use-dopamine";
 import { todayISO } from "@/lib/habits";
 import { cn } from "@/lib/utils";
-
 import { Button } from "@/components/ui/button";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
-import {
-  Conversation,
-  ConversationContent,
-  ConversationEmptyState,
-  ConversationScrollButton,
-} from "@/components/ai-elements/conversation";
-import {
-  Message,
-  MessageActions,
-  MessageAction,
-  MessageContent,
-  MessageResponse,
-  MessageToolbar,
-} from "@/components/ai-elements/message";
-import {
-  PromptInput,
-  PromptInputFooter,
-  PromptInputSubmit,
-  PromptInputTextarea,
-} from "@/components/ai-elements/prompt-input";
+import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import { Conversation, ConversationContent, ConversationEmptyState, ConversationScrollButton } from "@/components/ai-elements/conversation";
+import { Message, MessageActions, MessageAction, MessageContent, MessageToolbar } from "@/components/ai-elements/message";
+import { PromptInput, PromptInputFooter, PromptInputSubmit, PromptInputTextarea } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 
-// BULLETPROOF ID GENERATOR: 100% Math-based fallback to prevent WebView crashes
 const generateSafeId = () => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `id-${Math.random().toString(36).substring(2, 15)}-${Date.now().toString(36)}`;
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return `id-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
 };
 
 type AppContext = {
@@ -71,191 +44,126 @@ type ChatPanelProps = {
 
 function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelProps) {
   const [input, setInput] = useState("");
-  const { addHabit } = useAppState(); 
-  
+  const { addHabit } = useAppState();
   const appContextRef = useRef(appContext);
+
   useEffect(() => {
     appContextRef.current = appContext;
   }, [appContext]);
 
-  const { messages, isLoading, append, stop, error } = useChat({
+  const { messages, status, sendMessage, stop, error } = useChat({
     id: "outstand-assistant",
     api: "/api/chat",
     initialMessages,
     generateId: generateSafeId,
-    // FIX 1: Pass custom data using the built-in body property instead of mutating fetch options
-    body: {
-      appContext: appContextRef.current
-    },
-    onError: (err) => {
-      console.error("AI SDK Error:", err);
-      toast.error(`Error: ${err.message}`);
-    },
+    body: { appContext: appContextRef.current },
     fetch: async (url, options) => {
       const { data: { session } } = await supabase.auth.getSession();
       const headers = new Headers(options?.headers);
-      
-      if (session?.access_token) {
-        headers.set("Authorization", `Bearer ${session.access_token}`);
-      }
-      
-      // FIX 2: Removed fragile JSON parsing of options.body. 
-      // The SDK now handles injecting the body payload automatically.
-      return fetch(url, {
-        ...options,
-        headers,
-      });
+      if (session?.access_token) headers.set("Authorization", `Bearer ${session.access_token}`);
+      return fetch(url, { ...options, headers });
+    },
+    onError: (err) => {
+      console.error("AI SDK Error:", err);
+      toast.error(err.message || "The assistant could not respond.");
     },
   });
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    // FIX 3: Added standard event prevention to block rogue mobile webview reloads
-    if (e) e.preventDefault(); 
-    
-    const userText = input.trim();
-    if (!userText || isLoading) return;
-    
+  const isStreaming = status === "submitted" || status === "streaming";
+
+  const handleSubmit = async (event?: React.FormEvent) => {
+    event?.preventDefault();
+    const text = input.trim();
+    if (!text || isStreaming) return;
     setInput("");
-    
     try {
-      // FIX 4: Send only role and content. The SDK will invoke generateSafeId() internally.
-      await append({ 
-        role: "user", 
-        content: userText 
-      });
-    } catch (err: any) {
-      console.error("AI SDK append error:", err);
-      toast.error(`Send failed: ${err.message || "Could not process request."}`);
+      await sendMessage({ text });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not send message.";
+      console.error("AI message error:", err);
+      toast.error(message);
+      setInput(text);
     }
   };
 
   const handleClear = async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    if (!session) {
+      toast.error("Please sign in again.");
+      return;
+    }
 
-    const res = await fetch("/api/chat", {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    });
-
-    if (res.ok) {
+    try {
+      const response = await fetch("/api/chat", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!response.ok) throw new Error("Failed to clear chat history.");
       onClear();
       toast.success("Memory wiped. Fresh start.");
-    } else {
-      toast.error("Failed to clear chat history.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to clear chat history.");
     }
   };
 
   return (
     <div className="flex h-full flex-col">
-      <DrawerHeader className="flex shrink-0 items-start justify-between border-b border-white/5 pb-4 bg-slate-950/80">
+      <DrawerHeader className="flex shrink-0 items-start justify-between border-b border-white/5 bg-slate-950/80 pb-4">
         <div className="text-left">
           <DrawerTitle className="flex items-center gap-2 text-base text-white">
-            <div className="grid h-6 w-6 place-items-center rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 shadow-[0_0_15px_rgba(99,102,241,0.5)]">
+            <span className="grid h-6 w-6 place-items-center rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 shadow-[0_0_15px_rgba(99,102,241,0.5)]">
               <Bot className="h-3.5 w-3.5 text-white" />
-            </div>
+            </span>
             Outstand Intelligence
           </DrawerTitle>
-          <DrawerDescription className="text-xs text-slate-400 mt-1">
-            Real-time focus coaching and habit optimization.
-          </DrawerDescription>
+          <DrawerDescription className="mt-1 text-xs text-slate-400">Real-time focus coaching and habit optimization.</DrawerDescription>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon-sm" onClick={handleClear} className="text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors">
-            <Trash2 className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon-sm" onClick={onClose} className="text-slate-500 hover:text-white hover:bg-white/10 transition-colors">
-            <X className="h-4 w-4" />
-          </Button>
+          <Button variant="ghost" size="icon-sm" onClick={handleClear} aria-label="Clear assistant memory" className="text-slate-500 hover:bg-rose-500/10 hover:text-rose-400"><Trash2 className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close assistant" className="text-slate-500 hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></Button>
         </div>
       </DrawerHeader>
 
-      <Conversation className="flex-1 px-4 py-6 bg-slate-950/50">
+      <Conversation className="flex-1 bg-slate-950/50 px-4 py-6">
         <ConversationContent>
           {messages.length === 0 ? (
-            <ConversationEmptyState
-              icon={<Bot className="h-10 w-10 text-indigo-400 drop-shadow-[0_0_15px_rgba(129,140,248,0.5)]" />}
-              title="Systems Online"
-              description="I'm analyzing your dopamine baseline. Ask me to design a new habit for you, or how to recover from a focus slump."
-            />
+            <ConversationEmptyState icon={<Bot className="h-10 w-10 text-indigo-400" />} title="Systems Online" description="Ask for a habit idea, a focus plan, or help recovering from a productivity slump." />
           ) : (
             messages.map((message) => (
               <Message key={message.id} from={message.role}>
                 <MessageContent>
-                  {message.content && (
-                    <div className={cn(
-                      "whitespace-pre-wrap leading-relaxed",
-                      message.role === "assistant" ? "text-slate-200" : "text-white"
-                    )}>
-                      {message.content}
+                  {message.parts?.map((part, index) => part.type === "text" ? (
+                    <div key={`${message.id}-${index}`} className={cn("whitespace-pre-wrap leading-relaxed", message.role === "assistant" ? "text-slate-200" : "text-white")}>
+                      {part.text}
+                    </div>
+                  ) : null)}
+
+                  {message.role === "assistant" && message.parts?.some((part) => part.type === "tool-createHabit") && (
+                    <div className="mt-4 rounded-2xl border border-indigo-500/30 bg-indigo-900/20 p-4">
+                      <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-indigo-300"><Bot className="h-3 w-3" /> Recommended habit</div>
+                      {message.parts.map((part, index) => {
+                        if (part.type !== "tool-createHabit") return null;
+                        const input = part.input as { name?: string; emoji?: string; color?: string; reason?: string };
+                        if (!input?.name) return null;
+                        return (
+                          <motion.div key={`${message.id}-habit-${index}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+                            <div className="flex items-center gap-3">
+                              <div className="grid h-11 w-11 place-items-center rounded-xl bg-indigo-500/15 text-xl">{input.emoji || "✨"}</div>
+                              <div className="min-w-0"><h4 className="font-bold text-white">{input.name}</h4><p className="text-xs text-slate-400">{input.reason || "A simple habit to strengthen consistency."}</p></div>
+                            </div>
+                            <Button onClick={() => { addHabit({ name: input.name!, emoji: input.emoji || "✨", color: input.color || "primary" }); toast.success(`${input.name} added to your habits.`, { icon: <CheckCircle2 className="h-4 w-4 text-emerald-400" /> }); }} className="w-full bg-indigo-600 text-white hover:bg-indigo-500"><PlusCircle className="mr-2 h-4 w-4" /> Add habit</Button>
+                          </motion.div>
+                        );
+                      })}
                     </div>
                   )}
-
-                  {message.toolInvocations?.map((tool: any) => {
-                    if (tool.toolName === "createHabit") {
-                      return (
-                        <motion.div 
-                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          key={tool.toolCallId} 
-                          className="mt-4 mb-2 overflow-hidden rounded-2xl border border-indigo-500/40 bg-gradient-to-br from-indigo-900/40 to-slate-900/80 p-5 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-xl relative group"
-                        >
-                          <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                          
-                          <div className="relative z-10">
-                            <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-indigo-400">
-                              <Bot className="h-3 w-3" /> Recommended Protocol
-                            </div>
-                            
-                            <div className="mb-3 flex items-center gap-4">
-                              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-500/20 text-2xl shadow-inner border border-indigo-500/30">
-                                {tool.args.emoji}
-                              </div>
-                              <div>
-                                <h4 className="text-lg font-black text-white tracking-tight">
-                                  {tool.args.name}
-                                </h4>
-                                <p className="text-xs text-slate-400 line-clamp-2 mt-0.5">
-                                  {tool.args.reason || "Strategic baseline adjustment."}
-                                </p>
-                              </div>
-                            </div>
-
-                            <Button 
-                              onClick={() => {
-                                addHabit({
-                                  name: tool.args.name,
-                                  emoji: tool.args.emoji,
-                                  color: tool.args.color || "primary",
-                                });
-                                toast.success(`${tool.args.name} loaded into your dashboard.`, {
-                                  icon: <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                                });
-                              }}
-                              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_30px_rgba(79,70,229,0.5)] transition-all duration-300 group-hover:-translate-y-0.5"
-                            >
-                              <PlusCircle className="mr-2 h-4 w-4" /> Integrate Habit
-                            </Button>
-                          </div>
-                        </motion.div>
-                      );
-                    }
-                    return null;
-                  })}
                 </MessageContent>
-                
-                {message.role === "assistant" && !message.toolInvocations && (
+
+                {message.role === "assistant" && (
                   <MessageToolbar>
                     <MessageActions>
-                      <MessageAction
-                        tooltip="Copy response"
-                        label="Copy"
-                        onClick={() => {
-                          navigator.clipboard.writeText(message.content);
-                          toast.success("Copied to clipboard");
-                        }}
-                      >
-                        <span className="text-xs text-slate-500 hover:text-white transition-colors">Copy</span>
+                      <MessageAction tooltip="Copy response" label="Copy" onClick={() => { const text = message.parts?.filter((part) => part.type === "text").map((part) => part.text).join("") || ""; void navigator.clipboard.writeText(text); toast.success("Copied to clipboard"); }}>
+                        <span className="text-xs text-slate-500 hover:text-white">Copy</span>
                       </MessageAction>
                     </MessageActions>
                   </MessageToolbar>
@@ -263,179 +171,99 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
               </Message>
             ))
           )}
-          
+
           <AnimatePresence>
-            {isLoading && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <Message from="assistant">
-                  <MessageContent>
-                    <Shimmer className="text-sm font-medium text-indigo-400 drop-shadow-[0_0_8px_rgba(129,140,248,0.5)]">
-                      Synthesizing response...
-                    </Shimmer>
-                  </MessageContent>
-                </Message>
-              </motion.div>
-            )}
+            {isStreaming && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><Message from="assistant"><MessageContent><Shimmer className="text-sm font-medium text-indigo-400">Synthesizing response...</Shimmer></MessageContent></Message></motion.div>}
           </AnimatePresence>
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="shrink-0 border-t border-white/5 p-4 bg-slate-950 flex flex-col gap-2">
-        {error && (
-          <div className="rounded-lg border border-rose-500/50 bg-rose-500/10 p-3 text-sm text-rose-400">
-            <strong>Connection Failed:</strong> {error.message}
-          </div>
-        )}
-        
+      <div className="shrink-0 border-t border-white/5 bg-slate-950 p-4">
+        {error && <div className="mb-2 rounded-lg border border-rose-500/50 bg-rose-500/10 p-3 text-sm text-rose-300" role="alert"><strong>Connection failed:</strong> {error.message}</div>}
         <PromptInput onSubmit={handleSubmit}>
           <PromptInputTextarea
-            placeholder="Initialize command..."
+            placeholder="Ask Outstand anything..."
             value={input}
-            onChange={(e) => setInput(e.currentTarget.value)}
-            disabled={isLoading}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit();
-              }
-            }}
-            className="bg-slate-900/50 border-white/10 text-white placeholder:text-slate-600 focus:border-indigo-500/50 transition-colors resize-none"
+            onChange={(event) => setInput(event.currentTarget.value)}
+            disabled={isStreaming}
+            aria-label="Message Outstand Intelligence"
+            onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void handleSubmit(); } }}
+            className="resize-none border-white/10 bg-slate-900/50 text-white placeholder:text-slate-600 focus:border-indigo-500/50"
           />
           <PromptInputFooter className="justify-end pt-2">
-            <PromptInputSubmit
-              status={isLoading ? "streaming" : "idle"}
-              onStop={() => { if (stop) stop(); }}
-              disabled={(!input.trim() && !isLoading)}
-            />
+            <PromptInputSubmit status={isStreaming ? "streaming" : "idle"} onStop={() => stop()} disabled={!input.trim() && !isStreaming} aria-label={isStreaming ? "Stop response" : "Send message"} />
           </PromptInputFooter>
         </PromptInput>
       </div>
     </div>
   );
 }
+
 export function ChatAssistant() {
   const [open, setOpen] = useState(false);
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyKey, setHistoryKey] = useState(0);
-  
   const { user, profile } = useAuth();
   const { habits, sessions, outstand, xp, bestStreak } = useAppState();
   const { log } = useDailyLog();
   const today = todayISO();
 
-  const appContext: AppContext = useMemo(() => {
-    const completedToday = habits.filter((h) => h.history.includes(today)).map((h) => h.id);
-    return {
-      name: displayNameOf(user, profile),
-      habits: habits.map((h) => ({ id: h.id, name: h.name, emoji: h.emoji })),
-      completedToday,
-      sessions,
-      outstand,
-      xp,
-      bestStreak,
-      dopamineScore: log?.score ?? 50,
-    };
-  }, [habits, sessions, outstand, xp, bestStreak, log, user, profile, today]);
+  const appContext: AppContext = useMemo(() => ({
+    name: displayNameOf(user, profile),
+    habits: habits.map((habit) => ({ id: habit.id, name: habit.name, emoji: habit.emoji })),
+    completedToday: habits.filter((habit) => habit.history.includes(today)).map((habit) => habit.id),
+    sessions,
+    outstand,
+    xp,
+    bestStreak,
+    dopamineScore: log?.score ?? 50,
+  }), [habits, sessions, outstand, xp, bestStreak, log, user, profile, today]);
 
   useEffect(() => {
     if (!open || !user) return;
+    let cancelled = false;
 
-    setLoadingHistory(true);
-    const load = async () => {
+    const loadHistory = async () => {
       try {
-        const { data: conversation } = await supabase
-          .from("chat_conversations")
-          .select("id")
-          .eq("user_id", user.id)
-          .maybeSingle();
+        const { data: conversation, error: conversationError } = await supabase.from("chat_conversations").select("id").eq("user_id", user.id).maybeSingle();
+        if (conversationError) throw conversationError;
 
-        if (conversation?.id) {
-          const { data: messages } = await supabase
-            .from("chat_messages")
-            .select("role, content, created_at")
-            .eq("conversation_id", conversation.id)
-            .order("created_at", { ascending: true });
-
-          const uiMessages: UIMessage[] = (messages ?? [])
-            .filter((m) => m.role === "user" || m.role === "assistant")
-            .map((m) => ({
-              id: generateSafeId(),
-              role: m.role as "user" | "assistant",
-              content: m.content,
-            }));
-          setInitialMessages(uiMessages);
-        } else {
-          setInitialMessages([]);
+        if (!conversation?.id) {
+          if (!cancelled) setInitialMessages([]);
+          return;
         }
-      } catch (err) {
-        console.error("Failed to load chat history", err);
-        setInitialMessages([]);
-      } finally {
-        setLoadingHistory(false);
+
+        const { data: storedMessages, error: messageError } = await supabase.from("chat_messages").select("role, content, created_at").eq("conversation_id", conversation.id).order("created_at", { ascending: true });
+        if (messageError) throw messageError;
+
+        const uiMessages: UIMessage[] = (storedMessages ?? [])
+          .filter((message) => message.role === "user" || message.role === "assistant")
+          .map((message) => ({ id: generateSafeId(), role: message.role as "user" | "assistant", parts: [{ type: "text", text: message.content }] }));
+
+        if (!cancelled) setInitialMessages(uiMessages);
+      } catch (error) {
+        console.error("Failed to load chat history", error);
+        if (!cancelled) { setInitialMessages([]); toast.error("Could not load assistant history."); }
       }
     };
 
-    load();
+    void loadHistory();
+    return () => { cancelled = true; };
   }, [open, user, historyKey]);
-
-  const handleClear = () => {
-    setHistoryKey((k) => k + 1);
-  };
 
   return (
     <>
-      <motion.div
-        className="fixed bottom-24 right-4 md:bottom-8 md:right-8 z-50"
-        animate={{ y: [0, -8, 0] }}
-        transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
-      >
-        <Button
-          onClick={() => setOpen(true)}
-          className={cn(
-            "relative h-14 w-14 rounded-full p-0 border border-indigo-400/50",
-            "bg-slate-950 before:absolute before:inset-0 before:rounded-full before:bg-gradient-to-br before:from-indigo-500 before:to-purple-600 before:opacity-80",
-            "shadow-[0_0_30px_rgba(99,102,241,0.5)] hover:shadow-[0_0_50px_rgba(168,85,247,0.7)] hover:border-purple-400/80",
-            "transition-all duration-500 hover:scale-110 active:scale-95 group overflow-hidden"
-          )}
-          aria-label="Initialize Intelligence"
-        >
-          <div className="absolute inset-[-50%] bg-[conic-gradient(from_0deg,transparent_0_340deg,rgba(255,255,255,0.8)_360deg)] animate-[spin_3s_linear_infinite] opacity-50" />
-          <div className="absolute inset-[2px] rounded-full bg-slate-950 z-10 flex items-center justify-center">
-            <Bot className="h-6 w-6 text-indigo-400 group-hover:text-purple-300 transition-colors drop-shadow-[0_0_10px_rgba(129,140,248,0.8)]" />
-          </div>
+      <motion.div className="fixed bottom-24 right-4 z-50 md:bottom-8 md:right-8" animate={{ y: [0, -6, 0] }} transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}>
+        <Button onClick={() => setOpen(true)} aria-label="Open Outstand Intelligence" className="relative h-14 w-14 rounded-full border border-indigo-400/50 bg-slate-950 p-0 shadow-[0_0_30px_rgba(99,102,241,0.5)] hover:shadow-[0_0_40px_rgba(99,102,241,0.7)]">
+          <span className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 opacity-90" />
+          <Bot className="relative z-10 h-6 w-6 text-white" />
         </Button>
       </motion.div>
 
-      <Drawer open={open} onOpenChange={setOpen} direction="bottom">
-        <DrawerContent className="h-[90dvh] md:h-[85dvh] rounded-t-3xl border-t border-white/10 bg-slate-950/95 backdrop-blur-2xl shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
-          <div className="sr-only">
-            <DrawerTitle>Outstand Intelligence Assistant</DrawerTitle>
-            <DrawerDescription>Real-time coaching chat interface</DrawerDescription>
-          </div>
-
-          {loadingHistory ? (
-            <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
-              <div className="relative">
-                <Bot className="h-10 w-10 text-indigo-500 drop-shadow-[0_0_15px_rgba(99,102,241,0.5)]" />
-                <motion.div 
-                  className="absolute inset-0 border-2 border-indigo-500 rounded-full"
-                  animate={{ scale: [1, 1.5, 2], opacity: [1, 0.5, 0] }}
-                  transition={{ repeat: Infinity, duration: 1.5 }}
-                />
-              </div>
-              <p className="text-sm font-medium tracking-widest text-slate-400 uppercase">Decrypting Archives...</p>
-            </div>
-          ) : (
-            <ChatPanel
-              key={historyKey}
-              initialMessages={initialMessages}
-              appContext={appContext}
-              onClose={() => setOpen(false)}
-              onClear={handleClear}
-            />
-          )}
+      <Drawer open={open} onOpenChange={setOpen}>
+        <DrawerContent className="h-[88vh] border-white/10 bg-slate-950/95 p-0 text-white backdrop-blur-2xl">
+          <ChatPanel key={historyKey} initialMessages={initialMessages} appContext={appContext} onClose={() => setOpen(false)} onClear={() => { setInitialMessages([]); setHistoryKey((key) => key + 1); }} />
         </DrawerContent>
       </Drawer>
     </>
