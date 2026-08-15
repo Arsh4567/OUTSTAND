@@ -1,16 +1,31 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
-import { streamText, type UIMessage } from "ai";
+import { streamText, type ModelMessage } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 
 const ChatRequestSchema = z.object({
-  messages: z.array(z.any()),
-  appContext: z.any().optional(),
+  messages: z.array(z.unknown()).max(100),
+  appContext: z.unknown().optional(),
 });
 
+const MessagePartSchema = z.object({
+  type: z.literal("text"),
+  text: z.string(),
+});
+
+const MessageSchema = z.object({
+  role: z.enum(["system", "user", "assistant"]),
+  content: z.union([z.string(), z.array(MessagePartSchema)]),
+});
+
+type AppMessage = z.infer<typeof MessageSchema>;
+
 function buildSystemPrompt(appContext: unknown): string {
-  const ctx = appContext as Record<string, unknown> | undefined;
+  const ctx = (appContext && typeof appContext === "object")
+    ? (appContext as Record<string, unknown>)
+    : {};
+
   const today = new Date().toLocaleDateString(undefined, {
     weekday: "long",
     year: "numeric",
@@ -18,33 +33,90 @@ function buildSystemPrompt(appContext: unknown): string {
     day: "numeric",
   });
 
-  const habits = Array.isArray(ctx?.habits) ? ctx.habits : [];
-  const completedToday = Array.isArray(ctx?.completedToday) ? ctx.completedToday : [];
-  const sessions = Array.isArray(ctx?.sessions) ? ctx.sessions : [];
-  const outstand = Array.isArray(ctx?.outstand) ? ctx.outstand : [];
-  const xp = typeof ctx?.xp === "number" ? ctx.xp : 0;
-  const bestStreak = typeof ctx?.bestStreak === "number" ? ctx.bestStreak : 0;
-  const dopamineScore = typeof ctx?.dopamineScore === "number" ? ctx.dopamineScore : 50;
-  const name = typeof ctx?.name === "string" ? ctx.name : "friend";
+  const habits = Array.isArray(ctx.habits) ? ctx.habits : [];
+  const completedToday = Array.isArray(ctx.completedToday) ? ctx.completedToday : [];
+  const sessions = Array.isArray(ctx.sessions) ? ctx.sessions : [];
+  const outstand = Array.isArray(ctx.outstand) ? ctx.outstand : [];
+  const xp = typeof ctx.xp === "number" ? ctx.xp : 0;
+  const bestStreak = typeof ctx.bestStreak === "number" ? ctx.bestStreak : 0;
+  const dopamineScore = typeof ctx.dopamineScore === "number" ? ctx.dopamineScore : 50;
+  const name = typeof ctx.name === "string" ? ctx.name : "friend";
+
+  const habitSummary = habits
+    .filter((habit): habit is Record<string, unknown> => !!habit && typeof habit === "object")
+    .map((habit) => {
+      const id = typeof habit.id === "string" ? habit.id : "";
+      const habitName = typeof habit.name === "string" ? habit.name : "Habit";
+      return `${habitName} ${completedToday.includes(id) ? "(done today)" : "(not done today)"}`;
+    })
+    .join(", ");
 
   return `You are the Outstand AI Assistant, a supportive productivity coach inside the Outstand habit and focus tracking app.
 
 Today is ${today}. The user's display name is ${name}.
 
-Here is the user's current Outstand context:
+Current context:
 - Total XP: ${xp}
 - Best active streak: ${bestStreak} days
 - Dopamine score today: ${dopamineScore}/100
-- Habits (${habits.length} total): ${habits.map((h: any) => `${h.name} ${completedToday.includes(h.id) ? "(done today)" : "(not done today)"}`).join(", ") || "None yet"}
-- Completed focus sessions: ${sessions.filter((s: any) => s.completed).length}
+- Habits: ${habitSummary || "None yet"}
+- Completed focus sessions: ${sessions.filter((session) => !!session && typeof session === "object" && session.completed === true).length}
 - Completed Outstand challenges: ${outstand.length}
 
-Your role:
-- Encourage, never lecture. Keep responses concise and actionable.
-- Suggest the next habit to complete, a focus technique, or a quick challenge based on the context.
-- If the dopamine score is low, gently suggest a reset or a small win.
-- Use markdown for lists, bold text, and short paragraphs.
-- Do not mention the raw context numbers unless helpful.`.trim();
+Rules:
+- Encourage, never lecture.
+- Keep responses concise and actionable.
+- Prefer one clear next step.
+- Suggest focus techniques, habit adjustments, or a quick achievable challenge based on context.
+- Use markdown sparingly for readability.`.trim();
+}
+
+function normalizeMessages(rawMessages: unknown[]): ModelMessage[] {
+  return rawMessages
+    .map((raw): AppMessage | null => {
+      const parsed = MessageSchema.safeParse(raw);
+      return parsed.success ? parsed.data : null;
+    })
+    .filter((message): message is AppMessage => message !== null)
+    .map((message) => ({
+      role: message.role,
+      content: typeof message.content === "string"
+        ? message.content
+        : message.content.map((part) => ({ type: "text" as const, text: part.text })),
+    }));
+}
+
+function jsonError(message: string, status: number) {
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+async function getAuthenticatedSupabase(request: Request) {
+  const authHeader = request.headers.get("Authorization");
+  if (!authHeader) {
+    return { error: jsonError("Unauthorized access. Please log in.", 401) } as const;
+  }
+
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    return { error: jsonError("Server configuration error: Missing Supabase keys.", 500) } as const;
+  }
+
+  const client = createClient(supabaseUrl, supabaseKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: authHeader } },
+  });
+
+  const { data, error } = await client.auth.getUser();
+  if (error || !data.user) {
+    return { error: jsonError("Authentication failed. Session may be expired.", 401) } as const;
+  }
+
+  return { client, userId: data.user.id } as const;
 }
 
 export const Route = createFileRoute("/api/chat")({
@@ -52,173 +124,118 @@ export const Route = createFileRoute("/api/chat")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const authHeader = request.headers.get("Authorization");
-          if (!authHeader) {
-            return new Response(JSON.stringify({ error: "Unauthorized access. Please log in." }), { 
-              status: 401,
-              headers: { "Content-Type": "application/json" }
-            });
+          const auth = await getAuthenticatedSupabase(request);
+          if ("error" in auth) return auth.error;
+
+          const rawBody = await request.json().catch(() => null);
+          const parsedBody = ChatRequestSchema.safeParse(rawBody);
+          if (!parsedBody.success) {
+            return jsonError("Invalid chat request payload.", 400);
           }
 
-          const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-          const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-
-          if (!supabaseUrl || !supabaseKey) {
-            return new Response(JSON.stringify({ error: "Server configuration error: Missing Supabase keys." }), { 
-              status: 500,
-              headers: { "Content-Type": "application/json" }
-            });
+          const messages = normalizeMessages(parsedBody.data.messages);
+          if (messages.length === 0) {
+            return jsonError("At least one valid message is required.", 400);
           }
 
-          const supabase = createClient(supabaseUrl, supabaseKey, {
-            auth: { persistSession: false, autoRefreshToken: false },
-            global: { headers: { Authorization: authHeader } },
-          });
-
-          const { data: userData, error: userError } = await supabase.auth.getUser();
-          if (userError || !userData.user) {
-            return new Response(JSON.stringify({ error: "Authentication failed. Session may be expired." }), { 
-              status: 401,
-              headers: { "Content-Type": "application/json" }
-            });
-          }
-          const userId = userData.user.id;
-
-          let body: z.infer<typeof ChatRequestSchema>;
-          try {
-            const rawBody = await request.json();
-            body = ChatRequestSchema.parse(rawBody);
-          } catch (zodError: any) {
-            return new Response(JSON.stringify({ error: `Invalid request data: ${zodError?.message || "Check format"}` }), { 
-              status: 400,
-              headers: { "Content-Type": "application/json" }
-            });
-          }
-
-          const { messages, appContext } = body;
-
-          // Load or create conversation safely
-          let { data: existingConversation } = await supabase
+          let { data: conversation } = await auth.client
             .from("chat_conversations")
             .select("id")
-            .eq("user_id", userId)
+            .eq("user_id", auth.userId)
             .maybeSingle();
 
-          let conversationId = existingConversation?.id;
-          if (!conversationId) {
-            const { data: newConversation, error: createError } = await supabase
+          if (!conversation) {
+            const { data: created, error: createError } = await auth.client
               .from("chat_conversations")
-              .insert({ user_id: userId })
+              .insert({ user_id: auth.userId })
               .select("id")
               .single();
 
-            if (createError || !newConversation) {
-              return new Response(JSON.stringify({ error: "Failed to initialize conversation." }), { 
-                status: 500,
-                headers: { "Content-Type": "application/json" }
-              });
+            if (createError || !created) {
+              return jsonError("Failed to initialize conversation.", 500);
             }
-            conversationId = newConversation.id;
+            conversation = created;
           }
 
-          // Persist user message safely with fallback for text/parts formatting
-          const userMessage = messages[messages.length - 1];
-          if (userMessage?.role === "user") {
-            let text = "";
-            if (Array.isArray(userMessage.parts)) {
-              text = userMessage.parts
-                .filter((p: any) => p.type === "text")
-                .map((p: any) => p.text)
-                .join("");
-            } else if (typeof userMessage.content === "string") {
-              text = userMessage.content;
-            }
+          const latestUserMessage = [...messages].reverse().find((message) => message.role === "user");
+          if (latestUserMessage) {
+            const content = typeof latestUserMessage.content === "string"
+              ? latestUserMessage.content
+              : latestUserMessage.content.map((part) => part.text).join("");
 
-            if (text) {
-              await supabase.from("chat_messages").insert({
-                conversation_id: conversationId,
-                user_id: userId,
+            if (content.trim()) {
+              await auth.client.from("chat_messages").insert({
+                conversation_id: conversation.id,
+                user_id: auth.userId,
                 role: "user",
-                content: text,
+                content: content.trim(),
               });
             }
           }
 
-          // Setup Gemini API Key explicitly for Google AI Provider
           const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
           if (!apiKey) {
-            return new Response(JSON.stringify({ error: "Missing Gemini API Key in Vercel settings." }), { 
-              status: 500,
-              headers: { "Content-Type": "application/json" }
-            });
+            return jsonError("Missing Gemini API key. Add GEMINI_API_KEY to the Vercel environment.", 500);
           }
 
-          process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
-
           const result = streamText({
-            model: google("gemini-2.5-flash"), // Updated to current stable flash tier
-            system: buildSystemPrompt(appContext),
-            messages: messages as UIMessage[],
+            model: google("gemini-2.5-flash", { apiKey }),
+            system: buildSystemPrompt(parsedBody.data.appContext),
+            messages,
+            temperature: 0.7,
           });
 
-          return result.toDataStreamResponse({
-            onFinish: async ({ text }) => {
-              if (text) {
-                try {
-                  await supabase.from("chat_messages").insert({
-                    conversation_id: conversationId,
-                    user_id: userId,
-                    role: "assistant",
-                    content: text,
-                  });
-                } catch (dbError) {
-                  console.error("Failed to save assistant message:", dbError);
-                }
+          return result.toTextStreamResponse({
+            headers: {
+              "Cache-Control": "no-cache, no-transform",
+              Connection: "keep-alive",
+            },
+            async onFinish({ text }) {
+              if (!text.trim()) return;
+
+              const { error } = await auth.client.from("chat_messages").insert({
+                conversation_id: conversation.id,
+                user_id: auth.userId,
+                role: "assistant",
+                content: text,
+              });
+
+              if (error) {
+                console.error("Failed to save assistant message:", error);
               }
             },
           });
-        } catch (error: any) {
+        } catch (error) {
           console.error("Critical Chat API POST Error:", error);
-          return new Response(JSON.stringify({ error: error?.message || "An unexpected server error occurred." }), { 
-            status: 500,
-            headers: { "Content-Type": "application/json" }
-          });
+          return jsonError(error instanceof Error ? error.message : "An unexpected server error occurred.", 500);
         }
       },
 
       DELETE: async ({ request }) => {
         try {
-          const authHeader = request.headers.get("Authorization");
-          if (!authHeader) {
-            return new Response(JSON.stringify({ error: "Unauthorized access." }), { status: 401 });
-          }
+          const auth = await getAuthenticatedSupabase(request);
+          if ("error" in auth) return auth.error;
 
-          const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-          const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-
-          const supabase = createClient(supabaseUrl!, supabaseKey!, {
-            auth: { persistSession: false, autoRefreshToken: false },
-            global: { headers: { Authorization: authHeader } },
-          });
-
-          const { data: userData, error: userError } = await supabase.auth.getUser();
-          if (userError || !userData.user) {
-            return new Response(JSON.stringify({ error: "Authentication failed." }), { status: 401 });
-          }
-
-          const { data: conversation } = await supabase
+          const { data: conversation } = await auth.client
             .from("chat_conversations")
             .select("id")
-            .eq("user_id", userData.user.id)
+            .eq("user_id", auth.userId)
             .maybeSingle();
 
           if (conversation?.id) {
-            await supabase.from("chat_messages").delete().eq("conversation_id", conversation.id);
+            const { error } = await auth.client
+              .from("chat_messages")
+              .delete()
+              .eq("conversation_id", conversation.id);
+
+            if (error) {
+              return jsonError("Failed to clear chat history.", 500);
+            }
           }
 
           return new Response(null, { status: 204 });
-        } catch (error: any) {
-          return new Response(JSON.stringify({ error: error?.message || "Error clearing chat." }), { status: 500 });
+        } catch (error) {
+          return jsonError(error instanceof Error ? error.message : "Error clearing chat.", 500);
         }
       },
     },
