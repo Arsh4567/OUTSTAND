@@ -144,33 +144,53 @@ function DashboardHQ() {
 
   // 4. Portal Engine Lifecycle
   useEffect(() => {
-    if (isPortalActive && portalContainerRef.current && !portalRef.current) {
-      portalRef.current = new PortalEngine({
-        container: portalContainerRef.current, 
-        quality: Quality.ULTRA,
-        onOpen: () => {
-          setIsPortalFullyOpen(true);
-        }
-      });
-      portalRef.current.open();
-    }
+  if (!isPortalActive || !portalContainerRef.current) {
+    return;
+  }
 
-    return () => {
-      if (portalRef.current) {
-        portalRef.current.dispose();
-        portalRef.current = null;
-      }
-    };
-  }, [isPortalActive]);
+  // Prevent duplicate engines.
+  if (portalRef.current) {
+    return;
+  }
 
-  const closePortal = () => {
-    setIsPortalActive(false);
-    setIsPortalFullyOpen(false);
-    if (portalRef.current) {
-      portalRef.current.dispose();
+  const container = portalContainerRef.current;
+
+  const engine = new PortalEngine({
+    container,
+    quality: Quality.ULTRA,
+
+    onOpen: () => {
+      setIsPortalFullyOpen(true);
+    },
+
+    onClose: () => {
+      setIsPortalFullyOpen(false);
+    },
+  });
+
+  portalRef.current = engine;
+  engine.open();
+
+  return () => {
+    engine.dispose();
+
+    if (portalRef.current === engine) {
       portalRef.current = null;
     }
+
+    setIsPortalFullyOpen(false);
   };
+}, [isPortalActive]);
+
+ const closePortal = () => {
+  setIsPortalActive(false);
+  setIsPortalFullyOpen(false);
+
+  if (portalRef.current) {
+    portalRef.current.dispose();
+    portalRef.current = null;
+  }
+}; 
 
   if (isLoading) {
     return (
