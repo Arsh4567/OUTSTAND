@@ -1,4 +1,5 @@
-import type { ChallengeId, ChallengeTheme, OutstandChallenge, ThemeName } from "./challenges.types";
+import type { ChallengeTheme, OutstandChallenge, ThemeName, ChallengeId } from "./challenges.types";
+import { createChallengeBatch01 } from "./challenge-batch-01";
 
 const id = (value: string) => value as ChallengeId;
 
@@ -31,4 +32,5 @@ export const CHALLENGES: OutstandChallenge[] = [
   challenge({ id: "morning-first-win", title: "First Win", description: "Start your day with one useful action before opening entertainment: study, movement, planning, or reading.", emoji: "🌅", category: "Discipline", difficulty: "Medium", rarity: "Rare", durationMinutes: 20, timeWindow: "Morning", actionType: "Timer", xpReward: 100, coinsReward: 20, psychologicalProfile: { dopamineYield: "Reset", flavorText: "Own the first decision of the day.", cognitiveLoad: 2 }, theme: CHALLENGE_THEMES.Sunset, audio: { onStart: "chime", onComplete: "success_chime" }, haptics: { onStart: "light", onComplete: "success" } }),
   challenge({ id: "social-courage", title: "Courage Rep", description: "Do one small positive social action you have been putting off: ask, thank, explain, or start a conversation.", emoji: "🤝", category: "Social", difficulty: "Medium", rarity: "Rare", durationMinutes: 10, timeWindow: "Anytime", actionType: "Toggle", xpReward: 90, coinsReward: 20, psychologicalProfile: { dopamineYield: "High", flavorText: "Confidence grows through reps, not waiting.", cognitiveLoad: 3 }, theme: CHALLENGE_THEMES.Neon, audio: { onComplete: "success_chime" }, haptics: { onComplete: "success" } }),
   challenge({ id: "mastery-block", title: "Mastery Block", description: "Choose the skill that matters most this week and give it a protected 60-minute session with a measurable outcome.", emoji: "💎", category: "Focus", difficulty: "Master", rarity: "Divine", durationMinutes: 60, timeWindow: "Anytime", actionType: "Timer", xpReward: 800, coinsReward: 220, psychologicalProfile: { dopamineYield: "Surge", flavorText: "Do less. Go deeper. Finish stronger.", cognitiveLoad: 5 }, requirements: { minLevel: 5 }, theme: CHALLENGE_THEMES.Royal, audio: { onStart: "deep_hum", onComplete: "mythic_choir" }, haptics: { onStart: "heavy", onComplete: "cinematic_rumble" } }),
+  ...createChallengeBatch01(CHALLENGE_THEMES),
 ];
