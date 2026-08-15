@@ -1,150 +1,156 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAppState } from "@/hooks/use-app-state";
 import { useDailyLog } from "@/hooks/use-dopamine";
 import { CHALLENGES, randomChallenge, type OutstandChallenge } from "@/lib/Index";
-import { supabase } from "@/integrations/supabase/client"; // 🔥 Supabase Imported
+import { supabase } from "@/integrations/supabase/client";
 
 export function useOutstand() {
   const { recordOutstand } = useAppState();
   const { addPositive } = useDailyLog();
-  
   const [challenge, setChallenge] = useState<OutstandChallenge | null>(null);
   const [remaining, setRemaining] = useState(600);
   const [running, setRunning] = useState(false);
-  
   const [isShuffling, setIsShuffling] = useState(false);
   const [shuffleDisplay, setShuffleDisplay] = useState({ emoji: "⚡", title: "Locating Mission..." });
-  
   const [completionStage, setCompletionStage] = useState<0 | 1 | 2>(0);
-  const intervalRef = useRef<number | null>(null);
 
-  const generate = () => {
+  const intervalRef = useRef<number | null>(null);
+  const shuffleRef = useRef<number | null>(null);
+  const completionTimersRef = useRef<number[]>([]);
+  const mountedRef = useRef(true);
+
+  const clearTimer = useCallback((ref: React.MutableRefObject<number | null>) => {
+    if (ref.current !== null) {
+      window.clearInterval(ref.current);
+      ref.current = null;
+    }
+  }, []);
+
+  const clearCompletionTimers = useCallback(() => {
+    completionTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    completionTimersRef.current = [];
+  }, []);
+
+  const generate = useCallback(() => {
+    clearTimer(intervalRef);
+    clearTimer(shuffleRef);
+    clearCompletionTimers();
+    setRunning(false);
+    setCompletionStage(0);
     setIsShuffling(true);
-    setChallenge(null); 
-    
+    setChallenge(null);
+
     let ticks = 0;
-    const shuffleInterval = setInterval(() => {
+    shuffleRef.current = window.setInterval(() => {
       const temp = CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)];
       setShuffleDisplay({ emoji: temp.emoji, title: temp.title });
-      ticks++;
-      
+      ticks += 1;
+
       if (ticks > 12) {
-        clearInterval(shuffleInterval);
+        clearTimer(shuffleRef);
         const next = randomChallenge(challenge?.title);
-        
+        const duration = Math.max(1, Number(next.durationMinutes ?? 10)) * 60;
         setChallenge(next);
-        
-        // Providing a fallback of 10 minutes (600 seconds) just in case a malformed challenge slips through
-        const duration = next.durationMinutes ? next.durationMinutes * 60 : 600;
         setRemaining(duration);
-        
-        setRunning(false);
         setIsShuffling(false);
       }
-    }, 80); 
-  };
+    }, 80);
+  }, [challenge?.title, clearCompletionTimers, clearTimer]);
 
-  // 🔥 loadChallenge function specifically for deep-linking from the Dashboard
-  const loadChallenge = (id: string) => {
-    const specificChallenge = CHALLENGES.find((c) => c.id === id);
-    
-    if (specificChallenge) {
-      setChallenge(specificChallenge);
-      const duration = specificChallenge.durationMinutes ? specificChallenge.durationMinutes * 60 : 600;
-      
-      setRemaining(duration);
-      setRunning(false);
-      setIsShuffling(false);
-      setCompletionStage(0);
-    } else {
+  const loadChallenge = useCallback((id: string) => {
+    const specificChallenge = CHALLENGES.find((item) => item.id === id);
+    if (!specificChallenge) {
       console.warn(`Outstand challenge with ID "${id}" not found.`);
+      return;
     }
-  };
+
+    clearTimer(intervalRef);
+    clearTimer(shuffleRef);
+    clearCompletionTimers();
+    setChallenge(specificChallenge);
+    setRemaining(Math.max(1, Number(specificChallenge.durationMinutes ?? 10)) * 60);
+    setRunning(false);
+    setIsShuffling(false);
+    setCompletionStage(0);
+  }, [clearCompletionTimers, clearTimer]);
 
   useEffect(() => {
-    if (!running) return;
+    if (!running || remaining <= 0) return;
+    clearTimer(intervalRef);
     intervalRef.current = window.setInterval(() => {
-      setRemaining((r) => {
-        if (r <= 1) {
-          window.clearInterval(intervalRef.current!);
+      setRemaining((current) => {
+        if (current <= 1) {
+          clearTimer(intervalRef);
           setRunning(false);
-          if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
+          if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([200, 100, 200]);
           toast.success("Time's up! Mission complete.");
           return 0;
         }
-        return r - 1;
+        return current - 1;
       });
     }, 1000);
-    return () => { if (intervalRef.current) window.clearInterval(intervalRef.current); };
-  }, [running]);
+    return () => clearTimer(intervalRef);
+  }, [clearTimer, running, remaining]);
 
-  const complete = () => {
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      clearTimer(intervalRef);
+      clearTimer(shuffleRef);
+      clearCompletionTimers();
+    };
+  }, [clearCompletionTimers, clearTimer]);
+
+  const complete = useCallback(() => {
     if (!challenge || completionStage !== 0) return;
-    
-    const xpEarned = challenge.xp || 50; 
+
+    const xpEarned = Math.max(0, Number(challenge.xp ?? 50));
     const challengeEmoji = challenge.emoji;
-    const challengeColor = challenge.color || '#4f46e5'; 
-    
+    const challengeColor = challenge.color || "#4f46e5";
+    const challengeTitle = challenge.title;
+    const challengeDuration = Math.max(1, Number(challenge.durationMinutes ?? 10));
+
+    clearTimer(intervalRef);
+    clearTimer(shuffleRef);
+    clearCompletionTimers();
     setRunning(false);
-    setCompletionStage(1); 
-    
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate([20, 100, 30, 80, 50, 50, 100]); 
-    }
+    setCompletionStage(1);
 
-    // 🔥 SUPABASE INTEGRATION: Background Sync
-    // We fire this asynchronously so it NEVER blocks the 60FPS UI animations.
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const { error } = await supabase.from("outstand_logs").insert({
-          user_id: session.user.id,
-          challenge_id: challenge.id,
-          title: challenge.title,
-          xp_earned: xpEarned,
-          duration_minutes: challenge.durationMinutes || 10,
-        });
+    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([20, 100, 30, 80, 50, 50, 100]);
 
-        if (error) {
-          console.error("Supabase sync failed:", error.message);
-          // Note: We silently log errors here instead of toasting them 
-          // so we don't ruin the user's dopamine hit if they are offline.
-        }
-      }
+    void supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session?.user || !mountedRef.current) return;
+      const { error } = await supabase.from("outstand_logs").insert({
+        user_id: session.user.id,
+        challenge_id: challenge.id,
+        title: challengeTitle,
+        xp_earned: xpEarned,
+        duration_minutes: challengeDuration,
+      });
+      if (error) console.error("Outstand sync failed:", error.message);
     });
-    
-    setTimeout(() => {
-      setCompletionStage(2);
-    }, 1500);
 
-    setTimeout(() => {
-      recordOutstand(challenge.title, xpEarned);
+    completionTimersRef.current.push(window.setTimeout(() => {
+      if (mountedRef.current) setCompletionStage(2);
+    }, 1500));
+
+    completionTimersRef.current.push(window.setTimeout(() => {
+      if (!mountedRef.current) return;
+      recordOutstand(challengeTitle, xpEarned);
       addPositive("outstand");
-      
       toast.custom((t) => (
-        <div 
-          className="relative overflow-hidden w-full max-w-[360px] mx-auto rounded-2xl border border-white/10 bg-[#050810] p-4 flex items-center gap-4"
-          style={{ boxShadow: `0 20px 40px -10px ${challengeColor}60` }}
-        >
+        <div className="relative mx-auto flex w-full max-w-[360px] items-center gap-4 overflow-hidden rounded-2xl border border-white/10 bg-[#050810] p-4" style={{ boxShadow: `0 20px 40px -10px ${challengeColor}60` }}>
           <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-50" />
-          <div className="relative flex-shrink-0 w-14 h-14 flex items-center justify-center text-3xl bg-black/50 rounded-xl border border-white/10 shadow-[inset_0_0_20px_rgba(255,255,255,0.1)] z-10">
-            {challengeEmoji}
-          </div>
-          <div className="relative flex-1 z-10">
-            <h3 className="text-white font-black text-xs tracking-[0.2em] uppercase opacity-70">Mission Cleared</h3>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-white font-black font-mono text-2xl leading-none drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]">
-                +{xpEarned} <span className="text-sm opacity-50">XP</span>
-              </span>
-            </div>
-          </div>
+          <div className="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/50 text-3xl shadow-[inset_0_0_20px_rgba(255,255,255,0.1)]">{challengeEmoji}</div>
+          <div className="relative z-10 flex-1"><h3 className="text-xs font-black uppercase tracking-[0.2em] text-white/70">Mission Cleared</h3><div className="mt-1 font-mono text-2xl font-black leading-none text-white">+{xpEarned} <span className="text-sm opacity-50">XP</span></div></div>
         </div>
-      ), { duration: 4000 });
-
+      ), { id: `outstand-${challenge.id}`, duration: 4000 });
       setChallenge(null);
       setCompletionStage(0);
-    }, 2800);
-  };
+      completionTimersRef.current = [];
+    }, 2800));
+  }, [addPositive, challenge, clearCompletionTimers, clearTimer, completionStage, recordOutstand]);
 
   return {
     challenge,
@@ -157,7 +163,7 @@ export function useOutstand() {
     completionStage,
     generate,
     complete,
-    loadChallenge, 
+    loadChallenge,
     mins: Math.floor(remaining / 60),
     secs: remaining % 60,
   };
