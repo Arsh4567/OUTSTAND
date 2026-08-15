@@ -11,94 +11,55 @@ import {
   type OutstandCompletion,
 } from "@/lib/habits";
 
-const seedHabits: Habit[] = [
-  {
-    id: "h1",
-    name: "Read 20 minutes",
-    emoji: "📚",
-    color: "primary",
-    createdAt: new Date().toISOString(),
-    history: [],
-  },
-  {
-    id: "h2",
-    name: "Deep work session",
-    emoji: "🧠",
-    color: "accent",
-    createdAt: new Date().toISOString(),
-    history: [],
-  },
-  {
-    id: "h3",
-    name: "Exercise / stretch",
-    emoji: "🏃",
-    color: "success",
-    createdAt: new Date().toISOString(),
-    history: [],
-  },
-  {
-    id: "h4",
-    name: "No phone before class",
-    emoji: "📵",
-    color: "warning",
-    createdAt: new Date().toISOString(),
-    history: [],
-  },
-];
+const seedHabits: Habit[] = [];
+
+function safeUuid() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return `id-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
+}
 
 export function useAppState() {
-  // 1. Fetch raw data from local storage
   const [rawHabits, setHabits] = useLocalStorage<Habit[]>("ht.habits.v1", seedHabits);
   const [rawSessions, setSessions] = useLocalStorage<FocusSession[]>("ht.sessions.v1", []);
   const [rawOutstand, setOutstand] = useLocalStorage<OutstandCompletion[]>("ht.outstand.v1", []);
 
-  // 2. SANITIZATION: Guarantee these are ALWAYS arrays to prevent .reduce() and .filter() crashes
-  const habits = Array.isArray(rawHabits) ? rawHabits : seedHabits;
+  const habits = Array.isArray(rawHabits) ? rawHabits : [];
   const sessions = Array.isArray(rawSessions) ? rawSessions : [];
   const outstand = Array.isArray(rawOutstand) ? rawOutstand : [];
 
   const xp = useMemo(() => {
-    // 3. SAFE MATH: Use optional chaining (?.) and fallbacks (|| 0)
-    const habitCompletions = habits.reduce((sum, h) => sum + (h?.history?.length || 0), 0);
-    const focus = sessions.filter((s) => s?.completed).length;
-    const outstandXp = outstand.reduce((sum, o) => sum + (o?.xp || 0), 0);
-    
-    return (habitCompletions * XP_PER_HABIT) + (focus * XP_PER_FOCUS) + outstandXp;
+    const habitCompletions = habits.reduce((sum, habit) => sum + (Array.isArray(habit?.history) ? habit.history.length : 0), 0);
+    const completedFocusSessions = sessions.filter((session) => Boolean(session?.completed)).length;
+    const outstandXp = outstand.reduce((sum, completion) => sum + (typeof completion?.xp === "number" ? completion.xp : 0), 0);
+    return habitCompletions * XP_PER_HABIT + completedFocusSessions * XP_PER_FOCUS + outstandXp;
   }, [habits, sessions, outstand]);
 
   const level = Math.floor(xp / 500) + 1;
-  const progressToNextLevel = (xp % 500) / 5; 
+  const progressToNextLevel = (xp % 500) / 5;
 
-  const recordOutstand = (title: string, xp: number) => {
-    setOutstand((prev) => {
-      const safePrev = Array.isArray(prev) ? prev : [];
-      return [
-        { id: crypto.randomUUID(), title, xp, completedAt: new Date().toISOString() },
-        ...safePrev,
-      ].slice(0, 200);
-    });
+  const recordOutstand = (title: string, xpReward: number) => {
+    setOutstand((prev) => [
+      { id: safeUuid(), title, xp: xpReward, completedAt: new Date().toISOString() },
+      ...(Array.isArray(prev) ? prev : []),
+    ].slice(0, 200));
   };
 
   const toggleToday = (id: string) => {
     const today = todayISO();
-    setHabits((prev) => {
-      const safePrev = Array.isArray(prev) ? prev : [];
-      return safePrev.map((h) => {
-        if (h.id !== id) return h;
-        const history = Array.isArray(h.history) ? h.history : [];
-        const has = history.includes(today);
-        return {
-          ...h,
-          history: has ? history.filter((d) => d !== today) : [...history, today],
-        };
-      });
-    });
+    setHabits((prev) => (Array.isArray(prev) ? prev : []).map((habit) => {
+      if (habit.id !== id) return habit;
+      const history = Array.isArray(habit.history) ? habit.history : [];
+      return {
+        ...habit,
+        history: history.includes(today) ? history.filter((day) => day !== today) : [...history, today],
+      };
+    }));
   };
 
   const addHabit = (data: { name: string; emoji: string; color: string }) => {
     const habit: Habit = {
-      id: crypto.randomUUID(),
-      name: data.name,
+      id: safeUuid(),
+      name: data.name.trim(),
       emoji: data.emoji,
       color: data.color,
       createdAt: new Date().toISOString(),
@@ -107,11 +68,10 @@ export function useAppState() {
     setHabits((prev) => [...(Array.isArray(prev) ? prev : []), habit]);
   };
 
-  // NEW: Bulk setup function for onboarding initialization
   const setInitialHabits = (chosenHabits: Array<{ name: string; emoji: string; color: string }>) => {
     const formattedHabits: Habit[] = chosenHabits.map((item) => ({
-      id: crypto.randomUUID(),
-      name: item.name,
+      id: safeUuid(),
+      name: item.name.trim(),
       emoji: item.emoji,
       color: item.color,
       createdAt: new Date().toISOString(),
@@ -121,38 +81,32 @@ export function useAppState() {
   };
 
   const updateHabit = (id: string, data: Partial<Pick<Habit, "name" | "emoji" | "color">>) => {
-    setHabits((prev) => {
-      const safePrev = Array.isArray(prev) ? prev : [];
-      return safePrev.map((h) => (h.id === id ? { ...h, ...data } : h));
-    });
+    setHabits((prev) => (Array.isArray(prev) ? prev : []).map((habit) => (
+      habit.id === id ? { ...habit, ...data, name: typeof data.name === "string" ? data.name.trim() : habit.name } : habit
+    )));
   };
 
   const deleteHabit = (id: string) => {
-    setHabits((prev) => {
-      const safePrev = Array.isArray(prev) ? prev : [];
-      return safePrev.filter((h) => h.id !== id);
-    });
+    setHabits((prev) => (Array.isArray(prev) ? prev : []).filter((habit) => habit.id !== id));
   };
 
   const recordSession = (durationMin: number, completed: boolean) => {
-    const s: FocusSession = {
-      id: crypto.randomUUID(),
+    const safeDuration = Math.max(0, Math.round(durationMin));
+    const session: FocusSession = {
+      id: safeUuid(),
       startedAt: new Date().toISOString(),
-      durationMin,
+      durationMin: safeDuration,
       completed,
     };
-    setSessions((prev) => [s, ...(Array.isArray(prev) ? prev : [])].slice(0, 500));
+    setSessions((prev) => [session, ...(Array.isArray(prev) ? prev : [])].slice(0, 500));
   };
 
-  // 4. SAFE STREAK CALCULATION: Ensure computeStreak always receives an array
-  const streaks = useMemo(() => {
-    return habits.map((h) => ({ 
-      id: h?.id, 
-      streak: computeStreak(Array.isArray(h?.history) ? h.history : []) 
-    }));
-  }, [habits]);
+  const streaks = useMemo(() => habits.map((habit) => ({
+    id: habit.id,
+    streak: computeStreak(Array.isArray(habit.history) ? habit.history : []),
+  })), [habits]);
 
-  const bestStreak = streaks.reduce((a, b) => ((b?.streak || 0) > a ? (b?.streak || 0) : a), 0);
+  const bestStreak = streaks.reduce((best, current) => Math.max(best, current.streak || 0), 0);
 
   return {
     habits,
