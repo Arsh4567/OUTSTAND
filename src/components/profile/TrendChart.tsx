@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { scoreColor } from "@/lib/dopamine";
 
-const smoothEase = [0.22, 1, 0.36, 1];
+const smoothEase = [0.22, 1, 0.36, 1] as const;
 
 interface TrendChartProps {
   logs: { log_date: string; score: number }[];

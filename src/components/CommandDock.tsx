@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { LayoutDashboard, Timer, Sparkles, Flame } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -12,7 +12,8 @@ const NAV_ITEMS = [
 
 // Spring physics for the gliding active indicator
 const dockSpring = {
-  type: "spring",
+  // typed for framer-motion
+  type: "spring" as const,
   stiffness: 500,
   damping: 30,
 };

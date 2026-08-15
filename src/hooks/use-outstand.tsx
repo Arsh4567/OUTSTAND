@@ -65,12 +65,12 @@ export function useOutstand() {
   const complete = () => {
     if (!challenge || completionStage !== 0) return;
     
-    const xpEarned = challenge.xp || 50; // Fallback added for safety
+    const xpEarned = challenge.xpReward || 50; // Fallback added for safety
     const challengeEmoji = challenge.emoji;
     
     // Safely mapping the old color schema to the new dynamic themes if required
     // Defaulting to the Outstand Indigo hex if the color prop is missing
-    const challengeColor = challenge.color || '#4f46e5'; 
+    const challengeColor = challenge.theme?.particleColors?.[0] || '#4f46e5'; 
     
     setRunning(false);
     setCompletionStage(1); 

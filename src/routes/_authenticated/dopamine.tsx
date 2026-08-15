@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 
 import { useDailyLog } from "@/hooks/use-dopamine";
-import { scoreColor, generateInsights } from "@/lib/dopamine";
+import { scoreColor, generateInsights, POSITIVES, NEGATIVES } from "@/lib/dopamine";
 import { Button } from "@/components/ui/button";
 
 // ==========================================
@@ -27,22 +27,9 @@ export const Route = createFileRoute("/_authenticated/dopamine")({
 // ==========================================
 // DATA CONSTANTS
 // ==========================================
-const POSITIVES = [
-  { key: "workout", emoji: "🏃", label: "Intense Workout", description: "Pushed physical limits", points: 15 },
-  { key: "deep_work", emoji: "🧠", label: "Deep Work", description: "90m+ of uninterrupted focus", points: 20 },
-  { key: "cold_plunge", emoji: "🧊", label: "Cold Exposure", description: "Voluntary discomfort", points: 10 },
-  { key: "reading", emoji: "📚", label: "Reading", description: "Absorbed new knowledge", points: 10 },
-];
-
-const NEGATIVES = [
-  { key: "doom_scroll", emoji: "📱", label: "Doomscrolling", description: "Mindless social media consumption", points: -15 },
-  { key: "junk_food", emoji: "🍔", label: "Processed Food", description: "Compromised physical baseline", points: -10 },
-  { key: "snooze", emoji: "⏰", label: "Hit Snooze", description: "Lost the morning battle", points: -10 },
-  { key: "alcohol", emoji: "🍷", label: "Alcohol", description: "Borrowed happiness from tomorrow", points: -20 },
-];
 
 // Premium animation curve
-const smoothEase = [0.16, 1, 0.3, 1];
+const smoothEase = [0.16, 1, 0.3, 1] as const;
 
 // ==========================================
 // MAIN COMPONENT

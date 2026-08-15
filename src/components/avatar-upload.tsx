@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '@/lib/supabase'; // Adjust this import to match your supabase client path
+import { supabase } from '@/integrations/supabase/client'; // Adjust this import to match your supabase client path
 import { Camera, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 

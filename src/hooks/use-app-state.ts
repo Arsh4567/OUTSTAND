@@ -60,7 +60,7 @@ export function useAppState() {
     // 3. SAFE MATH: Use optional chaining (?.) and fallbacks (|| 0)
     const habitCompletions = habits.reduce((sum, h) => sum + (h?.history?.length || 0), 0);
     const focus = sessions.filter((s) => s?.completed).length;
-    const outstandXp = outstand.reduce((sum, o) => sum + (o?.xp || 0), 0);
+    const outstandXp = outstand.reduce((sum, o) => sum + ((o as any)?.xp || 0), 0);
     
     return (habitCompletions * XP_PER_HABIT) + (focus * XP_PER_FOCUS) + outstandXp;
   }, [habits, sessions, outstand]);

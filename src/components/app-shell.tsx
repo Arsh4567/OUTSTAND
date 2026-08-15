@@ -228,7 +228,7 @@ function ShellWithChrome() {
               pathname === "/dopamine" ? (
                 <motion.div key="dopamine-actions" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.2 }} className="flex items-center gap-3 sm:gap-4">
                   <XpBadge xp={safeXp} level={level} pct={pct} variantId="dopamine" />
-                  <button onClick={() => navigate({ to: "/dopamine/history" })} className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-slate-900/50 text-slate-400 transition-all hover:bg-indigo-500/20 hover:text-indigo-400 active:scale-95">
+                  <button onClick={() => navigate({ to: "/dopamine" })} className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-slate-900/50 text-slate-400 transition-all hover:bg-indigo-500/20 hover:text-indigo-400 active:scale-95">
                     <History className="h-4 w-4" />
                   </button>
                 </motion.div>
