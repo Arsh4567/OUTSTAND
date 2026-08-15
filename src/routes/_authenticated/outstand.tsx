@@ -7,7 +7,7 @@ import { FocusEngine } from "@/components/outstand/FocusEngine";
 import { EnvironmentEffects } from "@/components/outstand/EnvironmentEffects";
 import { OfflineBanner } from "@/components/outstand/OfflineBanner";
 import { useOutstand } from "@/hooks/use-outstand";
-import { CHALLENGES } from "@/lib/Index";
+import { CHALLENGES } from "@/lib/challenges.data";
 
 type OutstandSearch = { challengeId?: string };
 export const Route = createFileRoute("/_authenticated/outstand")({
@@ -80,11 +80,6 @@ export function OutstandPage() {
               <FocusEngine challenge={challenge} isShuffling={isShuffling} shuffleDisplay={shuffleDisplay} completionStage={completionStage} running={running} mins={mins} secs={secs} setRunning={setRunning} setRemaining={setRemaining} generate={generate} complete={complete} />
             </div>
           </div>
-
-          <footer className="mt-4 flex flex-col gap-2 px-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-            <span className="flex items-center gap-2">{isOnline ? <WifiStatus /> : <><WifiOff className="h-3 w-3" /> Offline mode</>}</span>
-            <span>Progress is saved automatically when a mission is cleared.</span>
-          </footer>
         </main>
       </div>
     </MotionConfig>
@@ -92,6 +87,11 @@ export function OutstandPage() {
 }
 
 function Metric({ icon, value, label }: { icon: ReactNode; value: string; label: string }) {
-  return <div className="min-w-[78px] rounded-2xl border border-white/[0.07] bg-white/[0.035] px-3 py-3 text-center backdrop-blur-md sm:min-w-[92px]"><div className="mx-auto mb-1.5 flex w-fit text-cyan-300/70">{icon}</div><div className="text-lg font-black tracking-tight text-white">{value}</div><div className="text-[8px] font-bold uppercase tracking-[0.18em] text-slate-600">{label}</div></div>;
+  return (
+    <div className="min-w-[82px] rounded-2xl border border-white/[0.08] bg-white/[0.025] px-3 py-2.5 backdrop-blur-md">
+      <div className="flex items-center gap-1.5 text-cyan-300/70">{icon}</div>
+      <div className="mt-1 text-lg font-black tracking-tight text-white">{value}</div>
+      <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">{label}</div>
+    </div>
+  );
 }
-function WifiStatus() { return <span className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]" /> System online</span>; }
