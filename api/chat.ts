@@ -38,14 +38,7 @@ function buildPrompt(appContext: unknown): string {
     })
     .join(", ");
 
-  return `You are Outstand Intelligence, a concise and supportive productivity coach.
-User: ${name}
-XP: ${xp}
-Best streak: ${streak} days
-Dopamine score: ${dopamineScore}/100
-Habits: ${habitSummary || "None yet"}
-
-Give practical, encouraging answers and prefer one clear next step.`;
+  return `You are Outstand Intelligence, a concise and supportive productivity coach.\nUser: ${name}\nXP: ${xp}\nBest streak: ${streak} days\nDopamine score: ${dopamineScore}/100\nHabits: ${habitSummary || "None yet"}\n\nGive practical, encouraging answers and prefer one clear next step.`;
 }
 
 function textFromMessage(message: z.infer<typeof MessageSchema>): string {
@@ -61,11 +54,7 @@ function json(res: any, status: number, body: unknown) {
 async function sendResponse(res: any, response: Response) {
   res.status(response.status);
   response.headers.forEach((value, key) => res.setHeader(key, value));
-
-  if (!response.body) {
-    res.end();
-    return;
-  }
+  if (!response.body) return res.end();
 
   const reader = response.body.getReader();
   try {
@@ -78,6 +67,36 @@ async function sendResponse(res: any, response: Response) {
     reader.releaseLock();
     res.end();
   }
+}
+
+function describeError(error: unknown): { message: string; code?: string; details?: string } {
+  if (error instanceof Error) {
+    const candidate = error as Error & { code?: string; cause?: unknown };
+    return {
+      message: error.message || "Unknown error",
+      ...(candidate.code ? { code: candidate.code } : {}),
+      ...(candidate.cause instanceof Error ? { details: candidate.cause.message } : {}),
+    };
+  }
+  if (typeof error === "object" && error !== null) {
+    const candidate = error as Record<string, unknown>;
+    return {
+      message: typeof candidate.message === "string" ? candidate.message : "Unknown error",
+      ...(typeof candidate.code === "string" ? { code: candidate.code } : {}),
+      ...(typeof candidate.details === "string" ? { details: candidate.details } : {}),
+    };
+  }
+  return { message: String(error) };
+}
+
+function sendDetailedError(res: any, status: number, error: unknown, fallback: string) {
+  const info = describeError(error);
+  console.error("AI API error", { status, ...info, error });
+  json(res, status, {
+    error: info.message || fallback,
+    code: info.code,
+    details: info.details,
+  });
 }
 
 export default async function handler(req: any, res: any) {
@@ -96,7 +115,7 @@ export default async function handler(req: any, res: any) {
 
   const authHeader = req.headers?.authorization as string | undefined;
   if (!authHeader?.startsWith("Bearer ")) {
-    json(res, 401, { error: "Unauthorized access." });
+    json(res, 401, { error: "Unauthorized access. Missing Bearer token." });
     return;
   }
 
@@ -105,11 +124,18 @@ export default async function handler(req: any, res: any) {
   const apiKey = env("GEMINI_API_KEY") || env("GOOGLE_GENERATIVE_AI_API_KEY");
 
   if (!supabaseUrl || !supabaseKey) {
-    json(res, 500, { error: "Missing Supabase server configuration." });
+    json(res, 500, {
+      error: "Missing Supabase server configuration.",
+      details: `SUPABASE_URL: ${supabaseUrl ? "present" : "missing"}; SUPABASE_PUBLISHABLE_KEY: ${supabaseKey ? "present" : "missing"}`,
+    });
     return;
   }
+
   if (!apiKey) {
-    json(res, 500, { error: "Missing Gemini API key in Vercel." });
+    json(res, 500, {
+      error: "Missing Gemini API key in Vercel.",
+      details: "Set GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY in the Vercel environment for the current deployment.",
+    });
     return;
   }
 
@@ -121,20 +147,28 @@ export default async function handler(req: any, res: any) {
 
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData.user) {
-      console.error("AI auth error:", userError);
-      json(res, 401, { error: "Authentication failed." });
+      sendDetailedError(res, 401, userError, "Authentication failed.");
       return;
     }
 
     if (req.method === "DELETE") {
-      const { data: conversation } = await supabase
+      const { data: conversation, error: conversationError } = await supabase
         .from("chat_conversations")
         .select("id")
         .eq("user_id", userData.user.id)
         .maybeSingle();
 
+      if (conversationError) {
+        sendDetailedError(res, 500, conversationError, "Could not load chat conversation.");
+        return;
+      }
+
       if (conversation?.id) {
-        await supabase.from("chat_messages").delete().eq("conversation_id", conversation.id);
+        const { error: deleteError } = await supabase.from("chat_messages").delete().eq("conversation_id", conversation.id);
+        if (deleteError) {
+          sendDetailedError(res, 500, deleteError, "Could not clear chat history.");
+          return;
+        }
       }
 
       res.status(204).end();
@@ -143,7 +177,10 @@ export default async function handler(req: any, res: any) {
 
     const parsed = RequestSchema.safeParse(req.body);
     if (!parsed.success) {
-      json(res, 400, { error: "Invalid chat request payload." });
+      json(res, 400, {
+        error: "Invalid chat request payload.",
+        details: parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; "),
+      });
       return;
     }
 
@@ -164,11 +201,16 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    let { data: conversation } = await supabase
+    let { data: conversation, error: conversationLookupError } = await supabase
       .from("chat_conversations")
       .select("id")
       .eq("user_id", userData.user.id)
       .maybeSingle();
+
+    if (conversationLookupError) {
+      sendDetailedError(res, 500, conversationLookupError, "Could not load chat conversation.");
+      return;
+    }
 
     if (!conversation) {
       const { data: created, error } = await supabase
@@ -178,8 +220,7 @@ export default async function handler(req: any, res: any) {
         .single();
 
       if (error || !created) {
-        console.error("Conversation creation error:", error);
-        json(res, 500, { error: "Failed to initialize conversation." });
+        sendDetailedError(res, 500, error, "Failed to initialize conversation.");
         return;
       }
       conversation = created;
@@ -199,7 +240,10 @@ export default async function handler(req: any, res: any) {
           role: "user",
           content: content.trim(),
         });
-        if (error) console.error("Failed to save user message:", error);
+        if (error) {
+          sendDetailedError(res, 500, error, "Could not save your message.");
+          return;
+        }
       }
     }
 
@@ -213,7 +257,7 @@ export default async function handler(req: any, res: any) {
     void result.text.then(async (text) => {
       if (!text.trim()) return;
       const { error } = await supabase.from("chat_messages").insert({
-        conversation_id: conversation.id,
+        conversation_id: conversation!.id,
         user_id: userData.user.id,
         role: "assistant",
         content: text,
@@ -223,7 +267,6 @@ export default async function handler(req: any, res: any) {
 
     await sendResponse(res, result.toUIMessageStreamResponse());
   } catch (error) {
-    console.error("AI chat error:", error);
-    json(res, 500, { error: error instanceof Error ? error.message : "AI request failed." });
+    sendDetailedError(res, 500, error, "AI request failed.");
   }
 }
