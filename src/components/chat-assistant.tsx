@@ -143,15 +143,15 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
                       <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-indigo-300"><Bot className="h-3 w-3" /> Recommended habit</div>
                       {message.parts.map((part, index) => {
                         if (part.type !== "tool-createHabit") return null;
-                        const input = part.input as { name?: string; emoji?: string; color?: string; reason?: string };
-                        if (!input?.name) return null;
+                        const toolInput = part.input as { name?: string; emoji?: string; color?: string; reason?: string } | undefined;
+                        if (!toolInput?.name) return null;
                         return (
                           <motion.div key={`${message.id}-habit-${index}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
                             <div className="flex items-center gap-3">
-                              <div className="grid h-11 w-11 place-items-center rounded-xl bg-indigo-500/15 text-xl">{input.emoji || "✨"}</div>
-                              <div className="min-w-0"><h4 className="font-bold text-white">{input.name}</h4><p className="text-xs text-slate-400">{input.reason || "A simple habit to strengthen consistency."}</p></div>
+                              <div className="grid h-11 w-11 place-items-center rounded-xl bg-indigo-500/15 text-xl">{toolInput.emoji || "✨"}</div>
+                              <div className="min-w-0"><h4 className="font-bold text-white">{toolInput.name}</h4><p className="text-xs text-slate-400">{toolInput.reason || "A simple habit to strengthen consistency."}</p></div>
                             </div>
-                            <Button onClick={() => { addHabit({ name: input.name!, emoji: input.emoji || "✨", color: input.color || "primary" }); toast.success(`${input.name} added to your habits.`, { icon: <CheckCircle2 className="h-4 w-4 text-emerald-400" /> }); }} className="w-full bg-indigo-600 text-white hover:bg-indigo-500"><PlusCircle className="mr-2 h-4 w-4" /> Add habit</Button>
+                            <Button onClick={() => { addHabit({ name: toolInput.name!, emoji: toolInput.emoji || "✨", color: toolInput.color || "primary" }); toast.success(`${toolInput.name} added to your habits.`, { icon: <CheckCircle2 className="h-4 w-4 text-emerald-400" /> }); }} className="w-full bg-indigo-600 text-white hover:bg-indigo-500"><PlusCircle className="mr-2 h-4 w-4" /> Add habit</Button>
                           </motion.div>
                         );
                       })}
@@ -252,17 +252,24 @@ export function ChatAssistant() {
     return () => { cancelled = true; };
   }, [open, user, historyKey]);
 
+  if (!user) return null;
+
   return (
     <>
-      <motion.div className="fixed bottom-24 right-4 z-50 md:bottom-8 md:right-8" animate={{ y: [0, -6, 0] }} transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}>
-        <Button onClick={() => setOpen(true)} aria-label="Open Outstand Intelligence" className="relative h-14 w-14 rounded-full border border-indigo-400/50 bg-slate-950 p-0 shadow-[0_0_30px_rgba(99,102,241,0.5)] hover:shadow-[0_0_40px_rgba(99,102,241,0.7)]">
-          <span className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 opacity-90" />
-          <Bot className="relative z-10 h-6 w-6 text-white" />
+      <motion.div className="fixed bottom-24 right-4 z-[80] md:bottom-8 md:right-8" animate={{ y: [0, -6, 0] }} transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}>
+        <Button onClick={() => setOpen(true)} aria-label="Open Outstand Intelligence" className="relative h-16 w-16 rounded-full border border-indigo-300/70 bg-slate-950 p-0 shadow-[0_0_35px_rgba(99,102,241,0.55)] hover:shadow-[0_0_50px_rgba(99,102,241,0.8)]">
+          <span className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-500 via-blue-600 to-purple-600 opacity-95" />
+          <span className="absolute inset-[2px] rounded-full bg-slate-950/30" />
+          <Bot className="relative z-10 h-7 w-7 text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.55)]" />
+          <span className="absolute right-0 top-0 h-3.5 w-3.5 rounded-full border-2 border-slate-950 bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)]" aria-label="AI online" />
         </Button>
+        <span className="pointer-events-none absolute right-0 top-full mt-2 whitespace-nowrap rounded-full border border-white/10 bg-slate-950/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-200 opacity-90 shadow-xl backdrop-blur-xl">
+          AI Assistant
+        </span>
       </motion.div>
 
       <Drawer open={open} onOpenChange={setOpen}>
-        <DrawerContent className="h-[88vh] border-white/10 bg-slate-950/95 p-0 text-white backdrop-blur-2xl">
+        <DrawerContent className="z-[90] h-[88vh] border-white/10 bg-slate-950/95 p-0 text-white backdrop-blur-2xl">
           <ChatPanel key={historyKey} initialMessages={initialMessages} appContext={appContext} onClose={() => setOpen(false)} onClear={() => { setInitialMessages([]); setHistoryKey((key) => key + 1); }} />
         </DrawerContent>
       </Drawer>
