@@ -5,8 +5,12 @@ import { useAppState } from "@/hooks/use-app-state";
 import { useDailyLog } from "@/hooks/use-dopamine";
 import { CHALLENGES } from "@/lib/challenges.data";
 import type { OutstandChallenge } from "@/lib/challenges.types";
-import { randomChallenge } from "@/lib/challenges.utils";
 import { supabase } from "@/integrations/supabase/client";
+
+const randomChallenge = (currentTitle?: string): OutstandChallenge => {
+  const available = CHALLENGES.filter((item) => item.title !== currentTitle);
+  return available[Math.floor(Math.random() * available.length)] ?? CHALLENGES[0];
+};
 
 export function useOutstand() {
   const { recordOutstand } = useAppState();
@@ -47,7 +51,7 @@ export function useOutstand() {
     let ticks = 0;
     shuffleRef.current = window.setInterval(() => {
       const temp = CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)];
-      setShuffleDisplay({ emoji: temp.emoji, title: temp.title });
+      if (temp) setShuffleDisplay({ emoji: temp.emoji, title: temp.title });
       ticks += 1;
       if (ticks > 12) {
         clearTimer(shuffleRef);
@@ -135,7 +139,7 @@ export function useOutstand() {
       if (!mountedRef.current) return;
       recordOutstand(challengeTitle, xpEarned);
       addPositive("outstand");
-      toast.custom((t) => (
+      toast.custom(() => (
         <div className="relative mx-auto flex w-full max-w-[360px] items-center gap-4 overflow-hidden rounded-2xl border border-white/10 bg-[#050810] p-4" style={{ boxShadow: `0 20px 40px -10px ${challengeColor}60` }}>
           <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-50" />
           <div className="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/50 text-3xl shadow-[inset_0_0_20px_rgba(255,255,255,0.1)]">{challengeEmoji}</div>
@@ -148,5 +152,19 @@ export function useOutstand() {
     }, 2800));
   }, [addPositive, challenge, clearCompletionTimers, clearTimer, completionStage, recordOutstand]);
 
-  return { challenge, remaining, running, setRunning, setRemaining, isShuffling, shuffleDisplay, completionStage, generate, complete, loadChallenge, mins: Math.floor(remaining / 60), secs: remaining % 60 };
+  return {
+    challenge,
+    remaining,
+    running,
+    setRunning,
+    setRemaining,
+    isShuffling,
+    shuffleDisplay,
+    completionStage,
+    generate,
+    complete,
+    loadChallenge,
+    mins: Math.floor(remaining / 60),
+    secs: remaining % 60,
+  };
 }
