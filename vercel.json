@@ -1,11 +1,4 @@
 {
-  "buildCommand": "bun run build:vercel",
-  "installCommand": "bun install",
-  "framework": "vite",
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
-    }
-  ]
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "tanstack-start"
 }
