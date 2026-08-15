@@ -43,11 +43,34 @@ type ChatPanelProps = {
   onClear: () => void;
 };
 
+type ApiErrorPayload = { error?: string; details?: string; code?: string };
+
+async function describeResponseError(response: Response) {
+  const raw = await response.text().catch(() => "");
+  let payload: ApiErrorPayload | null = null;
+  try {
+    payload = raw ? (JSON.parse(raw) as ApiErrorPayload) : null;
+  } catch {
+    payload = null;
+  }
+
+  const base = payload?.error || raw || `${response.status} ${response.statusText}`;
+  const extra = [payload?.details, payload?.code].filter(Boolean).join(" · ");
+  return `${base}${extra ? ` — ${extra}` : ""}`;
+}
+
+function describeClientError(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "An unexpected AI error occurred.";
+}
+
 function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const { addHabit } = useAppState();
   const appContextRef = useRef(appContext);
   const [serverAvailable, setServerAvailable] = useState<boolean | null>(null);
+  const [serverMessage, setServerMessage] = useState<string | null>(null);
 
   useEffect(() => {
     appContextRef.current = appContext;
@@ -55,13 +78,23 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
 
   useEffect(() => {
     let active = true;
-    fetch("/api/chat", { method: "GET", cache: "no-store" })
-      .then((response) => {
-        if (active) setServerAvailable(response.ok);
-      })
-      .catch(() => {
-        if (active) setServerAvailable(false);
-      });
+    const checkServer = async () => {
+      try {
+        const response = await fetch("/api/chat", { method: "GET", cache: "no-store" });
+        const message = response.ok ? null : await describeResponseError(response);
+        if (active) {
+          setServerAvailable(response.ok);
+          setServerMessage(message);
+        }
+      } catch (error) {
+        if (active) {
+          setServerAvailable(false);
+          setServerMessage(describeClientError(error));
+        }
+      }
+    };
+
+    void checkServer();
     return () => {
       active = false;
     };
@@ -77,7 +110,7 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
     }),
     onError: (err) => {
       console.error("AI SDK Error:", err);
-      toast.error(err.message || "The assistant could not respond.");
+      toast.error(describeClientError(err));
     },
   });
 
@@ -88,7 +121,11 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
     const text = input.trim();
     if (!text || isStreaming || serverAvailable === false) return;
 
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) {
+      toast.error(`Could not read your session: ${sessionError.message}`);
+      return;
+    }
     if (!session?.access_token) {
       toast.error("Your session has expired. Please sign in again.");
       return;
@@ -99,12 +136,15 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
       await sendMessage(
         { text },
         {
-          headers: { Authorization: `Bearer ${session.access_token}` },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
           body: { appContext: appContextRef.current },
         },
       );
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Could not send message.";
+      const message = describeClientError(err);
       console.error("AI message error:", err);
       toast.error(message);
       setInput(text);
@@ -112,8 +152,12 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
   };
 
   const handleClear = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) {
+      toast.error(`Could not read your session: ${sessionError.message}`);
+      return;
+    }
+    if (!session?.access_token) {
       toast.error("Please sign in again.");
       return;
     }
@@ -123,11 +167,11 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
         method: "DELETE",
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
-      if (!response.ok) throw new Error("Failed to clear chat history.");
+      if (!response.ok) throw new Error(await describeResponseError(response));
       onClear();
       toast.success("Memory wiped. Fresh start.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to clear chat history.");
+      toast.error(describeClientError(err));
     }
   };
 
@@ -207,10 +251,11 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
       <div className="shrink-0 border-t border-white/5 bg-slate-950 p-4">
         {serverAvailable === false && (
           <div className="mb-2 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm text-amber-200" role="status">
-            AI service is temporarily unavailable on this deployment.
+            <div className="font-semibold">AI service unavailable</div>
+            <div className="mt-1 break-words text-xs text-amber-200/80">{serverMessage || "The chat endpoint could not be reached."}</div>
           </div>
         )}
-        {error && <div className="mb-2 rounded-lg border border-rose-500/50 bg-rose-500/10 p-3 text-sm text-rose-300" role="alert"><strong>Connection failed:</strong> {error.message}</div>}
+        {error && <div className="mb-2 rounded-lg border border-rose-500/50 bg-rose-500/10 p-3 text-sm text-rose-300" role="alert"><strong>Connection failed:</strong> {describeClientError(error)}</div>}
         <PromptInput onSubmit={handleSubmit}>
           <PromptInputTextarea
             placeholder="Ask Outstand anything..."
@@ -257,7 +302,7 @@ export function ChatAssistant() {
     const loadHistory = async () => {
       try {
         const { data: conversation, error: conversationError } = await supabase.from("chat_conversations").select("id").eq("user_id", user.id).maybeSingle();
-        if (conversationError) throw conversationError;
+        if (conversationError) throw new Error(`${conversationError.message}${conversationError.code ? ` (${conversationError.code})` : ""}`);
 
         if (!conversation?.id) {
           if (!cancelled) setInitialMessages([]);
@@ -265,7 +310,7 @@ export function ChatAssistant() {
         }
 
         const { data: storedMessages, error: messageError } = await supabase.from("chat_messages").select("role, content, created_at").eq("conversation_id", conversation.id).order("created_at", { ascending: true });
-        if (messageError) throw messageError;
+        if (messageError) throw new Error(`${messageError.message}${messageError.code ? ` (${messageError.code})` : ""}`);
 
         const uiMessages: UIMessage[] = (storedMessages ?? [])
           .filter((message) => message.role === "user" || message.role === "assistant")
@@ -274,7 +319,10 @@ export function ChatAssistant() {
         if (!cancelled) setInitialMessages(uiMessages);
       } catch (error) {
         console.error("Failed to load chat history", error);
-        if (!cancelled) { setInitialMessages([]); toast.error("Could not load assistant history."); }
+        if (!cancelled) {
+          setInitialMessages([]);
+          toast.error(`Could not load assistant history: ${describeClientError(error)}`);
+        }
       }
     };
 
@@ -299,8 +347,8 @@ export function ChatAssistant() {
       </motion.div>
 
       <Drawer open={open} onOpenChange={setOpen}>
-        <DrawerContent className="h-[90vh] border-white/10 bg-slate-950 p-0 text-white md:h-[80vh]">
-          <ChatPanel initialMessages={initialMessages} appContext={appContext} onClose={() => setOpen(false)} onClear={() => { setInitialMessages([]); setHistoryKey((key) => key + 1); }} />
+        <DrawerContent className="z-[90] h-[88vh] border-white/10 bg-slate-950/95 p-0 text-white backdrop-blur-2xl">
+          <ChatPanel key={historyKey} initialMessages={initialMessages} appContext={appContext} onClose={() => setOpen(false)} onClear={() => { setInitialMessages([]); setHistoryKey((key) => key + 1); }} />
         </DrawerContent>
       </Drawer>
     </>
