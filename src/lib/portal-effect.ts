@@ -182,7 +182,11 @@ const Shaders = {
         float ripple = sin(dist * 20.0 - uTime * 10.0) * exp(-dist * 5.0);
         
         // Lens distortion (gravitational pull)
-        vec2 dir = normalize(uv - center);
+        vec2 offset = uv - center;
+float offsetLength = length(offset);
+vec2 dir = offsetLength > 0.0001
+  ? offset / offsetLength
+  : vec2(0.0);
         vec2 distortedUv = uv + dir * ripple * uStrength;
         
         gl_FragColor = texture2D(tDiffuse, mix(uv, distortedUv, uStrength));
@@ -335,12 +339,30 @@ export class PortalEngine {
   private targetTimeScale = 1.0;
 
   constructor(config: Partial<PortalConfig> = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
-    
-    // WebGL Setup
+  this.config = { ...DEFAULT_CONFIG, ...config };
+
+  // WebGL Setup
+  if (this.config.container) {
+    this.container = this.config.container;
+
+    Object.assign(this.container.style, {
+      position: 'absolute',
+      inset: '0',
+      overflow: 'hidden',
+      pointerEvents: 'none',
+    });
+  } else {
     this.container = document.createElement('div');
-    Object.assign(this.container.style, { position: 'fixed', inset: '0', pointerEvents: 'none', zIndex: '9999' });
+
+    Object.assign(this.container.style, {
+      position: 'fixed',
+      inset: '0',
+      pointerEvents: 'none',
+      zIndex: '9999',
+    });
+
     document.body.appendChild(this.container);
+  }
 
     this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false, powerPreference: "high-performance" });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -493,7 +515,7 @@ export class PortalEngine {
     this.globalTime += scaledDelta;
 
     // Orchestrate Systems
-    this.timeline.update(rawDelta * 1000); // Timeline reads unscaled real-time
+    this.timeline.update(rawDelta); // Timeline reads unscaled real-time
     this.sparks.update(this.globalTime);
     
     // Update Shader Uniforms
