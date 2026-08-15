@@ -18,7 +18,7 @@ const fallbackMissions = [
   { id: "fallback-plan", title: "Plan your top 3 priorities", category: "Planning", difficulty: "medium", xp_reward: 30 },
 ] as const;
 
-type Stats = { total_xp?: number; level?: number; streak_days?: number; current_level_xp?: number; next_level_xp?: number };
+type Stats = { total_xp?: number; level?: number; streak_days?: number };
 type QuestRow = { id: string; completed: boolean | null; quests: { id: string; title: string; category: string; difficulty: string; xp_reward: number } | { id: string; title: string; category: string; difficulty: string; xp_reward: number }[] | null };
 
 function DashboardHQ() {
@@ -36,17 +36,20 @@ function DashboardHQ() {
   const [mutatingIds, setMutatingIds] = useState<Set<string>>(new Set());
 
   const applyStats = (data: Stats | null) => {
-    setTotalXp(data?.total_xp ?? 0);
-    setLevel(data?.level ?? 1);
-    setStreak(data?.streak_days ?? 0);
-    const next = data?.next_level_xp ?? 1000;
-    setXpPct(Math.min(100, Math.max(0, ((data?.current_level_xp ?? 0) / Math.max(1, next)) * 100)));
+    const xp = Math.max(0, Number(data?.total_xp ?? 0));
+    const safeLevel = Math.max(1, Number(data?.level ?? Math.floor(xp / 500) + 1));
+    setTotalXp(xp);
+    setLevel(safeLevel);
+    setStreak(Math.max(0, Number(data?.streak_days ?? 0)));
+    // Keep the dashboard independent from optional schema columns. The real
+    // Supabase table has historically differed from generated client types.
+    setXpPct(Math.min(100, Math.max(0, ((xp % 500) / 500) * 100)));
   };
 
   const ensureUserStats = async (uid: string) => {
     const { data: existing, error: readError } = await supabase
       .from("user_stats")
-      .select("total_xp, level, streak_days, current_level_xp, next_level_xp")
+      .select("total_xp, level, streak_days")
       .eq("user_id", uid)
       .maybeSingle();
 
@@ -55,15 +58,8 @@ function DashboardHQ() {
 
     const { data: created, error: createError } = await supabase
       .from("user_stats")
-      .upsert({
-        user_id: uid,
-        total_xp: 0,
-        level: 1,
-        streak_days: 0,
-        current_level_xp: 0,
-        next_level_xp: 1000,
-      }, { onConflict: "user_id" })
-      .select("total_xp, level, streak_days, current_level_xp, next_level_xp")
+      .upsert({ user_id: uid, total_xp: 0, level: 1, streak_days: 0 }, { onConflict: "user_id" })
+      .select("total_xp, level, streak_days")
       .single();
 
     if (createError) throw createError;
@@ -96,9 +92,8 @@ function DashboardHQ() {
 
     if (signal?.aborted) return;
 
-    if (statsResult.status === "fulfilled") {
-      applyStats(statsResult.value);
-    } else {
+    if (statsResult.status === "fulfilled") applyStats(statsResult.value);
+    else {
       console.error("Stats load failed", statsResult.reason);
       applyStats(null);
     }
@@ -137,7 +132,6 @@ function DashboardHQ() {
     const controller = new AbortController();
     setLoadError(null);
     setIsLoading(true);
-
     loadDashboard(controller.signal)
       .catch((error) => {
         if (!controller.signal.aborted) {
@@ -148,18 +142,16 @@ function DashboardHQ() {
       .finally(() => {
         if (!controller.signal.aborted) setIsLoading(false);
       });
-
     return () => controller.abort();
   }, []);
 
   useEffect(() => {
     if (!userId) return;
-
     const refreshStats = async () => {
       try {
         const { data, error } = await supabase
           .from("user_stats")
-          .select("total_xp, level, streak_days, current_level_xp, next_level_xp")
+          .select("total_xp, level, streak_days")
           .eq("user_id", userId)
           .maybeSingle();
         if (!error) applyStats(data as Stats | null);
@@ -167,16 +159,10 @@ function DashboardHQ() {
         console.error("Realtime stats refresh failed", error);
       }
     };
-
     const channel = supabase
       .channel(`dashboard_${userId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "user_stats", filter: `user_id=eq.${userId}` },
-        refreshStats,
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_stats", filter: `user_id=eq.${userId}` }, refreshStats)
       .subscribe();
-
     return () => { void supabase.removeChannel(channel); };
   }, [userId]);
 
@@ -195,17 +181,14 @@ function DashboardHQ() {
   const handleCompleteMission = async (missionId: string) => {
     const mission = missionSource.find((item) => item.id === missionId);
     if (!mission || mission.completed || mutatingIds.has(missionId)) return;
-
     if (habits.length === 0) {
       setFallbackCompleted((prev) => new Set(prev).add(missionId));
       setTotalXp((prev) => prev + mission.quest.xp_reward);
       toast.success("Mission complete", { description: `+${mission.quest.xp_reward} XP added.` });
       return;
     }
-
     setMutatingIds((prev) => new Set(prev).add(missionId));
     setHabits((prev) => prev.map((item) => item.id === missionId ? { ...item, completed: true } : item));
-
     const { error } = await supabase.rpc("complete_daily_quest", { p_daily_quest_id: missionId });
     if (error) {
       setHabits((prev) => prev.map((item) => item.id === missionId ? { ...item, completed: false } : item));
@@ -213,82 +196,30 @@ function DashboardHQ() {
     } else {
       toast.success("Mission complete", { description: `+${mission.quest.xp_reward} XP added.` });
     }
-
     setMutatingIds((prev) => { const next = new Set(prev); next.delete(missionId); return next; });
   };
 
   const reducedMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#050816] text-white grid place-items-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="grid h-14 w-14 place-items-center rounded-2xl border border-white/10 bg-white/5">
-            <Loader2 className="h-6 w-6 animate-spin text-cyan-300" />
-          </div>
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Preparing your command center</p>
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return <div className="min-h-screen bg-[#050816] text-white grid place-items-center"><div className="flex flex-col items-center gap-4"><div className="grid h-14 w-14 place-items-center rounded-2xl border border-white/10 bg-white/5"><Loader2 className="h-6 w-6 animate-spin text-cyan-300" /></div><p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Preparing your command center</p></div></div>;
 
-  if (loadError) {
-    return (
-      <div className="min-h-screen bg-[#050816] text-white grid place-items-center px-4">
-        <div className="max-w-md rounded-3xl border border-red-400/15 bg-white/[0.04] p-6 text-center">
-          <p className="text-sm text-red-200">{loadError}</p>
-          <button onClick={() => window.location.reload()} className="mt-4 rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-950">Reload dashboard</button>
-        </div>
-      </div>
-    );
-  }
+  if (loadError) return <div className="min-h-screen bg-[#050816] text-white grid place-items-center px-4"><div className="max-w-md rounded-3xl border border-red-400/15 bg-white/[0.04] p-6 text-center"><p className="text-sm text-red-200">{loadError}</p><button onClick={() => window.location.reload()} className="mt-4 rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-950">Reload dashboard</button></div></div>;
 
   return (
     <MotionConfig reducedMotion={reducedMotion ? "always" : "never"}>
       <div className="relative min-h-screen overflow-x-hidden bg-[#050816] text-slate-100">
-        <div className="pointer-events-none fixed inset-0 overflow-hidden">
-          <div className="absolute left-1/2 top-[-20%] h-[55rem] w-[55rem] -translate-x-1/2 rounded-full bg-cyan-500/[0.045] blur-[120px]" />
-          <div className="absolute right-[-10%] top-[15%] h-[30rem] w-[30rem] rounded-full bg-fuchsia-500/[0.045] blur-[110px]" />
-          <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.018)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.018)_1px,transparent_1px)] bg-[size:42px_42px] [mask-image:linear-gradient(to_bottom,black,transparent_85%)]" />
-        </div>
+        <div className="pointer-events-none fixed inset-0 overflow-hidden"><div className="absolute left-1/2 top-[-20%] h-[55rem] w-[55rem] -translate-x-1/2 rounded-full bg-cyan-500/[0.045] blur-[120px]" /><div className="absolute right-[-10%] top-[15%] h-[30rem] w-[30rem] rounded-full bg-fuchsia-500/[0.045] blur-[110px]" /><div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.018)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.018)_1px,transparent_1px)] bg-[size:42px_42px] [mask-image:linear-gradient(to_bottom,black,transparent_85%)]" /></div>
         <main className="relative z-10 mx-auto max-w-7xl px-4 pb-16 pt-5 sm:px-6 lg:px-8 lg:pt-8">
-          <motion.section variants={fadeUp} initial="hidden" animate="show" className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-cyan-300/80"><Sparkles className="h-3.5 w-3.5" /> Personal command center</div>
-              <h1 className="text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl">Welcome back, <span className="bg-gradient-to-r from-cyan-300 via-white to-fuchsia-300 bg-clip-text text-transparent">{userName}</span></h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">Your day is already in motion. Pick one meaningful action, complete it, and let the momentum stack.</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-2 text-sm"><Flame className="h-4 w-4 text-amber-300" /><span className="font-black text-white">{streak}</span><span className="text-slate-500">day streak</span></div>
-              <XpBadge xp={totalXp} level={level} pct={xpPct} variantId="dash-redesign" />
-            </div>
-          </motion.section>
-
-          <motion.section variants={fadeUp} initial="hidden" animate="show" className="mb-6 grid gap-4 lg:grid-cols-[1.45fr_0.8fr_0.8fr]">
-            <div className="group relative overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-cyan-500/[0.10] via-white/[0.035] to-fuchsia-500/[0.06] p-6 shadow-2xl backdrop-blur-2xl sm:p-7">
-              <div className="relative">
-                <div className="mb-5 flex items-center justify-between"><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-cyan-200/80"><Target className="h-4 w-4" /> Today’s focus</div><span className="rounded-full border border-cyan-400/15 bg-cyan-400/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-cyan-200">{completionPct}% complete</span></div>
-                <h2 className="max-w-xl text-2xl font-black tracking-tight text-white sm:text-3xl">Make progress feel visible.</h2>
-                <p className="mt-2 max-w-xl text-sm leading-6 text-slate-400">You have {missionSource.length} daily missions in today’s queue. The next small win is enough to start the chain.</p>
-                <div className="mt-6 h-2 overflow-hidden rounded-full bg-white/5"><motion.div initial={{ width: 0 }} animate={{ width: `${completionPct}%` }} transition={{ duration: 0.9, ease }} className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-fuchsia-400" /></div>
-                <div className="mt-6 flex flex-wrap gap-3"><button onClick={() => navigate({ to: "/focus" })} className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-black text-slate-950 shadow-lg transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"><Focus className="h-4 w-4" /> Enter focus mode</button>{nextMission && !nextMission.completed && <button onClick={() => handleCompleteMission(nextMission.id)} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-4 py-2.5 text-sm font-bold text-white transition hover:border-cyan-400/30 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"><Zap className="h-4 w-4 text-amber-300" /> Complete next mission</button>}</div>
-              </div>
-            </div>
-            <div className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-6 shadow-xl"><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-amber-200/80"><Flame className="h-4 w-4" /> Daily rhythm</div><div className="mt-6 flex items-end gap-1.5">{[38,55,44,70,62,78,Math.max(18,completionPct)].map((height,index)=><motion.div key={index} initial={{height:0}} animate={{height:`${height}%`}} transition={{delay:index*0.05,duration:0.45,ease}} className="flex-1 rounded-t-lg bg-gradient-to-t from-cyan-500/30 to-cyan-300/80" />)}</div><p className="mt-4 text-sm text-slate-400">Consistency beats intensity. Keep the streak alive.</p></div>
-            <div className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-6 shadow-xl"><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-fuchsia-200/80"><Trophy className="h-4 w-4" /> Progress level</div><div className="mt-5 text-3xl font-black text-white">Level {level}</div><div className="mt-4 h-2 overflow-hidden rounded-full bg-white/5"><motion.div initial={{width:0}} animate={{width:`${xpPct}%`}} transition={{duration:0.9,ease}} className="h-full rounded-full bg-gradient-to-r from-fuchsia-400 to-cyan-300" /></div><p className="mt-3 text-sm text-slate-400">{totalXp.toLocaleString()} XP earned. Keep stacking small wins.</p></div>
-          </motion.section>
-
-          <motion.section variants={fadeUp} initial="hidden" animate="show" className="mb-6 rounded-[2rem] border border-white/10 bg-white/[0.035] p-5 shadow-xl sm:p-6">
-            <div className="mb-5 flex items-end justify-between"><div><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-cyan-200/80"><Compass className="h-4 w-4" /> Daily missions</div><h2 className="mt-2 text-2xl font-black text-white">Your next wins</h2></div><div className="text-xs font-semibold uppercase tracking-widest text-slate-500">{completedCount}/{missionSource.length} complete</div></div>
-            <div className="grid gap-3 md:grid-cols-2">{missionSource.map((mission)=><motion.button key={mission.id} whileHover={{y:-2}} whileTap={{scale:0.99}} disabled={mission.completed || mutatingIds.has(mission.id)} onClick={()=>handleCompleteMission(mission.id)} className={`flex w-full items-center gap-4 rounded-2xl border p-4 text-left transition ${mission.completed?"border-emerald-500/20 bg-emerald-500/[0.06]":"border-white/10 bg-black/10 hover:border-cyan-400/25"}`}><div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${mission.completed?"bg-emerald-400/10 text-emerald-300":"bg-cyan-400/10 text-cyan-300"}`}>{mission.completed?<CheckCircle2 className="h-5 w-5"/>:<Target className="h-5 w-5"/>}</div><div className="min-w-0 flex-1"><p className={`truncate font-bold ${mission.completed?"text-emerald-200":"text-white"}`}>{mission.quest.title}</p><p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">{mission.quest.category} · +{mission.quest.xp_reward} XP</p></div>{mission.completed?<CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-300"/>:<Zap className="h-5 w-5 shrink-0 text-slate-600"/>}</motion.button>)}</div>
-          </motion.section>
-
-          <motion.section variants={fadeUp} initial="hidden" animate="show" className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
-            <div className="rounded-[2rem] border border-white/10 bg-white/[0.035] p-6 shadow-xl"><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-fuchsia-200/80"><Sparkles className="h-4 w-4" /> Daily signal</div><p className="mt-5 text-xl font-bold leading-8 text-slate-100">“{dailyQuote.quote}”</p><div className="mt-5 flex flex-wrap gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500"><span>{dailyQuote.author}</span>{dailyQuote.application && <span>· {dailyQuote.application}</span>}</div></div>
-            <button onClick={() => navigate({ to: "/focus" })} className="group rounded-[2rem] border border-white/10 bg-gradient-to-br from-indigo-500/[0.14] to-cyan-500/[0.06] p-6 text-left shadow-xl transition hover:-translate-y-1 hover:border-indigo-300/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"><div className="flex items-start justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-200/80">Focus engine</p><h3 className="mt-3 text-2xl font-black text-white">Protect your next 25 minutes.</h3></div><Focus className="h-6 w-6 text-indigo-200 transition-transform group-hover:scale-110" /></div><p className="mt-3 text-sm leading-6 text-slate-400">Start a deep-focus session with your mission visible and distractions out of the way.</p></button>
-          </motion.section>
+          <motion.section variants={fadeUp} initial="hidden" animate="show" className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between"><div><div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-cyan-300/80"><Sparkles className="h-3.5 w-3.5" /> Personal command center</div><h1 className="text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl">Welcome back, <span className="bg-gradient-to-r from-cyan-300 via-white to-fuchsia-300 bg-clip-text text-transparent">{userName}</span></h1><p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">Your day is already in motion. Pick one meaningful action, complete it, and let the momentum stack.</p></div></motion.section>
+          <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><Stat icon={<Zap />} label="Total XP" value={totalXp.toLocaleString()} /><Stat icon={<Trophy />} label="Level" value={String(level)} /><Stat icon={<Flame />} label="Streak" value={`${streak}d`} /><Stat icon={<Target />} label="Today's missions" value={`${completedCount}/${missionSource.length}`} /></section>
+          <section className="mt-4 grid gap-4 lg:grid-cols-[1.5fr_1fr]"><div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl sm:p-7"><div className="flex items-center justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Level progress</p><p className="mt-2 text-2xl font-black">Level {level}</p></div><XpBadge xp={totalXp} /></div><div className="mt-6 h-3 overflow-hidden rounded-full bg-white/5"><motion.div initial={{ width: 0 }} animate={{ width: `${xpPct}%` }} transition={{ duration: 0.8, ease }} className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-fuchsia-400" /></div><p className="mt-2 text-xs text-slate-500">{Math.round(xpPct)}% toward the next level</p></div><div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl sm:p-7"><p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Today</p><p className="mt-3 text-lg font-bold">{dailyQuote.quote}</p><p className="mt-2 text-xs text-slate-500">— {dailyQuote.author}</p></div></section>
+          <section className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]"><div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl sm:p-7"><div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.22em] text-cyan-300/80">Daily missions</p><h2 className="mt-2 text-2xl font-black">Build momentum</h2></div><span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold text-slate-300">{completionPct}% complete</span></div><div className="mt-5 space-y-2">{missionSource.map((mission) => <button key={mission.id} onClick={() => handleCompleteMission(mission.id)} disabled={mission.completed || mutatingIds.has(mission.id)} className="flex w-full items-center gap-4 rounded-2xl border border-white/5 bg-black/20 p-4 text-left transition hover:border-cyan-300/20 hover:bg-white/[0.06] disabled:cursor-default disabled:opacity-70"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/5">{mission.completed ? <CheckCircle2 className="h-5 w-5 text-emerald-300" /> : <Compass className="h-5 w-5 text-cyan-300" />}</div><div className="min-w-0 flex-1"><p className={mission.completed ? "text-sm font-semibold text-slate-500 line-through" : "text-sm font-semibold text-white"}>{mission.quest.title}</p><p className="mt-1 text-xs text-slate-500">{mission.quest.category} · +{mission.quest.xp_reward} XP</p></div>{mutatingIds.has(mission.id) && <Loader2 className="h-4 w-4 animate-spin text-cyan-300" />}</button>)}</div></div><div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl sm:p-7"><p className="text-xs font-bold uppercase tracking-[0.22em] text-fuchsia-300/80">Next action</p><h2 className="mt-2 text-2xl font-black">{nextMission?.quest.title || "You're all caught up"}</h2><p className="mt-3 text-sm leading-6 text-slate-400">{nextMission?.completed ? "Excellent work. Keep the streak alive with another focused session." : "One small win is enough to change the direction of your day."}</p><button onClick={() => navigate("/focus")} className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 transition hover:-translate-y-0.5">Open Focus <Focus className="h-4 w-4" /></button></div></section>
         </main>
       </div>
     </MotionConfig>
   );
+}
+
+function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4"><div className="flex items-center gap-3"><div className="text-cyan-300">{icon}</div><div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">{label}</p><p className="mt-1 text-xl font-black text-white">{value}</p></div></div></div>;
 }
