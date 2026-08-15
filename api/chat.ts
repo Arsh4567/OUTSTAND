@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { generateText, type ModelMessage } from "ai";
+import { convertToModelMessages, streamText, type UIMessage } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 
@@ -9,11 +9,13 @@ const RequestSchema = z.object({
 });
 
 const MessageSchema = z.object({
+  id: z.string().optional(),
   role: z.enum(["user", "assistant", "system"]),
+  parts: z.array(z.object({ type: z.literal("text"), text: z.string() })).optional(),
   content: z.union([
     z.string(),
     z.array(z.object({ type: z.literal("text"), text: z.string() })),
-  ]),
+  ]).optional(),
 });
 
 const env = (name: string) => process.env[name] || undefined;
@@ -46,22 +48,36 @@ Habits: ${habitSummary || "None yet"}
 Give practical, encouraging answers and prefer one clear next step.`;
 }
 
-function normalizeMessages(raw: unknown[]): ModelMessage[] {
-  return raw.flatMap((item) => {
-    const parsed = MessageSchema.safeParse(item);
-    if (!parsed.success) return [];
-    const message = parsed.data;
-    return [{
-      role: message.role,
-      content: typeof message.content === "string"
-        ? message.content
-        : message.content.map((part) => ({ type: "text" as const, text: part.text })),
-    } satisfies ModelMessage];
-  });
+function textFromMessage(message: z.infer<typeof MessageSchema>): string {
+  if (typeof message.content === "string") return message.content;
+  if (Array.isArray(message.content)) return message.content.map((part) => part.text).join("");
+  return (message.parts ?? []).map((part) => part.text).join("");
 }
 
 function json(res: any, status: number, body: unknown) {
   res.status(status).json(body);
+}
+
+async function sendResponse(res: any, response: Response) {
+  res.status(response.status);
+  response.headers.forEach((value, key) => res.setHeader(key, value));
+
+  if (!response.body) {
+    res.end();
+    return;
+  }
+
+  const reader = response.body.getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      res.write(Buffer.from(value));
+    }
+  } finally {
+    reader.releaseLock();
+    res.end();
+  }
 }
 
 export default async function handler(req: any, res: any) {
@@ -79,7 +95,7 @@ export default async function handler(req: any, res: any) {
   }
 
   const authHeader = req.headers?.authorization as string | undefined;
-  if (!authHeader) {
+  if (!authHeader?.startsWith("Bearer ")) {
     json(res, 401, { error: "Unauthorized access." });
     return;
   }
@@ -105,6 +121,7 @@ export default async function handler(req: any, res: any) {
 
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData.user) {
+      console.error("AI auth error:", userError);
       json(res, 401, { error: "Authentication failed." });
       return;
     }
@@ -130,8 +147,19 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    const messages = normalizeMessages(parsed.data.messages);
-    if (!messages.length) {
+    const uiMessages: UIMessage[] = parsed.data.messages.flatMap((item) => {
+      const message = MessageSchema.safeParse(item);
+      if (!message.success) return [];
+      const text = textFromMessage(message.data).trim();
+      if (!text) return [];
+      return [{
+        id: message.data.id || crypto.randomUUID(),
+        role: message.data.role,
+        parts: [{ type: "text", text }],
+      } as UIMessage];
+    });
+
+    if (!uiMessages.length) {
       json(res, 400, { error: "At least one valid message is required." });
       return;
     }
@@ -150,17 +178,19 @@ export default async function handler(req: any, res: any) {
         .single();
 
       if (error || !created) {
+        console.error("Conversation creation error:", error);
         json(res, 500, { error: "Failed to initialize conversation." });
         return;
       }
       conversation = created;
     }
 
-    const latestUser = [...messages].reverse().find((message) => message.role === "user");
+    const latestUser = [...uiMessages].reverse().find((message) => message.role === "user");
     if (latestUser) {
-      const content = typeof latestUser.content === "string"
-        ? latestUser.content
-        : latestUser.content.map((part) => part.text).join("");
+      const content = latestUser.parts
+        .filter((part): part is Extract<UIMessage["parts"][number], { type: "text" }> => part.type === "text")
+        .map((part) => part.text)
+        .join("");
 
       if (content.trim()) {
         const { error } = await supabase.from("chat_messages").insert({
@@ -173,23 +203,25 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    const result = await generateText({
+    const result = streamText({
       model: google("gemini-2.5-flash", { apiKey }),
       system: buildPrompt(parsed.data.appContext),
-      messages,
+      messages: await convertToModelMessages(uiMessages),
       temperature: 0.7,
     });
 
-    const text = result.text || "I couldn't generate a response right now.";
-    const { error: saveError } = await supabase.from("chat_messages").insert({
-      conversation_id: conversation.id,
-      user_id: userData.user.id,
-      role: "assistant",
-      content: text,
-    });
-    if (saveError) console.error("Failed to save assistant message:", saveError);
+    void result.text.then(async (text) => {
+      if (!text.trim()) return;
+      const { error } = await supabase.from("chat_messages").insert({
+        conversation_id: conversation.id,
+        user_id: userData.user.id,
+        role: "assistant",
+        content: text,
+      });
+      if (error) console.error("Failed to save assistant message:", error);
+    }).catch((error) => console.error("Failed to save assistant response:", error));
 
-    res.status(200).send(text);
+    await sendResponse(res, result.toUIMessageStreamResponse());
   } catch (error) {
     console.error("AI chat error:", error);
     json(res, 500, { error: error instanceof Error ? error.message : "AI request failed." });
