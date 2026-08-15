@@ -11,8 +11,8 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/_authenticated/focus")({
   head: () => ({
     meta: [
-      { title: "Focus — Pomodoro sessions" },
-      { name: "description", content: "Run focused 25-minute Pomodoro sessions with break tracking." },
+      { title: "Focus — Outstand" },
+      { name: "description", content: "Run focused Pomodoro sessions, track breaks, and build attention consistency." },
     ],
   }),
   component: FocusPage,
@@ -22,35 +22,10 @@ type Mode = "focus" | "short" | "long";
 const DURATIONS: Record<Mode, number> = { focus: 25 * 60, short: 5 * 60, long: 15 * 60 };
 const LABELS: Record<Mode, string> = { focus: "Deep Focus", short: "Short Break", long: "Deep Rest" };
 
-// Theme engine for the Pomodoro timer
 const THEMES: Record<Mode, { color: string; bg: string; border: string; glow: string; aura: string; hex: string; icon: React.ReactNode }> = {
-  focus: {
-    color: "text-amber-400",
-    bg: "bg-amber-500/10",
-    border: "border-amber-500/30",
-    glow: "shadow-[0_0_40px_rgba(251,191,36,0.15)]",
-    aura: "bg-amber-500/20",
-    hex: "251, 191, 36", // Amber-400 rgb
-    icon: <Flame size={14} className="text-amber-400" />
-  },
-  short: {
-    color: "text-cyan-400",
-    bg: "bg-cyan-500/10",
-    border: "border-cyan-500/30",
-    glow: "shadow-[0_0_40px_rgba(6,182,212,0.15)]",
-    aura: "bg-cyan-500/20",
-    hex: "34, 211, 238", // Cyan-400 rgb
-    icon: <Zap size={14} className="text-cyan-400" />
-  },
-  long: {
-    color: "text-indigo-400",
-    bg: "bg-indigo-500/10",
-    border: "border-indigo-500/30",
-    glow: "shadow-[0_0_40px_rgba(99,102,241,0.15)]",
-    aura: "bg-indigo-500/20",
-    hex: "129, 140, 248", // Indigo-400 rgb
-    icon: <Moon size={14} className="text-indigo-400" />
-  }
+  focus: { color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/30", glow: "shadow-[0_0_40px_rgba(251,191,36,0.15)]", aura: "bg-amber-500/20", hex: "251, 191, 36", icon: <Flame size={14} className="text-amber-400" /> },
+  short: { color: "text-cyan-400", bg: "bg-cyan-500/10", border: "border-cyan-500/30", glow: "shadow-[0_0_40px_rgba(6,182,212,0.15)]", aura: "bg-cyan-500/20", hex: "34, 211, 238", icon: <Zap size={14} className="text-cyan-400" /> },
+  long: { color: "text-indigo-400", bg: "bg-indigo-500/10", border: "border-indigo-500/30", glow: "shadow-[0_0_40px_rgba(99,102,241,0.15)]", aura: "bg-indigo-500/20", hex: "129, 140, 248", icon: <Moon size={14} className="text-indigo-400" /> },
 };
 
 function FocusPage() {
@@ -59,70 +34,68 @@ function FocusPage() {
   const [mode, setMode] = useState<Mode>("focus");
   const [remaining, setRemaining] = useState(DURATIONS.focus);
   const [running, setRunning] = useState(false);
-  
-  // New Features State
   const [intent, setIntent] = useState("");
   const [zenMode, setZenMode] = useState(false);
-  const [shake, setShake] = useState(false); // Guilt-shake state
-  
+  const [shake, setShake] = useState(false);
   const intervalRef = useRef<number | null>(null);
+  const shakeTimeoutRef = useRef<number | null>(null);
   const startedAtRef = useRef<number | null>(null);
-
   const activeTheme = THEMES[mode];
 
-  // 1. The Core Timer Engine
   useEffect(() => {
     if (!running) return;
-    intervalRef.current = window.setInterval(() => {
-      setRemaining((r) => {
-        if (r <= 1) {
-          window.clearInterval(intervalRef.current!);
-          setRunning(false);
-          
-          if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
-
-          if (mode === "focus") {
-            recordSession(DURATIONS.focus / 60, true);
-            addPositive("pomodoro");
-            toast.success("Focus session complete", { description: "+20 dopamine · +25 XP" });
-            if (zenMode) setZenMode(false); 
-          } else {
-            toast("Break over", { description: "Back to work." });
-          }
-          return 0;
+    const intervalId = window.setInterval(() => {
+      setRemaining((current) => {
+        if (current > 1) return current - 1;
+        setRunning(false);
+        if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
+        if (mode === "focus") {
+          recordSession(DURATIONS.focus / 60, true);
+          addPositive("pomodoro");
+          toast.success("Focus session complete", { description: "+25 XP · nice work." });
+          setZenMode(false);
+        } else {
+          toast("Break over", { description: "Back to work." });
         }
-        return r - 1;
+        intervalRef.current = null;
+        return 0;
       });
     }, 1000);
+    intervalRef.current = intervalId;
     return () => {
-      if (intervalRef.current) window.clearInterval(intervalRef.current);
+      window.clearInterval(intervalId);
+      if (intervalRef.current === intervalId) intervalRef.current = null;
     };
-  }, [running, mode, recordSession, addPositive, zenMode]);
+  }, [running, mode, recordSession, addPositive]);
 
-  const switchMode = (m: Mode) => {
+  useEffect(() => () => {
+    if (intervalRef.current) window.clearInterval(intervalRef.current);
+    if (shakeTimeoutRef.current) window.clearTimeout(shakeTimeoutRef.current);
+  }, []);
+
+  const switchMode = (nextMode: Mode) => {
     if (running) {
-      toast.error("Pause the timer first", { description: "You must pause before switching modes." });
+      toast.error("Pause the timer first", { description: "Pause before switching modes." });
       return;
     }
-    setMode(m);
-    setRemaining(DURATIONS[m]);
+    setMode(nextMode);
+    setRemaining(DURATIONS[nextMode]);
     startedAtRef.current = null;
   };
 
   const toggle = () => {
     if (!running && startedAtRef.current == null) startedAtRef.current = Date.now();
-    setRunning((r) => !r);
+    setRunning((current) => !current);
   };
 
   const reset = () => {
     if (running && mode === "focus" && remaining < DURATIONS.focus) {
-      // Trigger the guilt shake
       setShake(true);
-      setTimeout(() => setShake(false), 500);
-      
+      if (shakeTimeoutRef.current) window.clearTimeout(shakeTimeoutRef.current);
+      shakeTimeoutRef.current = window.setTimeout(() => setShake(false), 500);
       recordSession(Math.round((DURATIONS.focus - remaining) / 60), false);
       addNegative("broke_focus");
-      toast.error("Focus Broken", { description: "Mission aborted. Streak penalized." });
+      toast.error("Focus session reset", { description: "Your partial session was saved." });
     }
     setRunning(false);
     setRemaining(DURATIONS[mode]);
@@ -133,379 +106,102 @@ function FocusPage() {
   const progress = 1 - remaining / total;
   const mins = Math.floor(remaining / 60);
   const secs = remaining % 60;
-
-  const completedFocus = sessions.filter((s) => s.completed).length;
-  const totalMinutes = sessions.filter((s) => s.completed).reduce((a, b) => a + b.durationMin, 0);
-
+  const completedFocus = sessions.filter((session) => session.completed).length;
+  const totalMinutes = sessions.filter((session) => session.completed).reduce((sum, session) => sum + session.durationMin, 0);
   const CIRCUMFERENCE = 289.026;
   const strokeDashoffset = CIRCUMFERENCE - progress * CIRCUMFERENCE;
 
   return (
     <>
-      {/* Dynamic Warp Speed Background */}
       <WarpSpeedCanvas isActive={running} colorRgb={activeTheme.hex} />
-
-      {/* Zen Mode Dimmer Overlay */}
       <AnimatePresence>
         {zenMode && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.8 }}
-            className="fixed inset-0 bg-[#030712]/70 backdrop-blur-sm z-40 pointer-events-none"
-          />
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.8 }} className="fixed inset-0 z-40 pointer-events-none bg-[#030712]/70 backdrop-blur-sm" aria-hidden="true" />
         )}
       </AnimatePresence>
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
-        animate={{ 
-          opacity: 1, 
-          y: 0,
-          x: shake ? [-15, 15, -10, 10, -5, 5, 0] : 0 // The violent shake effect
-        }}
+        animate={{ opacity: 1, y: 0, x: shake ? [-15, 15, -10, 10, -5, 5, 0] : 0 }}
         transition={{ duration: shake ? 0.4 : 0.7 }}
-        className={cn(
-          "space-y-8 pb-20 max-w-5xl mx-auto px-4 sm:px-6 relative",
-          zenMode ? "z-50 mt-12" : "z-10"
-        )}
+        className={cn("relative mx-auto max-w-5xl space-y-8 px-4 pb-20 sm:px-6", zenMode ? "z-50 mt-12" : "z-10")}
       >
-        {/* Header - Hides in Zen Mode */}
         <AnimatePresence>
           {!zenMode && (
-            <motion.div 
-              initial={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0, overflow: "hidden" }}
-              className="text-center pt-8"
-            >
-              <h1 className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-br from-white to-zinc-500 tracking-tight">
-                Pomodoro
-              </h1>
-              <p className="mt-2 text-sm md:text-base text-zinc-400">Master your attention. Conquer your tasks.</p>
+            <motion.div initial={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0, overflow: "hidden" }} className="pt-8 text-center">
+              <h1 className="text-3xl font-black tracking-tight text-transparent bg-gradient-to-br from-white to-zinc-500 bg-clip-text md:text-5xl">Pomodoro</h1>
+              <p className="mt-2 text-sm text-zinc-400 md:text-base">Master your attention. Conquer your tasks.</p>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Main Timer Glass Card */}
-        <div className={cn(
-          "relative mx-auto w-full max-w-xl p-4 sm:p-8 rounded-[2.5rem] backdrop-blur-2xl border transition-all duration-700",
-          running ? "bg-black/60 shadow-2xl" : "bg-zinc-900/50", 
-          activeTheme.border,
-          running ? activeTheme.glow : "",
-          zenMode && "bg-transparent border-transparent shadow-none"
-        )}>
-          
-          {/* Zen Mode Toggle */}
-          <button 
-            onClick={() => setZenMode(!zenMode)}
-            className="absolute top-6 right-6 z-20 text-zinc-500 hover:text-white transition-colors p-2 rounded-full hover:bg-white/5"
-          >
+        <div className={cn("relative mx-auto w-full max-w-xl rounded-[2.5rem] border p-4 backdrop-blur-2xl transition-all duration-700 sm:p-8", running ? "bg-black/60 shadow-2xl" : "bg-zinc-900/50", activeTheme.border, running ? activeTheme.glow : "", zenMode && "border-transparent bg-transparent shadow-none")}>
+          <button aria-label={zenMode ? "Exit zen mode" : "Enter zen mode"} onClick={() => setZenMode((current) => !current)} className="absolute right-6 top-6 z-20 rounded-full p-2 text-zinc-500 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
             {zenMode ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
           </button>
 
-          {/* Mode Switcher */}
-          <div className="flex justify-center gap-1 sm:gap-2 p-1.5 bg-black/40 rounded-full border border-white/5 w-fit mx-auto max-w-full overflow-x-auto no-scrollbar relative z-10">
-            {(["focus", "short", "long"] as Mode[]).map((m) => (
-              <button
-                key={m}
-                onClick={() => switchMode(m)}
-                className="relative px-3 sm:px-5 py-2 text-[10px] sm:text-xs font-bold uppercase tracking-widest rounded-full transition-colors z-10 shrink-0"
-              >
-                {mode === m && (
-                  <motion.div
-                    layoutId="active-mode"
-                    className={cn("absolute inset-0 rounded-full", THEMES[m].bg)}
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                  />
-                )}
-                <span className={cn("relative z-20 flex items-center gap-1.5 sm:gap-2", mode === m ? THEMES[m].color : "text-zinc-500 hover:text-zinc-300")}>
-                  {mode === m && THEMES[m].icon}
-                  {LABELS[m]}
-                </span>
+          <div className="relative z-10 mx-auto flex w-fit max-w-full gap-1 overflow-x-auto rounded-full border border-white/5 bg-black/40 p-1.5 no-scrollbar">
+            {(["focus", "short", "long"] as Mode[]).map((currentMode) => (
+              <button key={currentMode} type="button" aria-pressed={mode === currentMode} onClick={() => switchMode(currentMode)} className="relative shrink-0 rounded-full px-3 py-2 text-[10px] font-bold uppercase tracking-widest transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 sm:px-5 sm:text-xs">
+                {mode === currentMode && <motion.div layoutId="active-mode" className={cn("absolute inset-0 rounded-full", THEMES[currentMode].bg)} transition={{ type: "spring", bounce: 0.2, duration: 0.6 }} />}
+                <span className={cn("relative z-20 flex items-center gap-1.5 sm:gap-2", mode === currentMode ? THEMES[currentMode].color : "text-zinc-500 hover:text-zinc-300")}>{mode === currentMode && THEMES[currentMode].icon}{LABELS[currentMode]}</span>
               </button>
             ))}
           </div>
 
-          {/* Feature: Mission Intent Input */}
-          <div className="mt-8 max-w-xs mx-auto relative z-10">
+          <div className="relative z-10 mx-auto mt-8 max-w-xs">
             {running && intent ? (
-              <motion.div 
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={cn("text-center font-medium tracking-wide drop-shadow-md", activeTheme.color)}
-              >
-                Target: {intent}
-              </motion.div>
+              <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className={cn("text-center font-medium tracking-wide drop-shadow-md", activeTheme.color)}>Target: {intent}</motion.div>
             ) : (
-              <div className="relative group">
-                <Target className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500 group-focus-within:text-indigo-400 transition-colors" />
-                <input 
-                  type="text" 
-                  placeholder="What is your mission?" 
-                  value={intent}
-                  onChange={(e) => setIntent(e.target.value)}
-                  disabled={running}
-                  className="w-full bg-black/20 border border-white/5 rounded-xl py-2 pl-10 pr-4 text-sm text-center text-white placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/50 focus:bg-black/40 transition-all"
-                />
+              <div className="group relative">
+                <Target className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500 transition-colors group-focus-within:text-indigo-400" aria-hidden="true" />
+                <input type="text" maxLength={120} placeholder="What is your mission?" aria-label="Focus mission" value={intent} onChange={(event) => setIntent(event.target.value)} disabled={running} className="w-full rounded-xl border border-white/5 bg-black/20 py-2 pl-10 pr-4 text-center text-sm text-white placeholder:text-zinc-600 transition-all focus:border-indigo-500/50 focus:bg-black/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
               </div>
             )}
           </div>
 
-          {/* Circular Timer Display */}
-          <div className="relative mx-auto mt-8 flex h-[260px] w-[260px] sm:h-[320px] sm:w-[320px] items-center justify-center">
-            
-            {/* Ambient Breathing Aura */}
-            <AnimatePresence>
-              {running && (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: [1, 1.2, 1] }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                  className={cn("absolute inset-0 rounded-full blur-[60px] -z-10", activeTheme.aura)}
-                />
-              )}
-            </AnimatePresence>
-
-            {/* SVG Progress Ring */}
-            <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full -rotate-90 drop-shadow-2xl z-10">
+          <div className="relative mx-auto mt-8 flex h-[260px] w-[260px] items-center justify-center sm:h-[320px] sm:w-[320px]">
+            <AnimatePresence>{running && <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: [1, 1.2, 1] }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }} className={cn("absolute inset-0 -z-10 rounded-full blur-[60px]", activeTheme.aura)} aria-hidden="true" />}</AnimatePresence>
+            <svg viewBox="0 0 100 100" className="absolute inset-0 z-10 h-full w-full -rotate-90 drop-shadow-2xl" aria-hidden="true">
               <circle cx="50" cy="50" r="46" fill="none" className="stroke-white/5" strokeWidth="2" />
-              <circle
-                cx="50" cy="50" r="46" fill="none"
-                stroke={`url(#${mode}Grad)`} strokeWidth="3" strokeLinecap="round"
-                strokeDasharray={CIRCUMFERENCE}
-                strokeDashoffset={strokeDashoffset}
-                style={{ transition: "stroke-dashoffset 1s linear" }}
-              />
+              <circle cx="50" cy="50" r="46" fill="none" stroke={`url(#${mode}Grad)`} strokeWidth="3" strokeLinecap="round" strokeDasharray={CIRCUMFERENCE} strokeDashoffset={strokeDashoffset} style={{ transition: "stroke-dashoffset 1s linear" }} />
               <defs>
-                <linearGradient id="focusGrad" x1="0" x2="1" y1="0" y2="1">
-                  <stop offset="0%" stopColor="#f59e0b" />
-                  <stop offset="100%" stopColor="#ea580c" />
-                </linearGradient>
-                <linearGradient id="shortGrad" x1="0" x2="1" y1="0" y2="1">
-                  <stop offset="0%" stopColor="#2dd4bf" />
-                  <stop offset="100%" stopColor="#0891b2" />
-                </linearGradient>
-                <linearGradient id="longGrad" x1="0" x2="1" y1="0" y2="1">
-                  <stop offset="0%" stopColor="#818cf8" />
-                  <stop offset="100%" stopColor="#4f46e5" />
-                </linearGradient>
+                <linearGradient id="focusGrad" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#f59e0b" /><stop offset="100%" stopColor="#ea580c" /></linearGradient>
+                <linearGradient id="shortGrad" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#2dd4bf" /><stop offset="100%" stopColor="#0891b2" /></linearGradient>
+                <linearGradient id="longGrad" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#818cf8" /><stop offset="100%" stopColor="#4f46e5" /></linearGradient>
               </defs>
             </svg>
 
-            {/* Time Text */}
-            <motion.div 
-              animate={running ? { scale: [1, 1.03, 1] } : { scale: 1 }}
-              transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
-              className={cn(
-                "z-20 flex flex-col items-center justify-center h-[210px] w-[210px] sm:h-[260px] sm:w-[260px] rounded-full border bg-black/50 backdrop-blur-md shadow-inner transition-colors duration-500",
-                running ? activeTheme.border : "border-white/5"
-              )}
-            >
-              <div 
-                className={cn(
-                  "font-mono text-6xl sm:text-7xl font-black tabular-nums tracking-tighter transition-all duration-500", 
-                  activeTheme.color
-                )}
-                style={{
-                  textShadow: running ? `0 0 30px rgba(${activeTheme.hex}, 0.6)` : "none"
-                }}
-              >
-                {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
-              </div>
-              <div className="mt-2 text-[10px] sm:text-xs font-bold uppercase tracking-[0.3em] text-zinc-500">{LABELS[mode]}</div>
+            <motion.div animate={running ? { scale: [1, 1.03, 1] } : { scale: 1 }} transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }} className={cn("z-20 flex h-[210px] w-[210px] flex-col items-center justify-center rounded-full border bg-black/50 shadow-inner backdrop-blur-md transition-colors duration-500 sm:h-[260px] sm:w-[260px]", running ? activeTheme.border : "border-white/5")} role="timer" aria-live="off" aria-label={`${LABELS[mode]} ${mins} minutes ${secs} seconds remaining`}>
+              <div className={cn("font-mono text-6xl font-black tabular-nums tracking-tighter transition-all duration-500 sm:text-7xl", activeTheme.color)} style={{ textShadow: running ? `0 0 30px rgba(${activeTheme.hex}, 0.6)` : "none" }}>{String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}</div>
+              <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.3em] text-zinc-500 sm:text-xs">{LABELS[mode]}</div>
             </motion.div>
           </div>
 
-          {/* Controls */}
-          <div className="mt-10 sm:mt-12 flex items-center justify-center gap-4 relative z-20">
+          <div className="relative z-20 mt-10 flex items-center justify-center gap-4 sm:mt-12">
             <motion.div whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }}>
-              <Button 
-                onClick={toggle} 
-                className={cn("h-14 px-8 rounded-2xl font-bold text-lg border transition-all", activeTheme.bg, activeTheme.border, activeTheme.color, "hover:bg-opacity-20 shadow-lg")}
-              >
-                {running ? <><Pause className="mr-2 h-5 w-5" /> PAUSE</> : <><Play className="mr-2 h-5 w-5" /> START</>}
-              </Button>
+              <Button onClick={toggle} aria-label={running ? "Pause focus timer" : "Start focus timer"} className={cn("h-14 rounded-2xl border px-8 text-lg font-bold transition-all", activeTheme.bg, activeTheme.border, activeTheme.color, "shadow-lg hover:bg-opacity-20")}>{running ? <><Pause className="mr-2 h-5 w-5" /> Pause</> : <><Play className="mr-2 h-5 w-5" /> Start</>}</Button>
             </motion.div>
-            <motion.div whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }}>
-              <Button 
-                variant="outline" 
-                onClick={reset} 
-                className="h-14 w-14 rounded-2xl bg-black/40 border-white/10 text-zinc-400 hover:text-white hover:bg-rose-500/20 hover:text-rose-400 hover:border-rose-500/50 shadow-lg transition-all"
-              >
-                <RotateCcw className="h-5 w-5" />
-              </Button>
-            </motion.div>
+            <motion.div whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }}><Button variant="ghost" onClick={reset} aria-label="Reset focus timer" className="h-14 rounded-2xl px-4 text-zinc-500 transition hover:bg-white/5 hover:text-white"><RotateCcw className="h-5 w-5" /></Button></motion.div>
           </div>
         </div>
 
-        {/* Stats & History - Hides in Zen Mode */}
-        <AnimatePresence>
-          {!zenMode && (
-            <motion.div 
-              initial={{ opacity: 1 }}
-              exit={{ opacity: 0, y: 20 }}
-              className="space-y-8 relative z-10"
-            >
-              {/* Stats Row */}
-              <div className="grid gap-4 sm:grid-cols-3 max-w-3xl mx-auto">
-                <StatBig icon={<Timer className="text-amber-400"/>} label="Sessions" value={String(completedFocus)} />
-                <StatBig icon={<Coffee className="text-cyan-400"/>} label="Deep Work" value={`${totalMinutes} min`} />
-                <StatBig icon={<Play className="text-indigo-400"/>} label="Current Mode" value={LABELS[mode]} />
-              </div>
-
-              {/* History Log */}
-              <div className="bg-zinc-900/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6 max-w-3xl mx-auto">
-                <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-400 mb-4">Recent Sessions</h3>
-                {sessions.length === 0 ? (
-                  <div className="text-center py-8 text-zinc-600 border border-dashed border-zinc-800 rounded-2xl">
-                    No sessions logged yet. Time to get to work.
-                  </div>
-                ) : (
-                  <ul className="space-y-2">
-                    <AnimatePresence>
-                      {sessions.slice(0, 5).map((s) => (
-                        <motion.li 
-                          key={s.id}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          className="flex items-center justify-between p-3 sm:p-4 rounded-xl bg-white/[0.02] border border-white/[0.02] hover:bg-white/[0.04] transition-colors"
-                        >
-                          <span className="flex items-center gap-3 text-sm font-medium text-zinc-200">
-                            <span className={cn(
-                              "h-2.5 w-2.5 rounded-full shadow-[0_0_10px_currentColor]", 
-                              s.completed ? "bg-emerald-400 text-emerald-400" : "bg-rose-500 text-rose-500"
-                            )} />
-                            {s.durationMin} min {s.completed ? "Focus Block" : "Interrupted"}
-                          </span>
-                          <span className="text-xs text-zinc-500 font-mono">
-                            {new Date(s.startedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                          </span>
-                        </motion.li>
-                      ))}
-                    </AnimatePresence>
-                  </ul>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <div className="mx-auto grid max-w-xl grid-cols-2 gap-3 sm:grid-cols-3">
+          <StatCard icon={<Timer />} label="Sessions" value={completedFocus.toString()} />
+          <StatCard icon={<Clock3Icon />} label="Focus time" value={`${totalMinutes}m`} />
+          <StatCard icon={<Flame />} label="Status" value={running ? "Active" : "Ready"} />
+        </div>
       </motion.div>
     </>
   );
 }
 
-function StatBig({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <motion.div 
-      whileHover={{ y: -2 }}
-      className="bg-zinc-900/40 backdrop-blur-xl border border-white/5 flex items-center gap-4 p-5 rounded-3xl transition-all shadow-lg"
-    >
-      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/5 border border-white/10 shadow-inner">
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <div className="text-[10px] uppercase tracking-widest font-bold text-zinc-500">{label}</div>
-        <div className="truncate text-xl sm:text-2xl font-black text-white tracking-tight">{value}</div>
-      </div>
-    </motion.div>
-  );
+function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-center"><div className="mx-auto mb-2 flex w-fit text-zinc-500" aria-hidden="true">{icon}</div><div className="text-lg font-black text-white">{value}</div><div className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">{label}</div></div>;
 }
 
-// --- LOCAL WARP SPEED COMPONENT ---
-// Injected directly so it has immediate access to the current color hexes without needing prop drilling across files.
-function WarpSpeedCanvas({ isActive, colorRgb }: { isActive: boolean, colorRgb: string }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+function Clock3Icon() { return <Timer className="h-4 w-4" />; }
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    let animationFrameId: number;
-    let stars: { x: number; y: number; z: number; pz: number }[] = [];
-    const numStars = 400;
-    const maxDepth = 2000;
-    
-    const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-    window.addEventListener("resize", resize);
-    resize();
-
-    for (let i = 0; i < numStars; i++) {
-      stars.push({
-        x: (Math.random() - 0.5) * canvas.width * 2,
-        y: (Math.random() - 0.5) * canvas.height * 2,
-        z: Math.random() * maxDepth,
-        pz: Math.random() * maxDepth,
-      });
-    }
-
-    const draw = () => {
-      // Very transparent black to create motion trails
-      ctx.fillStyle = "rgba(3, 7, 18, 0.3)"; 
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-      
-      // Speed scales up significantly when running
-      const speed = isActive ? 30 : 0.5;
-
-      stars.forEach((star) => {
-        star.pz = star.z;
-        star.z -= speed;
-
-        if (star.z <= 0) {
-          star.x = (Math.random() - 0.5) * canvas.width * 2;
-          star.y = (Math.random() - 0.5) * canvas.height * 2;
-          star.z = maxDepth;
-          star.pz = maxDepth;
-        }
-
-        const fov = 300;
-        const sx = (star.x / star.z) * fov + centerX;
-        const sy = (star.y / star.z) * fov + centerY;
-        const px = (star.x / star.pz) * fov + centerX;
-        const py = (star.y / star.pz) * fov + centerY;
-
-        const opacity = 1 - star.z / maxDepth;
-        
-        ctx.beginPath();
-        if (isActive) {
-        // Dynamic streaks based on current Pomodoro theme
-          ctx.strokeStyle = `rgba(${colorRgb}, ${opacity})`;
-          ctx.lineWidth = 2;
-          ctx.moveTo(px, py);
-          ctx.lineTo(sx, sy);
-          ctx.stroke();
-        } else {
-          // Idle state stars
-          ctx.fillStyle = `rgba(255, 255, 255, ${opacity * 0.5})`;
-          ctx.arc(sx, sy, 1, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      });
-
-      animationFrameId = requestAnimationFrame(draw);
-    };
-
-    draw();
-
-    return () => {
-      window.removeEventListener("resize", resize);
-      cancelAnimationFrame(animationFrameId);
-    };
-  }, [isActive, colorRgb]);
-
-  return (
-    <div className="fixed inset-0 z-0 pointer-events-none opacity-80 mix-blend-screen transition-opacity duration-1000">
-      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full object-cover" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,#030712_80%)]" />
-    </div>
-  );
-}  
+function WarpSpeedCanvas({ isActive, colorRgb }: { isActive: boolean; colorRgb: string }) {
+  return <div aria-hidden="true" className={cn("fixed inset-0 -z-20 pointer-events-none transition-opacity duration-700", isActive ? "opacity-100" : "opacity-40")} style={{ background: `radial-gradient(circle at center, rgba(${colorRgb}, 0.06), transparent 48%)` }} />;
+}
