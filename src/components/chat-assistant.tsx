@@ -46,10 +46,25 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
   const [input, setInput] = useState("");
   const { addHabit } = useAppState();
   const appContextRef = useRef(appContext);
+  const [serverAvailable, setServerAvailable] = useState<boolean | null>(null);
 
   useEffect(() => {
     appContextRef.current = appContext;
   }, [appContext]);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/chat", { method: "GET", cache: "no-store" })
+      .then((response) => {
+        if (active) setServerAvailable(response.ok);
+      })
+      .catch(() => {
+        if (active) setServerAvailable(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const { messages, status, sendMessage, stop, error } = useChat({
     id: "outstand-assistant",
@@ -59,8 +74,10 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
     body: { appContext: appContextRef.current },
     fetch: async (url, options) => {
       const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Your session has expired. Please sign in again.");
+
       const headers = new Headers(options?.headers);
-      if (session?.access_token) headers.set("Authorization", `Bearer ${session.access_token}`);
+      headers.set("Authorization", `Bearer ${session.access_token}`);
       return fetch(url, { ...options, headers });
     },
     onError: (err) => {
@@ -180,19 +197,24 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
       </Conversation>
 
       <div className="shrink-0 border-t border-white/5 bg-slate-950 p-4">
+        {serverAvailable === false && (
+          <div className="mb-2 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-sm text-amber-200" role="status">
+            AI service is temporarily unavailable on this deployment.
+          </div>
+        )}
         {error && <div className="mb-2 rounded-lg border border-rose-500/50 bg-rose-500/10 p-3 text-sm text-rose-300" role="alert"><strong>Connection failed:</strong> {error.message}</div>}
         <PromptInput onSubmit={handleSubmit}>
           <PromptInputTextarea
             placeholder="Ask Outstand anything..."
             value={input}
             onChange={(event) => setInput(event.currentTarget.value)}
-            disabled={isStreaming}
+            disabled={isStreaming || serverAvailable === false}
             aria-label="Message Outstand Intelligence"
             onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void handleSubmit(); } }}
             className="resize-none border-white/10 bg-slate-900/50 text-white placeholder:text-slate-600 focus:border-indigo-500/50"
           />
           <PromptInputFooter className="justify-end pt-2">
-            <PromptInputSubmit status={isStreaming ? "streaming" : "idle"} onStop={() => stop()} disabled={!input.trim() && !isStreaming} aria-label={isStreaming ? "Stop response" : "Send message"} />
+            <PromptInputSubmit status={isStreaming ? "streaming" : "idle"} onStop={() => stop()} disabled={!input.trim() && !isStreaming || serverAvailable === false} aria-label={isStreaming ? "Stop response" : "Send message"} />
           </PromptInputFooter>
         </PromptInput>
       </div>
