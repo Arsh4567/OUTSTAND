@@ -1,5 +1,6 @@
 import type { ChallengeTheme, OutstandChallenge, ThemeName, ChallengeId } from "./challenges.types";
 import { createChallengeBatch01 } from "./challenge-batch-01";
+import { createChallengeBatch02 } from "./challenge-batch-02";
 
 const id = (value: string) => value as ChallengeId;
 
@@ -8,7 +9,7 @@ export const CHALLENGE_THEMES: Record<ThemeName, ChallengeTheme> = {
   Forest: { name: "Forest", bgGradient: "bg-gradient-to-br from-emerald-950 via-slate-950 to-black", borderGlow: "hover:shadow-[0_0_45px_rgba(52,211,153,.18)]", iconContainer: "bg-emerald-400/10 border-emerald-300/20", badgeColor: "text-emerald-300", particleColors: ["#34d399", "#10b981", "#fff"], cinematicVFX: "none" },
   Galaxy: { name: "Galaxy", bgGradient: "bg-gradient-to-br from-indigo-950 via-purple-950 to-black", borderGlow: "hover:shadow-[0_0_55px_rgba(129,140,248,.22)]", iconContainer: "bg-indigo-400/10 border-indigo-300/20", badgeColor: "text-indigo-300", particleColors: ["#818cf8", "#c084fc", "#fff"], cinematicVFX: "aurora_burst" },
   Sunset: { name: "Sunset", bgGradient: "bg-gradient-to-br from-orange-950 via-rose-950 to-black", borderGlow: "hover:shadow-[0_0_45px_rgba(251,146,60,.18)]", iconContainer: "bg-orange-400/10 border-orange-300/20", badgeColor: "text-orange-300", particleColors: ["#fb923c", "#f43f5e", "#fff"], cinematicVFX: "none" },
-  Volcano: { name: "Volcano", bgGradient: "bg-gradient-to-br from-red-950 via-zinc-950 to-black", borderGlow: "hover:shadow-[0_0_55px_rgba(248,113,113,.22)]", iconContainer: "bg-red-400/10 border-red-300/20", badgeColor: "text-red-300", particleColors: ["#f87171", "#ef4444", "#fff"], cinematicVFX: "cosmic_shockwave" },
+  Volcano: { name: "Volcano", bgGradient: "bg-gradient-to-br from-red-950 via-zinc-950 to-black", borderGlow: "hover:shadow-[0_0_55px_rgba(248,113,113,.22)]", iconContainer: "bg-red-400/10 border-red-300/30", badgeColor: "text-red-300", particleColors: ["#f87171", "#ef4444", "#fff"], cinematicVFX: "cosmic_shockwave" },
   Royal: { name: "Royal", bgGradient: "bg-gradient-to-br from-amber-950 via-zinc-950 to-black", borderGlow: "hover:shadow-[0_0_60px_rgba(251,191,36,.25)]", iconContainer: "bg-amber-400/10 border-amber-300/20", badgeColor: "text-amber-300", particleColors: ["#fbbf24", "#f59e0b", "#fff"], cinematicVFX: "divine_light" },
   Ice: { name: "Ice", bgGradient: "bg-gradient-to-br from-sky-950 via-cyan-950 to-black", borderGlow: "hover:shadow-[0_0_45px_rgba(56,189,248,.18)]", iconContainer: "bg-sky-400/10 border-sky-300/20", badgeColor: "text-sky-300", particleColors: ["#38bdf8", "#67e8f9", "#fff"], cinematicVFX: "none" },
   Neon: { name: "Neon", bgGradient: "bg-gradient-to-br from-fuchsia-950 via-violet-950 to-black", borderGlow: "hover:shadow-[0_0_55px_rgba(232,121,249,.22)]", iconContainer: "bg-fuchsia-400/10 border-fuchsia-300/20", badgeColor: "text-fuchsia-300", particleColors: ["#e879f9", "#c084fc", "#fff"], cinematicVFX: "aurora_burst" },
@@ -33,4 +34,5 @@ export const CHALLENGES: OutstandChallenge[] = [
   challenge({ id: "social-courage", title: "Courage Rep", description: "Do one small positive social action you have been putting off: ask, thank, explain, or start a conversation.", emoji: "🤝", category: "Social", difficulty: "Medium", rarity: "Rare", durationMinutes: 10, timeWindow: "Anytime", actionType: "Toggle", xpReward: 90, coinsReward: 20, psychologicalProfile: { dopamineYield: "High", flavorText: "Confidence grows through reps, not waiting.", cognitiveLoad: 3 }, theme: CHALLENGE_THEMES.Neon, audio: { onComplete: "success_chime" }, haptics: { onComplete: "success" } }),
   challenge({ id: "mastery-block", title: "Mastery Block", description: "Choose the skill that matters most this week and give it a protected 60-minute session with a measurable outcome.", emoji: "💎", category: "Focus", difficulty: "Master", rarity: "Divine", durationMinutes: 60, timeWindow: "Anytime", actionType: "Timer", xpReward: 800, coinsReward: 220, psychologicalProfile: { dopamineYield: "Surge", flavorText: "Do less. Go deeper. Finish stronger.", cognitiveLoad: 5 }, requirements: { minLevel: 5 }, theme: CHALLENGE_THEMES.Royal, audio: { onStart: "deep_hum", onComplete: "mythic_choir" }, haptics: { onStart: "heavy", onComplete: "cinematic_rumble" } }),
   ...createChallengeBatch01(CHALLENGE_THEMES),
+  ...createChallengeBatch02(CHALLENGE_THEMES),
 ];
