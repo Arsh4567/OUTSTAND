@@ -1,5 +1,11 @@
 {
   "buildCommand": "bun run build:vercel",
   "installCommand": "bun install",
-  "framework": null
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    }
+  ]
 }
