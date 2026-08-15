@@ -101,7 +101,7 @@ export default async function handler(req: any, res: any) {
   }
 
   const supabaseUrl = env("SUPABASE_URL") || env("VITE_SUPABASE_URL");
-  const supabaseKey = env("SUPABASE_PUBLISHABLE_KEY") || env("SUPABASE_ANON_KEY") || env("VITE_SUPABASE_ANON_KEY");
+  const supabaseKey = env("SUPABASE_PUBLISHABLE_KEY") || env("VITE_SUPABASE_PUBLISHABLE_KEY") || env("SUPABASE_ANON_KEY") || env("VITE_SUPABASE_ANON_KEY");
   const apiKey = env("GEMINI_API_KEY") || env("GOOGLE_GENERATIVE_AI_API_KEY");
 
   if (!supabaseUrl || !supabaseKey) {
