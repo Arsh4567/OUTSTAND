@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useChat, type UIMessage } from "@ai-sdk/react";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport, type UIMessage } from "ai";
 import { Bot, Trash2, X, PlusCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -78,53 +79,42 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
     appContextRef.current = appContext;
   }, [appContext]);
 
-  const { messages, isLoading, append, stop, error } = useChat({
+  const { messages, status, sendMessage, stop, error } = useChat({
     id: "outstand-assistant",
-    api: "/api/chat",
-    initialMessages,
+    messages: initialMessages,
     generateId: generateSafeId,
-    // FIX 1: Pass custom data using the built-in body property instead of mutating fetch options
-    body: {
-      appContext: appContextRef.current
-    },
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      body: () => ({ appContext: appContextRef.current }),
+      fetch: async (url: RequestInfo | URL, options?: RequestInit) => {
+        const { data: { session } } = await supabase.auth.getSession();
+        const headers = new Headers(options?.headers);
+        if (session?.access_token) {
+          headers.set("Authorization", `Bearer ${session.access_token}`);
+        }
+        return fetch(url, { ...options, headers });
+      },
+    }),
     onError: (err) => {
       console.error("AI SDK Error:", err);
       toast.error(`Error: ${err.message}`);
     },
-    fetch: async (url, options) => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const headers = new Headers(options?.headers);
-      
-      if (session?.access_token) {
-        headers.set("Authorization", `Bearer ${session.access_token}`);
-      }
-      
-      // FIX 2: Removed fragile JSON parsing of options.body. 
-      // The SDK now handles injecting the body payload automatically.
-      return fetch(url, {
-        ...options,
-        headers,
-      });
-    },
   });
 
+  const isLoading = status === "submitted" || status === "streaming";
+
   const handleSubmit = async (e?: React.FormEvent) => {
-    // FIX 3: Added standard event prevention to block rogue mobile webview reloads
-    if (e) e.preventDefault(); 
-    
+    if (e) e.preventDefault();
+
     const userText = input.trim();
     if (!userText || isLoading) return;
-    
+
     setInput("");
-    
+
     try {
-      // FIX 4: Send only role and content. The SDK will invoke generateSafeId() internally.
-      await append({ 
-        role: "user", 
-        content: userText 
-      });
+      await sendMessage({ text: userText });
     } catch (err: any) {
-      console.error("AI SDK append error:", err);
+      console.error("AI SDK send error:", err);
       toast.error(`Send failed: ${err.message || "Could not process request."}`);
     }
   };
@@ -179,20 +169,30 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
               description="I'm analyzing your dopamine baseline. Ask me to design a new habit for you, or how to recover from a focus slump."
             />
           ) : (
-            messages.map((message) => (
+            messages.map((message) => {
+              const text = message.parts
+                .filter((p: any) => p.type === "text")
+                .map((p: any) => p.text)
+                .join("");
+              const toolParts = message.parts.filter((p: any) =>
+                typeof p.type === "string" && p.type.startsWith("tool-"),
+              ) as any[];
+
+              return (
               <Message key={message.id} from={message.role}>
                 <MessageContent>
-                  {message.content && (
+                  {text && (
                     <div className={cn(
                       "whitespace-pre-wrap leading-relaxed",
                       message.role === "assistant" ? "text-slate-200" : "text-white"
                     )}>
-                      {message.content}
+                      {text}
                     </div>
                   )}
 
-                  {message.toolInvocations?.map((tool: any) => {
-                    if (tool.toolName === "createHabit") {
+                  {toolParts.map((tool: any) => {
+                    if (tool.type === "tool-createHabit") {
+                      const args = tool.input ?? {};
                       return (
                         <motion.div 
                           initial={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -209,14 +209,14 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
                             
                             <div className="mb-3 flex items-center gap-4">
                               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-500/20 text-2xl shadow-inner border border-indigo-500/30">
-                                {tool.args.emoji}
+                                {args.emoji}
                               </div>
                               <div>
                                 <h4 className="text-lg font-black text-white tracking-tight">
-                                  {tool.args.name}
+                                  {args.name}
                                 </h4>
                                 <p className="text-xs text-slate-400 line-clamp-2 mt-0.5">
-                                  {tool.args.reason || "Strategic baseline adjustment."}
+                                  {args.reason || "Strategic baseline adjustment."}
                                 </p>
                               </div>
                             </div>
@@ -224,11 +224,11 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
                             <Button 
                               onClick={() => {
                                 addHabit({
-                                  name: tool.args.name,
-                                  emoji: tool.args.emoji,
-                                  color: tool.args.color || "primary",
+                                  name: args.name,
+                                  emoji: args.emoji,
+                                  color: args.color || "primary",
                                 });
-                                toast.success(`${tool.args.name} loaded into your dashboard.`, {
+                                toast.success(`${args.name} loaded into your dashboard.`, {
                                   icon: <CheckCircle2 className="h-4 w-4 text-emerald-400" />
                                 });
                               }}
@@ -244,14 +244,14 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
                   })}
                 </MessageContent>
                 
-                {message.role === "assistant" && !message.toolInvocations && (
+                {message.role === "assistant" && toolParts.length === 0 && (
                   <MessageToolbar>
                     <MessageActions>
                       <MessageAction
                         tooltip="Copy response"
                         label="Copy"
                         onClick={() => {
-                          navigator.clipboard.writeText(message.content);
+                          navigator.clipboard.writeText(text);
                           toast.success("Copied to clipboard");
                         }}
                       >
@@ -261,7 +261,8 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
                   </MessageToolbar>
                 )}
               </Message>
-            ))
+              );
+            })
           )}
           
           <AnimatePresence>
@@ -288,7 +289,7 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
           </div>
         )}
         
-        <PromptInput onSubmit={handleSubmit}>
+        <PromptInput onSubmit={(_message, event) => handleSubmit(event)}>
           <PromptInputTextarea
             placeholder="Initialize command..."
             value={input}
@@ -304,7 +305,7 @@ function ChatPanel({ initialMessages, appContext, onClose, onClear }: ChatPanelP
           />
           <PromptInputFooter className="justify-end pt-2">
             <PromptInputSubmit
-              status={isLoading ? "streaming" : "idle"}
+              status={status}
               onStop={() => { if (stop) stop(); }}
               disabled={(!input.trim() && !isLoading)}
             />
@@ -363,7 +364,7 @@ export function ChatAssistant() {
             .map((m) => ({
               id: generateSafeId(),
               role: m.role as "user" | "assistant",
-              content: m.content,
+              parts: [{ type: "text" as const, text: m.content }],
             }));
           setInitialMessages(uiMessages);
         } else {
