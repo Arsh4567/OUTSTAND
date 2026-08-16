@@ -13,27 +13,44 @@ export type DailyLog = {
 
 const getStorageKey = (date: string) => `dopamine_log_${date}`;
 
-// 1. EXPLICITLY EXPORTED to fix the Vercel build error
+function readStoredLog(dateISO: string): DailyLog | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const saved = window.localStorage.getItem(getStorageKey(dateISO));
+    if (!saved) return null;
+
+    const parsed = JSON.parse(saved) as Partial<DailyLog>;
+    if (!parsed || typeof parsed !== "object") return null;
+
+    return {
+      log_date: typeof parsed.log_date === "string" ? parsed.log_date : dateISO,
+      positives: Array.isArray(parsed.positives) ? (parsed.positives as PositiveKey[]) : [],
+      negatives: Array.isArray(parsed.negatives) ? (parsed.negatives as NegativeKey[]) : [],
+      score: typeof parsed.score === "number" ? parsed.score : 50,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Browser-safe local cache. Reading localStorage during the state initializer
+// breaks TanStack Start SSR because window does not exist on the server.
 export function useDailyLog(dateISO: string = todayISO()) {
   const { user } = useAuth();
-  
-  const [log, setLog] = useState<DailyLog | null>(() => {
-    try {
-      const saved = localStorage.getItem(getStorageKey(dateISO));
-      return saved ? JSON.parse(saved) : null;
-    } catch (e) {
-      return null;
-    }
-  });
-  
+  const [log, setLog] = useState<DailyLog | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLog(readStoredLog(dateISO));
+  }, [dateISO]);
 
   const refetch = useCallback(async () => {
     if (!user) {
       setLoading(false);
       return;
     }
-    
+
     try {
       const { data, error } = await supabase
         .from("daily_logs")
@@ -48,11 +65,13 @@ export function useDailyLog(dateISO: string = todayISO()) {
         log_date: data?.log_date ?? dateISO,
         positives: Array.isArray(data?.positives) ? (data.positives as PositiveKey[]) : [],
         negatives: Array.isArray(data?.negatives) ? (data.negatives as NegativeKey[]) : [],
-        score: typeof data?.score === 'number' ? data.score : 50,
+        score: typeof data?.score === "number" ? data.score : 50,
       };
 
       setLog(fetchedLog);
-      localStorage.setItem(getStorageKey(dateISO), JSON.stringify(fetchedLog));
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(getStorageKey(dateISO), JSON.stringify(fetchedLog));
+      }
     } catch (err) {
       console.error("Data fetch error:", err);
     } finally {
@@ -61,23 +80,25 @@ export function useDailyLog(dateISO: string = todayISO()) {
   }, [user, dateISO]);
 
   useEffect(() => {
-    refetch();
+    void refetch();
   }, [refetch]);
 
   const upsert = useCallback(
     async (positives: PositiveKey[], negatives: NegativeKey[]) => {
       if (!user) return;
-      
+
       const score = computeScore(positives, negatives);
       const optimistic: DailyLog = { log_date: dateISO, positives, negatives, score };
-      
+
       setLog(optimistic);
-      localStorage.setItem(getStorageKey(dateISO), JSON.stringify(optimistic));
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(getStorageKey(dateISO), JSON.stringify(optimistic));
+      }
 
       const { error } = await supabase
         .from("daily_logs")
         .upsert({ user_id: user.id, log_date: dateISO, positives, negatives, score }, { onConflict: "user_id,log_date" });
-      
+
       if (error) console.error("Sync failed:", error);
     },
     [user, dateISO],
@@ -110,18 +131,15 @@ export function useDailyLog(dateISO: string = todayISO()) {
   return { log, loading, togglePositive, toggleNegative, addPositive, addNegative, refetch };
 }
 
-// 2. EXPLICITLY EXPORTED and Hardened to fix the Profile crash
 export function useWeeklyLogs(days = 7) {
   const { user } = useAuth();
-  
-  // Initialize with empty array so UI components don't crash on mount
   const [logs, setLogs] = useState<DailyLog[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user?.id) {
       setLoading(false);
-      setLogs([]); // Ensure we return empty array, not undefined
+      setLogs([]);
       return;
     }
 
@@ -140,33 +158,27 @@ export function useWeeklyLogs(days = 7) {
 
         if (error) throw error;
 
-        // Map existing data into a map for fast lookup
         const byDate = new Map<string, DailyLog>();
         (data ?? []).forEach((d) => {
           byDate.set(d.log_date, {
             log_date: d.log_date,
             positives: (Array.isArray(d.positives) ? d.positives : []) as PositiveKey[],
             negatives: (Array.isArray(d.negatives) ? d.negatives : []) as NegativeKey[],
-            score: typeof d.score === 'number' ? d.score : 50,
+            score: typeof d.score === "number" ? d.score : 50,
           });
         });
 
-        // Fill in missing dates so the chart doesn't break
-        const completeLogs = dates.map((d) => 
-          byDate.get(d) ?? { log_date: d, positives: [], negatives: [], score: 50 }
-        );
-
-        setLogs(completeLogs);
+        setLogs(dates.map((d) => byDate.get(d) ?? { log_date: d, positives: [], negatives: [], score: 50 }));
       } catch (err) {
         console.error("Failed to load weekly logs:", err);
-        setLogs([]); // Crash prevention
+        setLogs([]);
       } finally {
         setLoading(false);
       }
     };
 
-    load();
+    void load();
   }, [user?.id, days]);
 
   return { logs, loading };
-          }
+}
