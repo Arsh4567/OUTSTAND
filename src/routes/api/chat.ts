@@ -27,7 +27,7 @@ function json(data: unknown, status = 200, headers: HeadersInit = {}) {
 }
 
 function env(...names: string[]) {
-  return names.map((name) => process.env[name]).find(Boolean);
+  return names.map((name) => process.env[name]).find((value) => typeof value === "string" && value.trim().length > 0)?.trim();
 }
 
 function textFromMessage(message: z.infer<typeof MessageSchema>) {
@@ -73,6 +73,10 @@ function supabaseConfig() {
   };
 }
 
+function geminiApiKey() {
+  return env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY");
+}
+
 async function authenticate(request: Request) {
   const authorization = request.headers.get("authorization");
   if (!authorization?.startsWith("Bearer ")) return { error: json({ error: "Authentication required.", code: "AUTH_REQUIRED" }, 401) } as const;
@@ -86,7 +90,7 @@ async function authenticate(request: Request) {
   });
 
   const { data, error } = await client.auth.getUser();
-  if (error || !data.user) return { error: json({ error: "Authentication failed.", code: "AUTH_INVALID", details: error?.message ?? "No authenticated user returned by Supabase." }, 401) } as const;
+  if (error || !data.user) return { error: json({ error: "Authentication failed.", code: "AUTH_INVALID" }, 401) } as const;
   return { client, userId: data.user.id } as const;
 }
 
@@ -95,14 +99,28 @@ export const Route = createFileRoute("/api/chat")({
     handlers: {
       GET: async () => {
         const { url, key } = supabaseConfig();
-        const gemini = env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY");
-        return json({ ok: Boolean(url && key && gemini), service: "outstand-ai", supabaseConfigured: Boolean(url && key), geminiConfigured: Boolean(gemini) });
+        const apiKey = geminiApiKey();
+        return json({
+          ok: Boolean(url && key && apiKey),
+          service: "outstand-ai",
+          supabaseConfigured: Boolean(url && key),
+          geminiConfigured: Boolean(apiKey),
+        });
       },
 
       POST: async ({ request }) => {
         try {
           const auth = await authenticate(request);
           if ("error" in auth) return auth.error;
+
+          const apiKey = geminiApiKey();
+          if (!apiKey) {
+            console.error("[AI] Missing Gemini API key. Expected GEMINI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, or GOOGLE_API_KEY.");
+            return json({
+              error: "AI service is not configured on the server.",
+              code: "GEMINI_CONFIG_MISSING",
+            }, 503);
+          }
 
           const rawBody = await request.json().catch(() => null);
           const parsed = RequestSchema.safeParse(rawBody);
@@ -124,11 +142,11 @@ export const Route = createFileRoute("/api/chat")({
             .order("updated_at", { ascending: false })
             .limit(1)
             .maybeSingle();
-          if (lookupError) return json({ error: "Could not access your AI conversation.", code: lookupError.code, details: lookupError.message }, 500);
+          if (lookupError) return json({ error: "Could not access your AI conversation.", code: lookupError.code }, 500);
 
           if (!conversation) {
             const created = await auth.client.from("chat_conversations").insert({ user_id: auth.userId }).select("id").single();
-            if (created.error || !created.data) return json({ error: "Could not create your AI conversation.", code: created.error?.code ?? "CONVERSATION_CREATE_FAILED", details: created.error?.message }, 500);
+            if (created.error || !created.data) return json({ error: "Could not create your AI conversation.", code: "CONVERSATION_CREATE_FAILED" }, 500);
             conversation = created.data;
           }
 
@@ -136,15 +154,12 @@ export const Route = createFileRoute("/api/chat")({
           const latestText = latestUser?.parts.filter((part) => part.type === "text").map((part) => part.text).join("").trim() ?? "";
           if (latestText) {
             const existing = await auth.client.from("chat_messages").select("id").eq("conversation_id", conversation.id).eq("user_id", auth.userId).eq("role", "user").eq("content", latestText).order("created_at", { ascending: false }).limit(1).maybeSingle();
-            if (existing.error) return json({ error: "Could not validate your message history.", code: existing.error.code, details: existing.error.message }, 500);
+            if (existing.error) return json({ error: "Could not validate your message history.", code: existing.error.code }, 500);
             if (!existing.data) {
               const inserted = await auth.client.from("chat_messages").insert({ conversation_id: conversation.id, user_id: auth.userId, role: "user", content: latestText });
-              if (inserted.error) return json({ error: "Could not save your message.", code: inserted.error.code, details: inserted.error.message }, 500);
+              if (inserted.error) return json({ error: "Could not save your message.", code: inserted.error.code }, 500);
             }
           }
-
-          const apiKey = env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY");
-          if (!apiKey) return json({ error: "Gemini API configuration is missing.", code: "GEMINI_CONFIG_MISSING" }, 500);
 
           const result = streamText({
             model: google("gemini-2.5-flash", { apiKey }),
@@ -157,12 +172,14 @@ export const Route = createFileRoute("/api/chat")({
             if (!text.trim()) return;
             const { error } = await auth.client.from("chat_messages").insert({ conversation_id: conversation.id, user_id: auth.userId, role: "assistant", content: text });
             if (error) console.error("AI assistant persistence failed:", error.message);
+          }).catch((error) => {
+            console.error("AI assistant generation failed:", error);
           });
 
           return result.toUIMessageStreamResponse({ headers: { "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no" } });
         } catch (error) {
           console.error("Outstand AI request failed", error);
-          return json({ error: "AI request failed.", code: "AI_REQUEST_FAILED", details: error instanceof Error ? error.message : String(error) }, 500);
+          return json({ error: "AI request failed.", code: "AI_REQUEST_FAILED" }, 500);
         }
       },
 
@@ -171,14 +188,15 @@ export const Route = createFileRoute("/api/chat")({
           const auth = await authenticate(request);
           if ("error" in auth) return auth.error;
           const { data: conversation, error } = await auth.client.from("chat_conversations").select("id").eq("user_id", auth.userId).order("updated_at", { ascending: false }).limit(1).maybeSingle();
-          if (error) return json({ error: "Could not access your AI conversation.", code: error.code, details: error.message }, 500);
+          if (error) return json({ error: "Could not access your AI conversation.", code: error.code }, 500);
           if (conversation?.id) {
             const removed = await auth.client.from("chat_messages").delete().eq("conversation_id", conversation.id).eq("user_id", auth.userId);
-            if (removed.error) return json({ error: "Could not clear AI memory.", code: removed.error.code, details: removed.error.message }, 500);
+            if (removed.error) return json({ error: "Could not clear AI memory.", code: removed.error.code }, 500);
           }
           return new Response(null, { status: 204 });
         } catch (error) {
-          return json({ error: "Failed to clear AI memory.", code: "MEMORY_CLEAR_FAILED", details: error instanceof Error ? error.message : String(error) }, 500);
+          console.error("Failed to clear AI memory:", error);
+          return json({ error: "Failed to clear AI memory.", code: "MEMORY_CLEAR_FAILED" }, 500);
         }
       },
     },
