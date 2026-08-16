@@ -83,24 +83,58 @@ export async function getNotificationHistory(limit = 30) {
   return data ?? [];
 }
 
+function base64UrlToUint8Array(base64Url: string) {
+  const padding = "=".repeat((4 - (base64Url.length % 4)) % 4);
+  const base64 = (base64Url + padding).replace(/-/g, "+").replace(/_/g, "/");
+  return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+}
+
 export async function requestPushPermission() {
   if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
     throw new Error("Push notifications aren't supported by this browser.");
   }
-  const permission = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
+
+  const permission = Notification.permission === "default"
+    ? await Notification.requestPermission()
+    : Notification.permission;
   if (permission !== "granted") throw new Error("Notification permission was not granted.");
+
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Please sign in first.");
-  await navigator.serviceWorker.register("/sw.js");
-  const registration = await navigator.serviceWorker.ready;
+
+  const registration = await navigator.serviceWorker.register("/sw.js").then(() => navigator.serviceWorker.ready);
   const vapid = import.meta.env.VITE_VAPID_PUBLIC_KEY;
   if (!vapid) throw new Error("Push notifications are not configured yet.");
-  const key = Uint8Array.from(atob(vapid.replace(/-/g, "+").replace(/_/g, "/") + "=="), (char) => char.charCodeAt(0));
-  const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+
+  // If a subscription was created with an older VAPID key, reusing it can
+  // produce a subscription that the current private key cannot send to.
+  // Replace the existing browser subscription with one for the current key.
+  const existing = await registration.pushManager.getSubscription();
+  if (existing) await existing.unsubscribe();
+
+  const subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: base64UrlToUint8Array(vapid),
+  });
   const json = subscription.toJSON();
-  if (!json.endpoint || !json.keys?.auth || !json.keys?.p256dh) throw new Error("The browser returned an invalid push subscription.");
-  const { error } = await supabase.from("push_subscriptions").upsert({ user_id: session.user.id, endpoint: json.endpoint, auth_key: json.keys.auth, p256dh_key: json.keys.p256dh }, { onConflict: "user_id,endpoint" });
-  if (error) throw error;
+  if (!json.endpoint || !json.keys?.auth || !json.keys?.p256dh) {
+    throw new Error("The browser returned an invalid push subscription.");
+  }
+
+  const { error: subscriptionError } = await supabase.from("push_subscriptions").upsert(
+    {
+      user_id: session.user.id,
+      endpoint: json.endpoint,
+      auth_key: json.keys.auth,
+      p256dh_key: json.keys.p256dh,
+    },
+    { onConflict: "user_id,endpoint" },
+  );
+  if (subscriptionError) {
+    await subscription.unsubscribe().catch(() => undefined);
+    throw new Error(`Could not save your push subscription: ${subscriptionError.message}`);
+  }
+
   await saveNotificationPreferences({ push_enabled: true });
   return subscription;
 }
