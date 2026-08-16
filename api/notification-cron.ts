@@ -29,8 +29,7 @@ function quietHours(now: Date, start: string, end: string, enabled: boolean, tim
 }
 
 function chooseHabit(habits: any[], today: string) {
-  const pending = habits.filter((habit) => !Array.isArray(habit?.history) || !habit.history.includes(today));
-  return pending[0];
+  return habits.find((habit) => !Array.isArray(habit?.history) || !habit.history.includes(today));
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -53,13 +52,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const now = new Date();
     const clock = minutesInZone(now, tz);
     if (quietHours(now, pref.quiet_start, pref.quiet_end, pref.quiet_hours_enabled, tz)) continue;
-    if (clock.minute > 10) continue; // cron runs hourly; send only once near the selected hour.
+    if (clock.minute > 10) continue;
 
     const { data: state } = await admin.from('user_productivity_state').select('habits,sessions,outstand').eq('user_id', pref.user_id).maybeSingle();
     if (!state) continue;
 
     const date = localDate(now, tz);
-    const { count } = await admin.from('notification_events').select('id', { count: 'exact', head: true }).eq('user_id', pref.user_id).gte('created_at', `${date}T00:00:00Z`);
+    const since = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    const { count } = await admin.from('notification_events').select('id', { count: 'exact', head: true }).eq('user_id', pref.user_id).gte('created_at', since);
     if ((count ?? 0) >= Math.max(1, Number(pref.max_daily) || 3)) continue;
 
     let category: 'habit' | 'motivation' | null = null;
@@ -67,7 +67,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let body = '';
     let path = '/outstand';
 
-    // 19:00 local time: remind about the first unfinished habit.
     if (pref.habits_enabled && clock.hour === 19) {
       const habit = chooseHabit(Array.isArray(state.habits) ? state.habits : [], date);
       if (habit) {
@@ -77,7 +76,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // 08:00 local time: lightweight motivation, only if there was no habit reminder.
     if (!category && pref.motivational_enabled && clock.hour === 8) {
       const quotes = [
         'Small wins compound. Just take the next step. 🔵',
@@ -116,7 +114,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (delivered) {
       await admin.from('notification_delivery_log').insert({ user_id: pref.user_id, dedupe_key: dedupeKey, category });
-      await admin.from('notification_events').insert({ user_id: pref.user_id, category, title, body, url: path, delivered_at: new Date().toISOString() });
+      await admin.from('notification_events').insert({ user_id: pref.user_id, category, title, body, url: path, dedupe_key: dedupeKey, delivered_at: new Date().toISOString() });
       sent += 1;
     }
   }
