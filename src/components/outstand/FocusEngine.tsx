@@ -1,6 +1,7 @@
 import { memo, useMemo, useRef } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { AnimatePresence, motion, useMotionValue, useSpring } from "framer-motion";
-import { Crosshair, Layers3, Sparkles, Target, Zap } from "lucide-react";
+import { Crosshair, Layers3, Target, Zap } from "lucide-react";
 import { ChallengeCard } from "@/components/ChallengeCard";
 import type { OutstandChallenge } from "@/lib/challenges.types";
 
@@ -26,11 +27,9 @@ export const FocusEngine = memo((props: FocusEngineProps) => {
   const { challenge, isShuffling, shuffleDisplay, running, mins, secs, setRunning, setRemaining, generate, complete, completionStage } = props;
   const sceneSeed = useMemo(() => challenge?.id?.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0) ?? 42, [challenge?.id]);
 
-  return (
-    <AnimatePresence mode="wait" initial={false}>
-      {!challenge && !isShuffling ? <IdleScene generate={generate} /> : isShuffling ? <AcquisitionScene display={shuffleDisplay} /> : challenge ? <ActiveScene challenge={challenge} sceneSeed={sceneSeed} completionStage={completionStage} running={running} mins={mins} secs={secs} setRunning={setRunning} setRemaining={setRemaining} generate={generate} complete={complete} /> : null}
-    </AnimatePresence>
-  );
+  return <AnimatePresence mode="wait" initial={false}>
+    {!challenge && !isShuffling ? <IdleScene generate={generate} /> : isShuffling ? <AcquisitionScene display={shuffleDisplay} /> : <ActiveScene challenge={challenge!} sceneSeed={sceneSeed} completionStage={completionStage} running={running} mins={mins} secs={secs} setRunning={setRunning} setRemaining={setRemaining} generate={generate} complete={complete} />}
+  </AnimatePresence>;
 });
 FocusEngine.displayName = "FocusEngine";
 
@@ -41,11 +40,11 @@ function IdleScene({ generate }: { generate: () => void }) {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,.06),transparent_45%)]" />
       <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.04)_1px,transparent_1px)] [background-size:44px_44px] [mask-image:radial-gradient(circle_at_center,black,transparent_70%)]" />
     </div>
-    <motion.div initial={{ y: -12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="relative z-10 max-w-2xl px-6">
+    <div className="relative z-10 max-w-2xl px-6">
       <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-cyan-300/15 bg-cyan-300/[0.06] px-3 py-1.5 text-[9px] font-black uppercase tracking-[.3em] text-cyan-100/80"><Layers3 className="h-3.5 w-3.5" /> Focus chamber</div>
       <h2 className="mt-5 text-5xl font-black tracking-[-.06em] text-white sm:text-7xl">Make the next move count.</h2>
       <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-slate-500 sm:text-base">Outstand chooses a focused challenge, builds a timebox around it, and gets out of your way.</p>
-    </motion.div>
+    </div>
     <MagneticCore generate={generate} />
     <div className="relative z-10 flex flex-wrap justify-center gap-2 px-6 text-[9px] font-bold uppercase tracking-[.2em] text-slate-600"><span className="rounded-full border border-white/6 bg-white/[0.025] px-3 py-1.5">No feeds</span><span className="rounded-full border border-white/6 bg-white/[0.025] px-3 py-1.5">One mission</span><span className="rounded-full border border-white/6 bg-white/[0.025] px-3 py-1.5">Full attention</span></div>
   </motion.div>;
@@ -94,7 +93,7 @@ const MagneticCore = memo(({ generate }: { generate: () => void }) => {
   const x = useMotionValue(0); const y = useMotionValue(0);
   const springX = useSpring(x, { stiffness: 260, damping: 25, mass: 0.5 });
   const springY = useSpring(y, { stiffness: 260, damping: 25, mass: 0.5 });
-  const onMove = (event: React.PointerEvent<HTMLDivElement>) => {
+  const onMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== "mouse" || !ref.current) return;
     const rect = ref.current.getBoundingClientRect();
     x.set(((event.clientX - rect.left) / rect.width - 0.5) * 18);
