@@ -108,7 +108,14 @@ async function getAuth(req: VercelRequest) {
   if (!url || !key) return { error: { status: 500, body: { error: "Supabase server configuration is missing.", code: "SUPABASE_CONFIG_MISSING" } } } as const;
 
   const token = authorization.slice("Bearer ".length);
-  const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  // The token must be attached to every PostgREST request made by this client.
+  // auth.getUser(token) verifies the token, but does not mutate the client's
+  // Authorization header. Without this header, RLS evaluates auth.uid() as
+  // NULL and inserts into user-owned chat tables fail with 42501.
+  const client = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
   const { data, error } = await client.auth.getUser(token);
   if (error || !data.user) return { error: { status: 401, body: { error: "Authentication failed.", code: "AUTH_INVALID" } } } as const;
   return { client, userId: data.user.id } as const;
