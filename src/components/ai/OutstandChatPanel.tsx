@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Conversation, ConversationContent, ConversationEmptyState, ConversationScrollButton } from "@/components/ai-elements/conversation";
 import { Message, MessageAction, MessageActions, MessageContent, MessageToolbar } from "@/components/ai-elements/message";
-import { PromptInput, PromptInputFooter, PromptInputSubmit, PromptInputTextarea } from "@/components/ai-elements/prompt-input";
+import { PromptInput, PromptInputFooter, PromptInputSubmit, PromptInputTextarea, type PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { OutstandRobotAvatar } from "@/components/ai/OutstandRobotAvatar";
 
@@ -74,9 +74,12 @@ export function OutstandChatPanel({
 
   const streaming = status === "submitted" || status === "streaming";
 
-  const send = async (event?: React.FormEvent) => {
-    event?.preventDefault();
-    const text = input.trim();
+  // PromptInput calls onSubmit(message, event). The old handler treated the
+  // message object as the event, so clicking Send threw before the request
+  // could reach /api/chat. Keep the two arguments explicit and use message.text.
+  const send = async (message: PromptInputMessage, event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const text = message.text.trim();
     if (!text || streaming) return;
 
     const { data, error: sessionError } = await supabase.auth.getSession();
@@ -163,7 +166,7 @@ export function OutstandChatPanel({
       {healthy === false && <div className="mb-2 rounded-xl border border-amber-400/15 bg-amber-400/[0.06] p-3 text-amber-100"><div className="flex items-center justify-between"><div className="flex items-center gap-2 font-semibold"><WifiOff className="h-4 w-4" />AI connection issue</div><Button variant="ghost" size="icon-sm" onClick={() => void refresh()} aria-label="Retry"><RefreshCw className="h-4 w-4" /></Button></div><p className="mt-1 break-words text-xs text-amber-100/60">{healthMessage}</p></div>}
       {error && <div className="mb-2 rounded-xl border border-rose-400/15 bg-rose-400/[0.06] p-3 text-sm text-rose-200">{formatAiError(error)}</div>}
       <PromptInput onSubmit={send}>
-        <PromptInputTextarea placeholder="Ask Outstand..." value={input} onChange={(event) => setInput(event.currentTarget.value)} disabled={streaming} aria-label="Message Outstand Intelligence" onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void send(); } }} />
+        <PromptInputTextarea placeholder="Ask Outstand..." value={input} onChange={(event) => setInput(event.currentTarget.value)} disabled={streaming} aria-label="Message Outstand Intelligence" onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void send({ text: input, files: [] }, event as unknown as React.FormEvent<HTMLFormElement>); } }} />
         <PromptInputFooter className="justify-end"><PromptInputSubmit status={streaming ? "streaming" : "idle"} onStop={stop} disabled={(!input.trim() && !streaming)} /></PromptInputFooter>
       </PromptInput>
     </div>
