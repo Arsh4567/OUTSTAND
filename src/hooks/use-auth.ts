@@ -1,23 +1,34 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
-export type Profile = { 
-  id: string; 
-  display_name?: string | null; 
+export type Profile = {
+  id: string;
+  display_name?: string | null;
   full_name?: string | null;
+  username?: string | null;
+  bio?: string | null;
   avatar_url?: string | null;
   has_completed_onboarding?: boolean;
   screen_time?: number | null;
 };
+
+const fallbackProfile = (id: string): Profile => ({
+  id,
+  display_name: null,
+  full_name: null,
+  username: null,
+  bio: null,
+  avatar_url: null,
+  has_completed_onboarding: false,
+});
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Unified fetch function to get User and Profile simultaneously
-  const fetchUserDataAndProfile = async (currentUser: User | null) => {
+  const fetchProfile = useCallback(async (currentUser: User | null) => {
     if (!currentUser?.id) {
       setUser(null);
       setProfile(null);
@@ -26,7 +37,6 @@ export function useAuth() {
     }
 
     setUser(currentUser);
-
     try {
       const { data, error } = await supabase
         .from("profiles")
@@ -36,77 +46,76 @@ export function useAuth() {
 
       if (error) {
         console.error("Error fetching profile:", error);
-        setProfile({ id: currentUser.id, display_name: null, full_name: null, avatar_url: null, has_completed_onboarding: false });
+        setProfile(fallbackProfile(currentUser.id));
       } else {
-        setProfile(data ?? { id: currentUser.id, display_name: null, full_name: null, avatar_url: null, has_completed_onboarding: false });
+        setProfile(data ? (data as Profile) : fallbackProfile(currentUser.id));
       }
-    } catch (err) {
-      console.error("Unhandled profile fetch error:", err);
-      setProfile({ id: currentUser.id });
+    } catch (error) {
+      console.error("Unhandled profile fetch error:", error);
+      setProfile(fallbackProfile(currentUser.id));
     } finally {
-      // Only stop loading AFTER both user and profile are securely locked in state
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    let isMounted = true;
+    let mounted = true;
 
-    // 1. Initial Session Check on Mount (Hard Refresh handler)
     supabase.auth.getSession()
       .then(({ data }) => {
-        if (isMounted) {
-          fetchUserDataAndProfile(data.session?.user ?? null);
-        }
+        if (mounted) void fetchProfile(data.session?.user ?? null);
       })
-      .catch((err) => {
-        console.error("Failed to get session:", err);
-        if (isMounted) setLoading(false);
+      .catch((error) => {
+        console.error("Failed to get session:", error);
+        if (mounted) setLoading(false);
       });
 
-    // 2. Auth State Change Listener (Login/Logout events)
-    const { data: { subscription: sub } } = supabase.auth.onAuthStateChange((_e, session) => {
-      if (isMounted) {
-        setLoading(true);
-        fetchUserDataAndProfile(session?.user ?? null);
-      }
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
+      setLoading(true);
+      void fetchProfile(session?.user ?? null);
     });
 
     return () => {
-      isMounted = false;
-      sub?.unsubscribe();
+      mounted = false;
+      listener.subscription.unsubscribe();
     };
-  }, []);
+  }, [fetchProfile]);
 
-  // Optimistic Update Function for Cinematic Onboarding
-  const updateProfile = async (updates: Partial<Profile>) => {
-    if (!user?.id) return { error: "No authenticated user found." };
+  const updateProfile = useCallback(async (updates: Partial<Profile>) => {
+    if (!user?.id) return { error: new Error("No authenticated user found.") };
 
-    setProfile((prev) => prev ? { ...prev, ...updates } : { id: user.id, ...updates });
+    const previous = profile;
+    setProfile((current) => current ? { ...current, ...updates } : { ...fallbackProfile(user.id), ...updates });
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .update(updates)
-      .eq("id", user.id);
+      .eq("id", user.id)
+      .select("*")
+      .single();
 
     if (error) {
+      setProfile(previous);
       console.error("Failed to sync profile update:", error);
       return { error };
     }
-    
-    return { success: true };
-  };
 
-  return { user, profile, loading, updateProfile };
+    setProfile(data as Profile);
+    return { data: data as Profile };
+  }, [profile, user?.id]);
+
+  return { user, profile, loading, updateProfile, refreshProfile: () => fetchProfile(user) };
 }
 
 export function displayNameOf(user: User | null, profile: Profile | null): string {
   return (
     profile?.full_name ||
     profile?.display_name ||
-    (user?.user_metadata as any)?.full_name ||
-    (user?.user_metadata as any)?.display_name ||
+    profile?.username ||
+    (user?.user_metadata as Record<string, unknown> | undefined)?.full_name as string ||
+    (user?.user_metadata as Record<string, unknown> | undefined)?.display_name as string ||
     user?.email?.split("@")[0] ||
-    "Hustler"
+    "Friend"
   );
 }
