@@ -1,56 +1,45 @@
-// public/sw.js
+// OUTSTAND service worker
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
 
-self.addEventListener('push', function (event) {
-  if (event.data) {
-    let data = {};
-    
-    // Safely attempt to parse JSON, fallback to plain text if it fails
-    try {
-      data = event.data.json();
-    } catch (e) {
-      console.warn('Push payload was not JSON. Falling back to text.');
-      data = { 
-        title: 'New Alert', 
-        body: event.data.text() 
-      };
-    }
-    
-    const options = {
-      body: data.body || 'You have a new notification.', // Fallback body
-      icon: '/icon-192x192.png', 
-      badge: '/badge-72x72.png', 
-      vibrate: [100, 50, 100],
-      data: {
-        dateOfArrival: Date.now(),
-        primaryKey: '2'
-      }
-    };
-    
-    event.waitUntil(
-      self.registration.showNotification(data.title || 'Notification', options) // Fallback title
-    );
+  let data = {};
+  try {
+    data = event.data.json();
+  } catch {
+    data = { title: "OUTSTAND", body: event.data.text() };
   }
+
+  const url = typeof data.url === "string" && data.url.startsWith("/") ? data.url : "/";
+  const options = {
+    body: data.body || "You have a new OUTSTAND notification.",
+    icon: data.icon || "/icon-192x192.png",
+    badge: data.badge || "/badge-72x72.png",
+    tag: data.tag || "outstand-notification",
+    renotify: Boolean(data.renotify),
+    requireInteraction: false,
+    vibrate: [80, 40, 80],
+    data: { url },
+    actions: Array.isArray(data.actions) ? data.actions.slice(0, 2) : [],
+  };
+
+  event.waitUntil(self.registration.showNotification(data.title || "OUTSTAND", options));
 });
 
-self.addEventListener('notificationclick', function (event) {
+self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  
+  const target = event.notification.data?.url || "/";
+
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clientList) {
-      // Check if any window is already open matching our base URL
-      for (var i = 0; i < clientList.length; i++) {
-        var client = clientList[i];
-        
-        // Use startsWith to handle absolute URLs (e.g., https://myapp.com/)
-        if (client.url && client.url.startsWith(self.location.origin) && 'focus' in client) {
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.startsWith(self.location.origin) && "focus" in client) {
+          if ("navigate" in client && client.url !== `${self.location.origin}${target}`) {
+            client.navigate(target);
+          }
           return client.focus();
         }
       }
-      
-      // If no window is open, open a new one
-      if (clients.openWindow) {
-        return clients.openWindow('/');
-      }
+      return clients.openWindow ? clients.openWindow(target) : undefined;
     })
   );
 });
