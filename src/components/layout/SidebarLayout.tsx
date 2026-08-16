@@ -29,6 +29,7 @@ const NAV_ITEMS = [
   { to: "/focus", label: "Focus", icon: Timer },
   { to: "/dopamine", label: "Dopamine", icon: Brain },
   { to: "/outstand", label: "Outstand", icon: Zap },
+  { to: "/intelligence", label: "Intelligence", icon: Bot },
   { to: "/league", label: "Leaderboard", icon: Trophy },
 ] as const;
 
@@ -92,15 +93,14 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => window.dispatchEvent(new CustomEvent("outstand:open-ai"))}
+              <Link
+                to="/intelligence"
                 aria-label="Open Outstand Intelligence"
-                className="hidden items-center gap-2 rounded-2xl border border-indigo-300/20 bg-indigo-400/[0.06] px-3 py-2 text-xs font-bold text-indigo-100 shadow-[0_0_22px_rgba(99,102,241,0.12)] transition hover:border-indigo-300/35 hover:bg-indigo-400/[0.10] md:flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300/70"
+                className="hidden items-center gap-2 rounded-2xl border border-cyan-300/20 bg-cyan-400/[0.06] px-3 py-2 text-xs font-bold text-cyan-100 shadow-[0_0_22px_rgba(34,211,238,0.12)] transition hover:border-cyan-300/35 hover:bg-cyan-400/[0.10] md:flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
               >
-                <Bot className="h-4 w-4 text-indigo-300" />
+                <Bot className="h-4 w-4 text-cyan-300" />
                 Intelligence
-              </button>
+              </Link>
 
               <Link to="/profile" className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.035] px-2.5 py-1.5 transition hover:border-cyan-300/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70" aria-label="Open profile">
                 <div className="relative h-9 w-9 overflow-hidden rounded-xl border border-cyan-300/20 bg-cyan-950/40">
@@ -170,11 +170,11 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
                 </nav>
 
                 <div className="relative z-10 space-y-2 border-t border-white/7 bg-[#060911]/80 p-4 backdrop-blur-xl">
-                  <button type="button" onClick={() => { setIsOpen(false); window.dispatchEvent(new CustomEvent("outstand:open-ai")); }} className="group relative flex w-full items-center gap-3 overflow-hidden rounded-2xl border border-indigo-300/15 bg-indigo-500/[0.06] px-4 py-3 transition hover:border-indigo-300/30 hover:bg-indigo-500/[0.1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300/70">
-                    <div className="grid h-10 w-10 place-items-center rounded-xl border border-indigo-300/15 bg-indigo-400/10 text-indigo-200"><Bot className="h-[18px] w-[18px]" /></div>
-                    <div className="min-w-0 flex-1 text-left"><div className="text-sm font-bold text-indigo-100">Outstand Intelligence</div><div className="mt-0.5 text-[10px] font-medium text-indigo-300/55">Open your AI coach</div></div>
-                    <ChevronRight className="h-4 w-4 text-indigo-300/45" />
-                  </button>
+                  <Link to="/intelligence" onClick={() => setIsOpen(false)} className="group relative flex w-full items-center gap-3 overflow-hidden rounded-2xl border border-cyan-300/15 bg-cyan-500/[0.06] px-4 py-3 transition hover:border-cyan-300/30 hover:bg-cyan-500/[0.1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">
+                    <div className="grid h-10 w-10 place-items-center rounded-xl border border-cyan-300/15 bg-cyan-400/10 text-cyan-200"><Bot className="h-[18px] w-[18px]" /></div>
+                    <div className="min-w-0 flex-1 text-left"><div className="text-sm font-bold text-cyan-100">Outstand Intelligence</div><div className="mt-0.5 text-[10px] font-medium text-cyan-300/55">Open the intelligence workspace</div></div>
+                    <ChevronRight className="h-4 w-4 text-cyan-300/45" />
+                  </Link>
 
                   <Link to="/regain" className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-red-400/15 bg-red-500/[0.05] px-4 py-3 transition hover:border-red-300/25 hover:bg-red-500/[0.09] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/60">
                     <div className="grid h-10 w-10 place-items-center rounded-xl border border-red-400/15 bg-red-400/10 text-red-300"><ShieldAlert className="h-[18px] w-[18px]" /></div>
