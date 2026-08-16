@@ -1,65 +1,61 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import webpush from 'web-push';
-import { createClient } from '@supabase/supabase-js';
+import type { VercelRequest, VercelResponse } from "@vercel/node";
+import webpush from "web-push";
+import { createClient } from "@supabase/supabase-js";
 
-// 1. Configure Web Push with your keys
-webpush.setVapidDetails(
-  'mailto:your-email@example.com', 
-  process.env.VITE_VAPID_PUBLIC_KEY as string, 
-  process.env.VAPID_PRIVATE_KEY as string
-);
-
-
-// 2. Initialize Supabase
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL as string,
-  process.env.VITE_SUPABASE_PUBLISHABLE_KEY as string
-  
-);
+const env = (...names: string[]) => names.map((name) => process.env[name]).find((value) => typeof value === "string" && value.trim());
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Only allow POST requests
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith("Bearer ")) return res.status(401).json({ error: "Authentication required" });
+
+  const supabaseUrl = env("SUPABASE_URL", "VITE_SUPABASE_URL");
+  const publishableKey = env("SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_PUBLISHABLE_KEY");
+  const serviceRoleKey = env("SUPABASE_SERVICE_ROLE_KEY");
+  const publicKey = env("VAPID_PUBLIC_KEY", "VITE_VAPID_PUBLIC_KEY");
+  const privateKey = env("VAPID_PRIVATE_KEY");
+
+  if (!supabaseUrl || !publishableKey || !serviceRoleKey || !publicKey || !privateKey) {
+    return res.status(503).json({ error: "Push notification server configuration is incomplete" });
   }
 
-  const { userId } = req.body;
+  const token = authorization.slice("Bearer ".length);
+  const authClient = createClient(supabaseUrl, publishableKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+  const { data: { user }, error: authError } = await authClient.auth.getUser(token);
+  if (authError || !user) return res.status(401).json({ error: "Authentication failed" });
 
-  try {
-    // 3. Find the user's device in Supabase
-    const { data: subs, error } = await supabase
-      .from('push_subscriptions')
-      .select('*')
-      .eq('user_id', userId);
+  const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  webpush.setVapidDetails(env("VAPID_SUBJECT") || "mailto:notifications@outstand.app", publicKey, privateKey);
 
-    if (error || !subs || subs.length === 0) {
-      return res.status(404).json({ error: 'No subscription found for this user' });
+  const { data: subs, error } = await admin.from("push_subscriptions").select("endpoint,auth_key,p256dh_key").eq("user_id", user.id);
+  if (error) return res.status(500).json({ error: "Could not load notification subscriptions" });
+  if (!subs?.length) return res.status(404).json({ error: "No push subscription found for this account" });
+
+  const payload = JSON.stringify({
+    title: "OUTSTAND 🤖",
+    body: "Your notifications are working. You're ready for smarter reminders! 🎉",
+    icon: "/icon-192x192.png",
+    badge: "/badge-72x72.png",
+    url: "/",
+    tag: "outstand-test",
+  });
+
+  let sent = 0;
+  for (const sub of subs) {
+    try {
+      await webpush.sendNotification({ endpoint: sub.endpoint, keys: { auth: sub.auth_key, p256dh: sub.p256dh_key } }, payload);
+      sent += 1;
+    } catch (error: any) {
+      // Expired/unregistered browser subscriptions should be removed automatically.
+      if (error?.statusCode === 404 || error?.statusCode === 410) {
+        await admin.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
+      }
     }
-
-    // 4. The Notification Content
-    const payload = JSON.stringify({
-      title: "Outstand",
-      body: "This is your first test notification! 🎉",
-      icon: "/icon-192x192.png", 
-      badge: "/icon-192x192.png",
-      url: "/" 
-    });
-
-    // 5. Send to all devices the user has allowed
-    const sendPromises = subs.map((sub) => {
-      const pushSubscription = {
-        endpoint: sub.endpoint,
-        keys: { auth: sub.auth_key, p256dh: sub.p256dh_key },
-      };
-      return webpush.sendNotification(pushSubscription, payload);
-    });
-
-    await Promise.all(sendPromises);
-    return res.status(200).json({ success: true, message: 'Push sent!' });
-
-  } catch (error) {
-    console.error('Error sending push:', error);
-    return res.status(500).json({ error: 'Failed to send push notification' });
   }
-}
 
+  return res.status(sent ? 200 : 502).json({ success: sent > 0, sent });
+}
