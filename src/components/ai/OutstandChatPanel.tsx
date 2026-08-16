@@ -74,9 +74,9 @@ export function OutstandChatPanel({
 
   const streaming = status === "submitted" || status === "streaming";
 
-  // PromptInput calls onSubmit(message, event). The old handler treated the
-  // message object as the event, so clicking Send threw before the request
-  // could reach /api/chat. Keep the two arguments explicit and use message.text.
+  // PromptInput calls onSubmit(message, event). The previous handler treated
+  // the message object as the event, so the Send button failed before the
+  // request reached /api/chat. Keep the signature aligned with PromptInput.
   const send = async (message: PromptInputMessage, event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const text = message.text.trim();
@@ -166,8 +166,8 @@ export function OutstandChatPanel({
       {healthy === false && <div className="mb-2 rounded-xl border border-amber-400/15 bg-amber-400/[0.06] p-3 text-amber-100"><div className="flex items-center justify-between"><div className="flex items-center gap-2 font-semibold"><WifiOff className="h-4 w-4" />AI connection issue</div><Button variant="ghost" size="icon-sm" onClick={() => void refresh()} aria-label="Retry"><RefreshCw className="h-4 w-4" /></Button></div><p className="mt-1 break-words text-xs text-amber-100/60">{healthMessage}</p></div>}
       {error && <div className="mb-2 rounded-xl border border-rose-400/15 bg-rose-400/[0.06] p-3 text-sm text-rose-200">{formatAiError(error)}</div>}
       <PromptInput onSubmit={send}>
-        <PromptInputTextarea placeholder="Ask Outstand..." value={input} onChange={(event) => setInput(event.currentTarget.value)} disabled={streaming} aria-label="Message Outstand Intelligence" onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void send({ text: input, files: [] }, event as unknown as React.FormEvent<HTMLFormElement>); } }} />
-        <PromptInputFooter className="justify-end"><PromptInputSubmit status={streaming ? "streaming" : "idle"} onStop={stop} disabled={(!input.trim() && !streaming)} /></PromptInputFooter>
+        <PromptInputTextarea placeholder="Ask Outstand..." value={input} onChange={(event) => setInput(event.currentTarget.value)} disabled={streaming} aria-label="Message Outstand Intelligence" />
+        <PromptInputFooter className="justify-end"><PromptInputSubmit status={streaming ? "streaming" : "idle"} onStop={stop} disabled={!input.trim() && !streaming} /></PromptInputFooter>
       </PromptInput>
     </div>
   </div>;
