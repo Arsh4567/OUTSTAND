@@ -2,7 +2,6 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 import { convertToModelMessages, pipeUIMessageStreamToResponse, streamText, type UIMessage } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { buildIntelligencePrompt } from "../src/lib/intelligence/prompt";
 
 const env = (...names: string[]) => names.map((name) => process.env[name]).find((value) => typeof value === "string" && value.trim().length > 0);
 
@@ -47,18 +46,45 @@ function textFromMessage(message: any) {
   return "";
 }
 
-function intelligencePrompt(context: unknown) {
+function buildIntelligenceSystemPrompt(context: unknown, memoryContext?: string) {
   const ctx = context && typeof context === "object" ? context as Record<string, unknown> : {};
-  const name = typeof ctx.name === "string" && ctx.name.trim() ? ctx.name.trim() : "there";
-  const habits = Array.isArray(ctx.habits) ? ctx.habits.filter((item: any) => item && typeof item.id === "string" && typeof item.name === "string").map((item: any) => ({ id: item.id, name: item.name })) : [];
-  const completedToday = Array.isArray(ctx.completedToday) ? ctx.completedToday.filter((id): id is string => typeof id === "string") : [];
-  const sessions = Array.isArray(ctx.sessions) ? ctx.sessions : [];
-  const focusSessions = sessions.length;
-  const xp = typeof ctx.xp === "number" && Number.isFinite(ctx.xp) ? ctx.xp : 0;
-  const streak = typeof ctx.bestStreak === "number" && Number.isFinite(ctx.bestStreak) ? ctx.bestStreak : 0;
-  const dopamineScore = typeof ctx.dopamineScore === "number" && Number.isFinite(ctx.dopamineScore) ? ctx.dopamineScore : null;
+  const name = typeof ctx.name === "string" ? ctx.name : "there";
+  const xp = typeof ctx.xp === "number" ? ctx.xp : 0;
+  const streak = typeof ctx.bestStreak === "number" ? ctx.bestStreak : 0;
+  const score = typeof ctx.dopamineScore === "number" ? ctx.dopamineScore : 50;
+  const habits = Array.isArray(ctx.habits) ? ctx.habits : [];
+  const completed = Array.isArray(ctx.completedToday) ? ctx.completedToday : [];
+  const sessions = Array.isArray(ctx.sessions) ? ctx.sessions.length : 0;
+  const habitSummary = habits.slice(0, 30).map((item: any) => `${typeof item?.name === "string" ? item.name : "Habit"} ${typeof item?.id === "string" && completed.includes(item.id) ? "(done today)" : "(not done today)"}`).join(", ");
+  const completionRate = habits.length ? Math.round((completed.length / habits.length) * 100) : 0;
+  const state = completionRate >= 70 && sessions > 0 ? "momentum" : completionRate < 40 || (streak === 0 && sessions === 0) ? "recovery" : "building";
+  const priority = state === "momentum" ? "Protect the strongest existing behavior and make the next action small." : state === "recovery" ? "Reduce friction and choose one achievable action that restores momentum." : "Build consistency with one focused action before adding complexity.";
+  return `You are OUTSTAND Intelligence, a personal productivity intelligence system for ${name}.
 
-  return buildIntelligencePrompt(name, { xp, streak, dopamineScore, habits, completedToday, focusSessions });
+CURRENT OUTSTAND STATE (source of truth)
+- XP: ${xp}
+- Best streak: ${streak} days
+- Dopamine score: ${score}/100
+- Habits today: ${completed.length}/${habits.length} completed (${completionRate}%)
+- Focus sessions logged in supplied context: ${sessions}
+- Operating state: ${state}
+- Current priority: ${priority}
+- Habits: ${habitSummary || "None yet"}
+${memoryContext ? `\nRELEVANT USER MEMORY\n${memoryContext}` : ""}
+
+INTELLIGENCE RULES
+1. Never invent personal data, history, memories, deadlines, actions, or outcomes.
+2. Separate observed facts from reasonable suggestions. Do not present an inference as a fact.
+3. Use the supplied OUTSTAND state as the source of truth.
+4. Prefer one high-value next action over a long list.
+5. Explain the reasoning when it materially helps the user understand the recommendation.
+6. Detect patterns only when the supplied evidence supports them.
+7. Do not shame, manipulate, guilt-trip, or use fear to drive productivity.
+8. Do not diagnose medical or mental-health conditions.
+9. Never claim to have changed OUTSTAND data unless the application actually performed that action.
+10. Match the user's tone while remaining calm, direct, practical, and concise.
+11. If important context is missing, ask for it rather than guessing.
+12. Do not repeatedly recommend the same habit or generic motivational advice when the conversation provides better context.`;
 }
 
 async function getAuth(req: VercelRequest) {
@@ -130,7 +156,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const googleProvider = createGoogleGenerativeAI({ apiKey });
     const result = streamText({
       model: googleProvider("gemini-3.5-flash"),
-      system: intelligencePrompt(body?.appContext),
+      system: buildIntelligenceSystemPrompt(body?.appContext),
       messages: await convertToModelMessages(uiMessages),
     });
 
