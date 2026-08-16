@@ -1,6 +1,7 @@
 // src/hooks/use-app-state.ts
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { supabase } from "@/integrations/supabase/client";
 import {
   computeStreak,
   todayISO,
@@ -26,6 +27,39 @@ export function useAppState() {
   const habits = Array.isArray(rawHabits) ? rawHabits : [];
   const sessions = Array.isArray(rawSessions) ? rawSessions : [];
   const outstand = Array.isArray(rawOutstand) ? rawOutstand : [];
+
+  // Keep the existing local-first experience, but continuously mirror the state
+  // to the authenticated user's cloud snapshot. The server uses this snapshot
+  // when the browser is closed and it is time to send a reminder.
+  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasSyncedOnce = useRef(false);
+
+  useEffect(() => {
+    if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const response = await fetch("/api/sync-productivity-state", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ habits, sessions, outstand }),
+        });
+        if (response.ok) hasSyncedOnce.current = true;
+      } catch (error) {
+        // Cloud sync is intentionally non-blocking. Local state remains the source
+        // of truth for the UI if the network is unavailable.
+        console.warn("Outstand cloud sync unavailable:", error);
+      }
+    }, hasSyncedOnce.current ? 1200 : 250);
+
+    return () => {
+      if (syncTimer.current) clearTimeout(syncTimer.current);
+    };
+  }, [habits, sessions, outstand]);
 
   const xp = useMemo(() => {
     const habitCompletions = habits.reduce((sum, habit) => sum + (Array.isArray(habit?.history) ? habit.history.length : 0), 0);
