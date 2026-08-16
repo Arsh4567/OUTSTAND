@@ -112,17 +112,22 @@ For analytical requests: you may use structured data and explicit metrics becaus
 Your goal is to help the user make meaningful progress while making the conversation feel like talking to an intelligent companion, not filling out a productivity form.`;
 }
 
-async function getAuth(req: VercelRequest) {
+type AuthSuccess = { client: ReturnType<typeof createClient>; userId: string };
+type AuthFailure = { error: { status: number; body: { error: string; code: string } } };
+type AuthResult = AuthSuccess | AuthFailure;
+
+async function getAuth(req: VercelRequest): Promise<AuthResult> {
   const authorization = req.headers.authorization;
-  if (!authorization?.startsWith("Bearer ")) return { error: { status: 401, body: { error: "Authentication required.", code: "AUTH_REQUIRED" } } } as const;
+  if (!authorization?.startsWith("Bearer ")) return { error: { status: 401, body: { error: "Authentication required.", code: "AUTH_REQUIRED" } } };
   const url = env("SUPABASE_URL", "VITE_SUPABASE_URL");
   const key = env("SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_PUBLISHABLE_KEY");
-  if (!url || !key) return { error: { status: 500, body: { error: "Supabase server configuration is missing.", code: "SUPABASE_CONFIG_MISSING" } } } as const;
-  const token = authorization.slice("Bearer ".length);
+  if (!url || !key) return { error: { status: 500, body: { error: "Supabase server configuration is missing.", code: "SUPABASE_CONFIG_MISSING" } } };
+  const token = authorization.slice("Bearer ".length).trim();
+  if (!token) return { error: { status: 401, body: { error: "Authentication token is missing.", code: "AUTH_REQUIRED" } } };
   const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: `Bearer ${token}` } } });
   const { data, error } = await client.auth.getUser(token);
-  if (error || !data.user) return { error: { status: 401, body: { error: "Authentication failed.", code: "AUTH_INVALID" } } } as const;
-  return { client, userId: data.user.id } as const;
+  if (error || !data.user) return { error: { status: 401, body: { error: "Authentication failed.", code: "AUTH_INVALID" } } };
+  return { client, userId: data.user.id };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -177,27 +182,3 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const apiKey = env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY");
     if (!apiKey) { sendJson(res, 503, { error: "Gemini API configuration is missing.", code: "GEMINI_CONFIG_MISSING", hint: "Set GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY in the Vercel Production environment." }); return; }
-
-    const googleProvider = createGoogleGenerativeAI({ apiKey });
-    const result = streamText({
-      model: googleProvider("gemini-3.5-flash"),
-      system: buildIntelligenceSystemPrompt(body?.appContext),
-      messages: await convertToModelMessages(uiMessages),
-    });
-
-    const stream = result.toUIMessageStream({
-      originalMessages: uiMessages,
-      onFinish: async ({ responseMessage }) => {
-        const text = responseMessage.parts.filter((part: any) => part.type === "text").map((part: any) => part.text).join("").trim();
-        if (!text) return;
-        const saved = await auth.client.from("chat_messages").insert({ conversation_id: conversation!.id, user_id: auth.userId, role: "assistant", content: text });
-        if (saved.error) console.error("AI assistant persistence failed:", saved.error.message);
-      },
-      onError: (error) => error instanceof Error ? error.message : String(error),
-    });
-    await pipeUIMessageStreamToResponse({ response: res, stream, headers: { "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no" } });
-  } catch (error) {
-    console.error("Outstand AI request failed", error);
-    if (!res.headersSent) sendJson(res, 500, { error: "AI request failed.", code: "AI_REQUEST_FAILED", details: error instanceof Error ? error.message : String(error) });
-  }
-}
