@@ -9,11 +9,60 @@ function sendJson(res: VercelResponse, status: number, data: unknown) {
   res.status(status).setHeader("Cache-Control", "no-store").json(data);
 }
 
-function getBody(req: VercelRequest): any {
-  if (typeof req.body === "string") {
-    try { return JSON.parse(req.body); } catch { return null; }
-  }
-  return req.body ?? null;
+/**
+ * Vercel's lazy req.body parser can throw `TypeError: invalid media type`
+ * before application code gets a chance to handle an otherwise valid chat
+ * request. Read the raw Node request stream instead and parse JSON ourselves.
+ */
+async function getBody(req: VercelRequest): Promise<any> {
+  const request = req as unknown as NodeJS.ReadableStream & { readableEnded?: boolean };
+
+  if (request.readableEnded) return null;
+
+  const chunks: Buffer[] = [];
+  let size = 0;
+  const maxBytes = 1_000_000;
+
+  return await new Promise((resolve, reject) => {
+    const onData = (chunk: Buffer | string) => {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      size += buffer.length;
+      if (size > maxBytes) {
+        cleanup();
+        reject(new Error("Request body is too large."));
+        return;
+      }
+      chunks.push(buffer);
+    };
+
+    const onEnd = () => {
+      cleanup();
+      if (!chunks.length) {
+        resolve(null);
+        return;
+      }
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+      } catch {
+        reject(new Error("Invalid JSON request body."));
+      }
+    };
+
+    const onError = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+
+    const cleanup = () => {
+      request.removeListener("data", onData);
+      request.removeListener("end", onEnd);
+      request.removeListener("error", onError);
+    };
+
+    request.on("data", onData);
+    request.on("end", onEnd);
+    request.on("error", onError);
+  });
 }
 
 function textFromMessage(message: any) {
@@ -101,7 +150,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const body = getBody(req);
+    const body = await getBody(req);
     const rawMessages = Array.isArray(body?.messages) ? body.messages : [];
     if (!rawMessages.length) { sendJson(res, 400, { error: "At least one chat message is required.", code: "EMPTY_MESSAGES" }); return; }
 
