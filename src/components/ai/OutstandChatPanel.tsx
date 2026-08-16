@@ -16,6 +16,7 @@ import { Conversation, ConversationContent, ConversationEmptyState, Conversation
 import { Message, MessageAction, MessageActions, MessageContent, MessageToolbar } from "@/components/ai-elements/message";
 import { PromptInput, PromptInputFooter, PromptInputSubmit, PromptInputTextarea } from "@/components/ai-elements/prompt-input";
 import { Shimmer } from "@/components/ai-elements/shimmer";
+import { OutstandRobotAvatar } from "@/components/ai/OutstandRobotAvatar";
 
 export type OutstandChatContext = {
   name: string;
@@ -123,9 +124,7 @@ export function OutstandChatPanel({
     <DrawerHeader className="flex shrink-0 items-start justify-between border-b border-white/[0.06] bg-white/[0.02] pb-4">
       <div>
         <DrawerTitle className="flex items-center gap-2.5 text-base text-white">
-          <span className="grid h-7 w-7 place-items-center rounded-xl border border-cyan-300/20 bg-gradient-to-br from-cyan-400/20 to-indigo-500/30">
-            <Bot className="h-4 w-4 text-cyan-200" />
-          </span>
+          <OutstandRobotAvatar size="sm" />
           Outstand Intelligence
           <span className="rounded-full border border-emerald-400/15 bg-emerald-400/10 px-2 py-0.5 text-[8px] font-black uppercase tracking-[.18em] text-emerald-200">Online</span>
         </DrawerTitle>
@@ -139,7 +138,7 @@ export function OutstandChatPanel({
 
     <Conversation className="flex-1 bg-[radial-gradient(circle_at_50%_0%,rgba(34,211,238,0.07),transparent_32%)] px-4 py-5"><ConversationContent>
       {historyLoading && messages.length === 0 && <div className="flex items-center justify-center py-10 text-xs text-slate-500"><LoaderCircle className="mr-2 h-4 w-4 animate-spin" />Restoring your conversation...</div>}
-      {!historyLoading && messages.length === 0 ? <ConversationEmptyState icon={<Bot className="h-10 w-10 text-cyan-300" />} title="Talk to your system" description={`Ask for a focus plan, a habit adjustment, or what to do next, ${context.name.split(" ")[0] || "friend"}.`} /> : messages.map((message) => (
+      {!historyLoading && messages.length === 0 ? <ConversationEmptyState icon={<OutstandRobotAvatar size="xl" pulse />} title="Talk to your system" description={`Ask for a focus plan, a habit adjustment, or what to do next, ${context.name.split(" ")[0] || "friend"}.`} /> : messages.map((message) => (
         <Message key={message.id} from={message.role}>
           <MessageContent>
             {message.parts?.map((part, index) => part.type === "text" ? <div key={`${message.id}-${index}`} className="whitespace-pre-wrap leading-7">{part.text}</div> : null)}
