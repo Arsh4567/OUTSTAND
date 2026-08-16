@@ -1,11 +1,11 @@
-import React, { memo, useRef } from "react";
-import { motion, AnimatePresence, useMotionValue, useSpring } from "framer-motion";
-import { Zap, Sparkles, Crosshair } from "lucide-react";
+import { memo, useMemo, useRef } from "react";
+import { AnimatePresence, motion, useMotionValue, useSpring } from "framer-motion";
+import { Crosshair, Layers3, Sparkles, Target, Zap } from "lucide-react";
 import { ChallengeCard } from "@/components/ChallengeCard";
 import type { OutstandChallenge } from "@/lib/challenges.types";
 
-const cinematicEase = [0.16, 1, 0.3, 1];
-const explosiveEase = [0.19, 1, 0.22, 1];
+const cinematicEase = [0.16, 1, 0.3, 1] as const;
+const explosiveEase = [0.19, 1, 0.22, 1] as const;
 const TRANSFORM_OPT = { transform: "translateZ(0)" } as const;
 
 interface FocusEngineProps {
@@ -23,128 +23,93 @@ interface FocusEngineProps {
 }
 
 export const FocusEngine = memo((props: FocusEngineProps) => {
-  const { challenge, isShuffling, running, mins, secs, setRunning, setRemaining, generate, complete, completionStage } = props;
+  const { challenge, isShuffling, shuffleDisplay, running, mins, secs, setRunning, setRemaining, generate, complete, completionStage } = props;
+  const sceneSeed = useMemo(() => challenge?.id?.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0) ?? 42, [challenge?.id]);
 
   return (
     <AnimatePresence mode="wait" initial={false}>
-      {!challenge && !isShuffling ? (
-        <motion.div
-          key="idle"
-          initial={{ opacity: 0, scale: 0.97 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.96 }}
-          transition={{ duration: 0.45, ease: cinematicEase }}
-          className="flex w-full flex-col items-center gap-12 text-center will-change-transform"
-          style={TRANSFORM_OPT}
-        >
-          <div className="relative z-10 flex w-full flex-col items-center gap-5">
-            <motion.div
-              initial={{ opacity: 0, y: -12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.08, duration: 0.45, ease: cinematicEase }}
-              className="inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-950/30 px-4 py-2 text-[11px] font-black uppercase tracking-[0.22em] text-cyan-200/90 backdrop-blur-md"
-            >
-              <Sparkles className="h-3.5 w-3.5" /> Initialize protocol
-            </motion.div>
-            <h1 className="bg-gradient-to-b from-white to-white/40 bg-clip-text pb-2 text-6xl font-black tracking-tighter text-transparent sm:text-7xl md:text-8xl">Outstand.</h1>
-          </div>
-          <MagneticCore generate={generate} disabled={isShuffling} />
-        </motion.div>
-      ) : isShuffling ? (
-        <motion.div
-          key="shuffling"
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 1.03 }}
-          transition={{ duration: 0.3, ease: explosiveEase }}
-          className="relative z-40 flex h-[440px] w-full max-w-lg items-center justify-center will-change-transform"
-          style={TRANSFORM_OPT}
-        >
-          <motion.div initial={{ opacity: 0 }} exit={{ opacity: 1 }} transition={{ duration: 0.14 }} className="pointer-events-none absolute inset-[-40%] z-50 rounded-full bg-white" />
-          <motion.div
-            animate={{ x: [-1, 2, -1, 1, 0], y: [0, -1, 1, 0, 0] }}
-            transition={{ duration: 0.35, repeat: Infinity, ease: "linear" }}
-            className="absolute inset-0 flex items-center justify-center will-change-transform"
-            style={TRANSFORM_OPT}
-          >
-            <motion.div
-              animate={{ scale: [0.92, 1.08, 0.92], opacity: [0.28, 0.5, 0.28] }}
-              transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut" }}
-              className="pointer-events-none absolute h-64 w-64 rounded-full"
-              style={{ background: "radial-gradient(circle, rgba(34,211,238,0.45) 0%, transparent 68%)", ...TRANSFORM_OPT }}
-            />
-            <motion.div animate={{ rotate: 360 }} transition={{ duration: 2.4, repeat: Infinity, ease: "linear" }} className="absolute h-72 w-72 rounded-full border border-cyan-500/20 will-change-transform sm:h-80 sm:w-80">
-              <div className="h-1/2 w-1/2 origin-bottom-right bg-gradient-to-r from-transparent to-cyan-400/20" />
-            </motion.div>
-            <motion.div
-              animate={{ rotate: -360, scale: [1, 1.025, 1] }}
-              transition={{ duration: 4.5, repeat: Infinity, ease: "linear" }}
-              className="absolute h-80 w-80 border border-cyan-500/20 will-change-transform sm:h-96 sm:w-96"
-              style={{ clipPath: "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)", ...TRANSFORM_OPT }}
-            />
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-30">
-              <div className="absolute h-px w-[110%] bg-cyan-400/40" />
-              <div className="absolute h-[110%] w-px bg-cyan-400/40" />
-              <motion.div animate={{ rotate: 360 }} transition={{ duration: 7, repeat: Infinity, ease: "linear" }}>
-                <Crosshair className="h-20 w-20 text-cyan-300" strokeWidth={0.5} />
-              </motion.div>
-            </div>
-            <div className="relative z-10 w-full max-w-xs">
-              <div className="mb-3 text-center font-mono text-[10px] tracking-[0.45em] text-cyan-300/70">TARGET ACQUISITION</div>
-              <div className="rounded-2xl border border-cyan-500/25 bg-black/75 px-6 py-5 text-center backdrop-blur-md">
-                <div className="font-mono text-2xl font-black uppercase tracking-[0.18em] text-white">CALCULATING</div>
-                <div className="mt-3 h-1 overflow-hidden rounded-full bg-cyan-950">
-                  <motion.div initial={{ x: "-100%" }} animate={{ x: "100%" }} transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }} className="h-full w-1/2 bg-cyan-400 will-change-transform" />
-                </div>
-                <div className="mt-3 font-mono text-[8px] tracking-widest text-cyan-400/60">VECTORS CALIBRATED · SELECTING MISSION</div>
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-      ) : challenge ? (
-        <motion.div key="active" initial={{ opacity: 0, y: 32, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.5, ease: cinematicEase }} className="relative z-30 w-full will-change-transform" style={TRANSFORM_OPT}>
-          <div className="pointer-events-none absolute -bottom-20 left-1/2 h-28 w-full -translate-x-1/2" style={{ background: "radial-gradient(ellipse at center, rgba(34,211,238,0.12) 0%, transparent 70%)" }} />
-          <ChallengeCard challenge={challenge} completionStage={completionStage} running={running} mins={mins} secs={secs} setRunning={setRunning} setRemaining={setRemaining} generate={generate} complete={complete} />
-        </motion.div>
-      ) : null}
+      {!challenge && !isShuffling ? <IdleScene generate={generate} /> : isShuffling ? <AcquisitionScene display={shuffleDisplay} /> : challenge ? <ActiveScene challenge={challenge} sceneSeed={sceneSeed} completionStage={completionStage} running={running} mins={mins} secs={secs} setRunning={setRunning} setRemaining={setRemaining} generate={generate} complete={complete} /> : null}
     </AnimatePresence>
   );
 });
 FocusEngine.displayName = "FocusEngine";
 
-const MagneticCore = memo(({ generate, disabled }: { generate: () => void; disabled: boolean }) => {
-  const ref = useRef<HTMLDivElement>(null);
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-  const springX = useSpring(x, { stiffness: 260, damping: 26, mass: 0.5 });
-  const springY = useSpring(y, { stiffness: 260, damping: 26, mass: 0.5 });
-
-  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (disabled || event.pointerType !== "mouse" || !ref.current) return;
-    const rect = ref.current.getBoundingClientRect();
-    const px = (event.clientX - (rect.left + rect.width / 2)) / rect.width;
-    const py = (event.clientY - (rect.top + rect.height / 2)) / rect.height;
-    x.set(px * 18);
-    y.set(py * 18);
-  };
-
-  return (
-    <motion.div ref={ref} onPointerMove={handlePointerMove} onPointerLeave={() => { x.set(0); y.set(0); }} style={{ x: springX, y: springY, ...TRANSFORM_OPT }} className="relative flex cursor-pointer touch-none items-center justify-center p-16">
-      <motion.div animate={{ rotate: 360 }} transition={{ duration: 28, repeat: Infinity, ease: "linear" }} className="absolute inset-4 rounded-full border border-white/5 border-t-cyan-500/40 border-b-cyan-500/40 will-change-transform" />
-      <motion.div animate={{ rotate: -360 }} transition={{ duration: 22, repeat: Infinity, ease: "linear" }} className="absolute inset-8 rounded-full border border-dashed border-indigo-400/20 border-l-indigo-400/50 will-change-transform" />
-      <motion.button
-        type="button"
-        onClick={() => { generate(); x.set(0); y.set(0); }}
-        disabled={disabled}
-        whileHover={disabled ? undefined : { scale: 1.035 }}
-        whileTap={disabled ? undefined : { scale: 0.96 }}
-        transition={{ type: "spring", stiffness: 420, damping: 22, mass: 0.45 }}
-        className="group relative flex h-36 w-36 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#070b14] shadow-[0_0_40px_rgba(34,211,238,0.08)] sm:h-44 sm:w-44"
-      >
-        <span className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-indigo-600/10 opacity-70 transition-opacity duration-300 group-hover:opacity-100" />
-        <Zap className="relative z-10 h-16 w-16 text-cyan-400/80 transition-transform duration-300 group-hover:scale-110 group-hover:text-cyan-300 sm:h-20 sm:w-20" fill="currentColor" />
-      </motion.button>
+function IdleScene({ generate }: { generate: () => void }) {
+  return <motion.div key="idle" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ duration: 0.5, ease: cinematicEase }} className="relative flex w-full flex-col items-center justify-center gap-10 overflow-hidden py-10 text-center" style={TRANSFORM_OPT}>
+    <div className="pointer-events-none absolute inset-0">
+      <div className="absolute left-1/2 top-1/2 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-400/[0.06] blur-[90px]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,.06),transparent_45%)]" />
+      <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.04)_1px,transparent_1px)] [background-size:44px_44px] [mask-image:radial-gradient(circle_at_center,black,transparent_70%)]" />
+    </div>
+    <motion.div initial={{ y: -12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="relative z-10 max-w-2xl px-6">
+      <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-cyan-300/15 bg-cyan-300/[0.06] px-3 py-1.5 text-[9px] font-black uppercase tracking-[.3em] text-cyan-100/80"><Layers3 className="h-3.5 w-3.5" /> Focus chamber</div>
+      <h2 className="mt-5 text-5xl font-black tracking-[-.06em] text-white sm:text-7xl">Make the next move count.</h2>
+      <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-slate-500 sm:text-base">Outstand chooses a focused challenge, builds a timebox around it, and gets out of your way.</p>
     </motion.div>
-  );
+    <MagneticCore generate={generate} />
+    <div className="relative z-10 flex flex-wrap justify-center gap-2 px-6 text-[9px] font-bold uppercase tracking-[.2em] text-slate-600"><span className="rounded-full border border-white/6 bg-white/[0.025] px-3 py-1.5">No feeds</span><span className="rounded-full border border-white/6 bg-white/[0.025] px-3 py-1.5">One mission</span><span className="rounded-full border border-white/6 bg-white/[0.025] px-3 py-1.5">Full attention</span></div>
+  </motion.div>;
+}
+
+function AcquisitionScene({ display }: { display: { emoji: string; title: string } }) {
+  return <motion.div key="shuffling" initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.04 }} transition={{ duration: 0.35, ease: explosiveEase }} className="relative flex h-[560px] w-full items-center justify-center overflow-hidden" style={TRANSFORM_OPT}>
+    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(34,211,238,.11),transparent_40%),radial-gradient(circle_at_center,rgba(99,102,241,.08),transparent_58%)]" />
+    <motion.div className="absolute h-[360px] w-[360px] rounded-full border border-cyan-300/15" animate={{ rotate: 360, scale: [1, 1.04, 1] }} transition={{ rotate: { duration: 8, repeat: Infinity, ease: "linear" }, scale: { duration: 1.8, repeat: Infinity } }} />
+    <motion.div className="absolute h-[290px] w-[290px] rounded-full border border-indigo-400/20 border-dashed" animate={{ rotate: -360 }} transition={{ duration: 5, repeat: Infinity, ease: "linear" }} />
+    <motion.div className="absolute h-[190px] w-[190px] rounded-full bg-cyan-300/[0.06] blur-2xl" animate={{ scale: [0.9, 1.12, 0.9] }} transition={{ duration: 1.2, repeat: Infinity }} />
+    <motion.div className="absolute inset-0 opacity-30" animate={{ opacity: [0.15, 0.35, 0.15] }} transition={{ duration: 0.9, repeat: Infinity }}><div className="absolute left-1/2 top-1/2 h-px w-[85%] -translate-x-1/2 bg-cyan-300/40" /><div className="absolute left-1/2 top-1/2 h-[85%] w-px -translate-y-1/2 bg-cyan-300/40" /></motion.div>
+    <Crosshair className="absolute h-28 w-28 text-cyan-200/30" strokeWidth={0.5} />
+    <div className="relative z-20 w-full max-w-sm px-6 text-center">
+      <div className="text-[9px] font-black uppercase tracking-[.35em] text-cyan-200/60">Selecting your next move</div>
+      <div className="mt-4 rounded-3xl border border-white/10 bg-black/55 p-6 shadow-[0_30px_100px_rgba(0,0,0,.5)] backdrop-blur-xl">
+        <div className="text-5xl">{display.emoji}</div><div className="mt-4 text-xl font-black text-white">{display.title}</div>
+        <div className="mt-5 h-1 overflow-hidden rounded-full bg-white/8"><motion.div className="h-full w-1/3 bg-gradient-to-r from-cyan-300 to-indigo-400" animate={{ x: ["-120%", "420%"] }} transition={{ duration: 1.1, repeat: Infinity, ease: "linear" }} /></div>
+        <p className="mt-3 text-[9px] font-bold uppercase tracking-[.24em] text-slate-600">Calibrating duration · intensity · reward</p>
+      </div>
+    </div>
+  </motion.div>;
+}
+
+function ActiveScene({ challenge, sceneSeed, completionStage, running, mins, secs, setRunning, setRemaining, generate, complete }: { challenge: OutstandChallenge; sceneSeed: number; completionStage: number; running: boolean; mins: string; secs: string; setRunning: (state: boolean) => void; setRemaining: (time: number) => void; generate: () => void; complete: () => void }) {
+  const rot = useMotionValue(0);
+  const springRot = useSpring(rot, { stiffness: 45, damping: 14, mass: 0.8 });
+  const accent = challenge.theme.particleColors[0] || "#22d3ee";
+
+  return <motion.div key="active" initial={{ opacity: 0, scale: 0.985, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.98, y: -16 }} transition={{ duration: 0.55, ease: cinematicEase }} className="relative w-full" style={{ ...TRANSFORM_OPT, rotateZ: springRot }}>
+    <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[2.2rem]">
+      <div className="absolute -left-20 -top-20 h-72 w-72 rounded-full blur-3xl" style={{ background: `radial-gradient(circle, ${accent}22, transparent 68%)` }} />
+      <div className="absolute -bottom-20 right-0 h-80 w-80 rounded-full bg-indigo-500/10 blur-3xl" />
+      <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.035)_1px,transparent_1px)] [background-size:48px_48px] [mask-image:linear-gradient(to_bottom,black,transparent)]" />
+      <motion.div className="absolute inset-x-12 top-10 h-px" style={{ background: `linear-gradient(90deg,transparent,${accent}80,transparent)` }} animate={{ opacity: [0.25, 0.65, 0.25] }} transition={{ duration: 2.2 + (sceneSeed % 11) / 10, repeat: Infinity }} />
+    </div>
+    <div className="relative z-20">
+      <div className="mb-5 flex items-center justify-between px-1"><div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[.28em] text-slate-500"><Target className="h-3.5 w-3.5 text-cyan-300" /> Your mission is ready</div><button type="button" onClick={generate} className="text-[9px] font-black uppercase tracking-[.22em] text-slate-600 transition hover:text-white">New mission</button></div>
+      <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.25 }}><ChallengeCard challenge={challenge} completionStage={completionStage} running={running} mins={mins} secs={secs} setRunning={setRunning} setRemaining={setRemaining} generate={generate} complete={complete} /></motion.div>
+    </div>
+  </motion.div>;
+}
+
+const MagneticCore = memo(({ generate }: { generate: () => void }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const x = useMotionValue(0); const y = useMotionValue(0);
+  const springX = useSpring(x, { stiffness: 260, damping: 25, mass: 0.5 });
+  const springY = useSpring(y, { stiffness: 260, damping: 25, mass: 0.5 });
+  const onMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== "mouse" || !ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    x.set(((event.clientX - rect.left) / rect.width - 0.5) * 18);
+    y.set(((event.clientY - rect.top) / rect.height - 0.5) * 18);
+  };
+  return <motion.div ref={ref} onPointerMove={onMove} onPointerLeave={() => { x.set(0); y.set(0); }} style={{ x: springX, y: springY, ...TRANSFORM_OPT }} className="relative flex cursor-pointer items-center justify-center p-16">
+    <motion.div className="absolute inset-3 rounded-full border border-white/5 border-t-cyan-300/45 border-b-indigo-400/35" animate={{ rotate: 360 }} transition={{ duration: 18, repeat: Infinity, ease: "linear" }} />
+    <motion.div className="absolute inset-10 rounded-full border border-dashed border-cyan-300/15 border-l-cyan-300/45" animate={{ rotate: -360 }} transition={{ duration: 12, repeat: Infinity, ease: "linear" }} />
+    <motion.div className="absolute h-48 w-48 rounded-full bg-cyan-400/[0.06] blur-2xl" animate={{ scale: [0.88, 1.08, 0.88], opacity: [0.5, 0.95, 0.5] }} transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }} />
+    <motion.button type="button" onClick={() => { generate(); x.set(0); y.set(0); }} whileHover={{ scale: 1.045 }} whileTap={{ scale: 0.95 }} className="group relative z-10 flex h-36 w-36 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#070b14] shadow-[0_0_60px_rgba(34,211,238,.14),inset_0_0_50px_rgba(99,102,241,.07)] sm:h-44 sm:w-44">
+      <span className="absolute inset-0 bg-[radial-gradient(circle_at_35%_30%,rgba(103,232,249,.22),transparent_30%),radial-gradient(circle_at_70%_75%,rgba(129,140,248,.18),transparent_38%)]" />
+      <span className="absolute inset-4 rounded-full border border-white/5" />
+      <Zap className="relative z-10 h-14 w-14 text-cyan-300 transition duration-300 group-hover:scale-110 sm:h-16 sm:w-16" fill="currentColor" />
+      <motion.span className="absolute bottom-4 text-[8px] font-black uppercase tracking-[.3em] text-cyan-100/55" animate={{ opacity: [0.35, 0.8, 0.35] }} transition={{ duration: 2, repeat: Infinity }}>Start</motion.span>
+    </motion.button>
+  </motion.div>;
 });
 MagneticCore.displayName = "MagneticCore";
