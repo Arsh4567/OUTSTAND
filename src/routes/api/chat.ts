@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
-import { google } from "@ai-sdk/google";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
 
 const RequestSchema = z.object({
@@ -18,6 +18,10 @@ const MessageSchema = z.object({
     z.array(z.object({ type: z.literal("text"), text: z.string() })),
   ]).optional(),
 });
+
+type AuthSuccess = { client: ReturnType<typeof createClient>; userId: string };
+type AuthFailure = { error: Response };
+type AuthResult = AuthSuccess | AuthFailure;
 
 function json(data: unknown, status = 200, headers: HeadersInit = {}) {
   return new Response(JSON.stringify(data), {
@@ -77,12 +81,16 @@ function geminiApiKey() {
   return env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY");
 }
 
-async function authenticate(request: Request) {
+async function authenticate(request: Request): Promise<AuthResult> {
   const authorization = request.headers.get("authorization");
-  if (!authorization?.startsWith("Bearer ")) return { error: json({ error: "Authentication required.", code: "AUTH_REQUIRED" }, 401) } as const;
+  if (!authorization?.startsWith("Bearer ")) {
+    return { error: json({ error: "Authentication required.", code: "AUTH_REQUIRED" }, 401) };
+  }
 
   const { url, key } = supabaseConfig();
-  if (!url || !key) return { error: json({ error: "Supabase server configuration is missing.", code: "SUPABASE_CONFIG_MISSING" }, 500) } as const;
+  if (!url || !key) {
+    return { error: json({ error: "Supabase server configuration is missing.", code: "SUPABASE_CONFIG_MISSING" }, 500) };
+  }
 
   const client = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -90,8 +98,10 @@ async function authenticate(request: Request) {
   });
 
   const { data, error } = await client.auth.getUser();
-  if (error || !data.user) return { error: json({ error: "Authentication failed.", code: "AUTH_INVALID" }, 401) } as const;
-  return { client, userId: data.user.id } as const;
+  if (error || !data.user) {
+    return { error: json({ error: "Authentication failed.", code: "AUTH_INVALID" }, 401) };
+  }
+  return { client, userId: data.user.id };
 }
 
 export const Route = createFileRoute("/api/chat")({
@@ -161,8 +171,9 @@ export const Route = createFileRoute("/api/chat")({
             }
           }
 
+          const google = createGoogleGenerativeAI({ apiKey });
           const result = streamText({
-            model: google("gemini-2.5-flash", { apiKey }),
+            model: google("gemini-2.5-flash"),
             system: systemPrompt(parsed.data.appContext),
             messages: await convertToModelMessages(uiMessages),
             temperature: 0.6,
