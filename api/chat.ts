@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 import { convertToModelMessages, pipeUIMessageStreamToResponse, streamText, type UIMessage } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { buildIntelligencePrompt } from "../src/lib/intelligence/prompt";
 
 const env = (...names: string[]) => names.map((name) => process.env[name]).find((value) => typeof value === "string" && value.trim().length > 0);
 
@@ -46,29 +47,18 @@ function textFromMessage(message: any) {
   return "";
 }
 
-function systemPrompt(context: unknown) {
+function intelligencePrompt(context: unknown) {
   const ctx = context && typeof context === "object" ? context as Record<string, unknown> : {};
-  const name = typeof ctx.name === "string" ? ctx.name : "there";
-  const xp = typeof ctx.xp === "number" ? ctx.xp : 0;
-  const streak = typeof ctx.bestStreak === "number" ? ctx.bestStreak : 0;
-  const score = typeof ctx.dopamineScore === "number" ? ctx.dopamineScore : 50;
-  const habits = Array.isArray(ctx.habits) ? ctx.habits : [];
-  const completed = Array.isArray(ctx.completedToday) ? ctx.completedToday : [];
-  const habitSummary = habits.slice(0, 30).map((item: any) => `${typeof item?.name === "string" ? item.name : "Habit"} ${typeof item?.id === "string" && completed.includes(item.id) ? "(done today)" : "(not done today)"}`).join(", ");
-  return `You are Outstand Intelligence, a precise and encouraging productivity coach.
-User: ${name}
-XP: ${xp}
-Best streak: ${streak} days
-Dopamine score: ${score}/100
-Habits: ${habitSummary || "None yet"}
+  const name = typeof ctx.name === "string" && ctx.name.trim() ? ctx.name.trim() : "there";
+  const habits = Array.isArray(ctx.habits) ? ctx.habits.filter((item: any) => item && typeof item.id === "string" && typeof item.name === "string").map((item: any) => ({ id: item.id, name: item.name })) : [];
+  const completedToday = Array.isArray(ctx.completedToday) ? ctx.completedToday.filter((id): id is string => typeof id === "string") : [];
+  const sessions = Array.isArray(ctx.sessions) ? ctx.sessions : [];
+  const focusSessions = sessions.length;
+  const xp = typeof ctx.xp === "number" && Number.isFinite(ctx.xp) ? ctx.xp : 0;
+  const streak = typeof ctx.bestStreak === "number" && Number.isFinite(ctx.bestStreak) ? ctx.bestStreak : 0;
+  const dopamineScore = typeof ctx.dopamineScore === "number" && Number.isFinite(ctx.dopamineScore) ? ctx.dopamineScore : null;
 
-Rules:
-- Be concise but useful.
-- Give one clear next action when appropriate.
-- Never claim you performed an action unless the app actually exposes that action.
-- Do not invent personal data.
-- Prefer practical, specific guidance over generic motivation.
-- Keep a calm premium tone.`;
+  return buildIntelligencePrompt(name, { xp, streak, dopamineScore, habits, completedToday, focusSessions });
 }
 
 async function getAuth(req: VercelRequest) {
@@ -140,7 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const googleProvider = createGoogleGenerativeAI({ apiKey });
     const result = streamText({
       model: googleProvider("gemini-3.5-flash"),
-      system: systemPrompt(body?.appContext),
+      system: intelligencePrompt(body?.appContext),
       messages: await convertToModelMessages(uiMessages),
     });
 
