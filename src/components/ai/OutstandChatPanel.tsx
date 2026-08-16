@@ -84,8 +84,6 @@ export function OutstandChatPanel({
       return;
     }
 
-    if (healthy !== true && !(await refresh())) return;
-
     setInput("");
     try {
       await sendMessage({ text }, {
@@ -163,11 +161,11 @@ export function OutstandChatPanel({
     </ConversationContent><ConversationScrollButton /></Conversation>
 
     <div className="shrink-0 border-t border-white/[0.06] bg-black/20 p-4">
-      {healthy === false && <div className="mb-2 rounded-xl border border-amber-400/15 bg-amber-400/[0.06] p-3 text-amber-100"><div className="flex items-center justify-between"><div className="flex items-center gap-2 font-semibold"><WifiOff className="h-4 w-4" />AI temporarily unavailable</div><Button variant="ghost" size="icon-sm" onClick={() => void refresh()} aria-label="Retry"><RefreshCw className="h-4 w-4" /></Button></div><p className="mt-1 break-words text-xs text-amber-100/60">{healthMessage}</p></div>}
+      {healthy === false && <div className="mb-2 rounded-xl border border-amber-400/15 bg-amber-400/[0.06] p-3 text-amber-100"><div className="flex items-center justify-between"><div className="flex items-center gap-2 font-semibold"><WifiOff className="h-4 w-4" />AI connection issue</div><Button variant="ghost" size="icon-sm" onClick={() => void refresh()} aria-label="Retry"><RefreshCw className="h-4 w-4" /></Button></div><p className="mt-1 break-words text-xs text-amber-100/60">{healthMessage}</p></div>}
       {error && <div className="mb-2 rounded-xl border border-rose-400/15 bg-rose-400/[0.06] p-3 text-sm text-rose-200">{formatAiError(error)}</div>}
       <PromptInput onSubmit={send}>
-        <PromptInputTextarea placeholder="Ask Outstand..." value={input} onChange={(event) => setInput(event.currentTarget.value)} disabled={streaming || healthy === false} aria-label="Message Outstand Intelligence" onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void send(); } }} />
-        <PromptInputFooter className="justify-end"><PromptInputSubmit status={streaming ? "streaming" : "idle"} onStop={stop} disabled={(!input.trim() && !streaming) || healthy === false} /></PromptInputFooter>
+        <PromptInputTextarea placeholder="Ask Outstand..." value={input} onChange={(event) => setInput(event.currentTarget.value)} disabled={streaming} aria-label="Message Outstand Intelligence" onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void send(); } }} />
+        <PromptInputFooter className="justify-end"><PromptInputSubmit status={streaming ? "streaming" : "idle"} onStop={stop} disabled={(!input.trim() && !streaming)} /></PromptInputFooter>
       </PromptInput>
     </div>
   </div>;
