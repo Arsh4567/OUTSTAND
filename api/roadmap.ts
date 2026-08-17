@@ -32,7 +32,7 @@ function extractJson(text: string) {
   }
 }
 
-const baseRules = `You are OUTSTAND Intelligence, an adaptive personal planning AI. Never invent user facts. Ask for missing information before planning. Plans must be realistic, specific and measurable. Do not give generic advice such as “study maths for 2 hours”. For academics, collect class/grade, board/curriculum, target result, subjects, current level, exam/deadline, available days/time, weak areas, strong areas and constraints. For fitness, collect goal, age if relevant, height, weight, training experience, available days/time, equipment, current ability and limitations; do not prescribe unsafe or extreme targets. For business/money, collect current situation, target, timeframe, skills/resources, constraints and risk tolerance. For skill learning, collect current level, target skill/outcome, deadline, available time, resources and preferred learning style. For content creation, collect platform, niche, current audience/status, target, cadence, skills, equipment and time. For sports/chess, collect discipline, current level/rating, competition target, deadline, practice availability and constraints. For habits/productivity, collect current routine, target behavior, frequency, triggers, obstacles and available time. Keep questions concise and only ask what changes the plan. Return JSON only.`;
+const baseRules = `You are OUTSTAND Intelligence, an adaptive personal planning AI. Never invent user facts. Ask for missing information before planning. Plans must be realistic, specific and measurable. Do not give generic advice such as “study maths for 2 hours”. For academics, collect class/grade, board/curriculum, target result, subjects, current level/marks, exam/deadline, available days/time, school/tuition schedule if relevant, weak areas, strong areas, preferred study windows and constraints. For fitness, collect goal, age if relevant, height, weight, training experience, available days/time, equipment, current ability and limitations; do not prescribe unsafe or extreme targets. For business/money, collect current situation, target, timeframe, skills/resources, constraints and risk tolerance. For skill learning, collect current level, target skill/outcome, deadline, available time, resources and preferred learning style. For content creation, collect platform, niche, current audience/status, target, cadence, skills, equipment and time. For sports/chess, collect discipline, current level/rating, competition target, deadline, practice availability and constraints. For habits/productivity, collect current routine, target behavior, frequency, triggers, obstacles and available time. Keep questions concise and only ask what changes the plan. Return JSON only.`;
 
 type AIJsonResult = unknown;
 
@@ -43,31 +43,10 @@ function isRateLimit(status: number, text: string) {
 async function askGroq(prompt: string): Promise<AIJsonResult> {
   const apiKey = env("GROQ_API_KEY");
   if (!apiKey) throw Object.assign(new Error("Groq API configuration is missing."), { code: "GROQ_CONFIG_MISSING", status: 503 });
-
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "llama-3.1-8b-instant",
-      temperature: 0.2,
-      max_tokens: 2500,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: baseRules },
-        { role: "user", content: prompt },
-      ],
-    }),
-  });
-
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "llama-3.1-8b-instant", temperature: 0.2, max_tokens: 3000, response_format: { type: "json_object" }, messages: [{ role: "system", content: baseRules }, { role: "user", content: prompt }] }) });
   const raw = await response.text();
-  if (!response.ok) {
-    const error = new Error(`Groq request failed (${response.status}).`);
-    Object.assign(error, { status: response.status, code: isRateLimit(response.status, raw) ? "AI_QUOTA_EXCEEDED" : "GROQ_REQUEST_FAILED" });
-    throw error;
-  }
-
-  const parsed = JSON.parse(raw);
-  const content = parsed?.choices?.[0]?.message?.content;
+  if (!response.ok) { const error = new Error(`Groq request failed (${response.status}).`); Object.assign(error, { status: response.status, code: isRateLimit(response.status, raw) ? "AI_QUOTA_EXCEEDED" : "GROQ_REQUEST_FAILED" }); throw error; }
+  const parsed = JSON.parse(raw); const content = parsed?.choices?.[0]?.message?.content;
   if (typeof content !== "string" || !content.trim()) throw new Error("Groq returned an empty AI response.");
   return extractJson(content);
 }
@@ -75,36 +54,17 @@ async function askGroq(prompt: string): Promise<AIJsonResult> {
 async function askGemini(prompt: string): Promise<AIJsonResult> {
   const apiKey = env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY");
   if (!apiKey) throw Object.assign(new Error("Gemini API configuration is missing."), { code: "GEMINI_CONFIG_MISSING", status: 503 });
-
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: `${baseRules}\n\n${prompt}` }] }],
-      generationConfig: { temperature: 0.2, responseMimeType: "application/json" },
-    }),
-  });
-
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: `${baseRules}\n\n${prompt}` }] }], generationConfig: { temperature: 0.2, responseMimeType: "application/json" } }) });
   const raw = await response.text();
-  if (!response.ok) {
-    const error = new Error(`Gemini request failed (${response.status}).`);
-    Object.assign(error, { status: response.status, code: isRateLimit(response.status, raw) ? "AI_QUOTA_EXCEEDED" : "GEMINI_REQUEST_FAILED" });
-    throw error;
-  }
-
-  const parsed = JSON.parse(raw);
-  const content = parsed?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text || "").join("");
+  if (!response.ok) { const error = new Error(`Gemini request failed (${response.status}).`); Object.assign(error, { status: response.status, code: isRateLimit(response.status, raw) ? "AI_QUOTA_EXCEEDED" : "GEMINI_REQUEST_FAILED" }); throw error; }
+  const parsed = JSON.parse(raw); const content = parsed?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text || "").join("");
   if (typeof content !== "string" || !content.trim()) throw new Error("Gemini returned an empty AI response.");
   return extractJson(content);
 }
 
 async function ask(prompt: string) {
-  try {
-    return await askGroq(prompt);
-  } catch (error: any) {
-    if (isRateLimit(error?.status || 0, error?.message || "") && env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")) {
-      return await askGemini(prompt);
-    }
+  try { return await askGroq(prompt); } catch (error: any) {
+    if (isRateLimit(error?.status || 0, error?.message || "") && env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")) return await askGemini(prompt);
     throw error;
   }
 }
@@ -125,22 +85,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (mode === "questions") {
       const answered = Object.entries(answers).map(([key, value]) => `${key}: ${String(value)}`).join("\n") || "No answers yet.";
-      const result = await ask(`Create the next 3 to 5 most useful questions for a ${category} goal. These questions must be based on the answers already given and must not repeat answered information. If this is the first turn, start with the goal, measurable outcome, timeline and the category-specific information that materially changes the plan. Return exactly {"questions":[{"id":"string","question":"string","type":"text|number|choice|multiline","required":true,"options":["..."],"placeholder":"..."}].\n\nAlready answered:\n${answered}\nSelected habits:\n${JSON.stringify(habits)}\nUser context:\n${JSON.stringify(context)}`);
+      const result = await ask(`Create the next 3 to 5 highest-value questions for a ${category} goal. Do not repeat answered information. Universal requirements: collect the exact goal, measurable target, timeline/duration and difficulty preference before planning. For academics, if the target involves Class 10/board exams, you must collect class, board, target percentage/grade, subjects, current marks or baseline, exam date/days remaining, school/tuition schedule, realistic weekday/weekend availability, weak chapters and strong chapters. Ask for study windows if a timetable will depend on them. For fitness, collect the safety and planning details required by the category rules. Return exactly {"questions":[{"id":"string","question":"string","type":"text|number|choice|multiline","required":true,"options":["..."],"placeholder":"..."}].\n\nAlready answered:\n${answered}\nSelected habits:\n${JSON.stringify(habits)}\nUser context:\n${JSON.stringify(context)}`);
       return json(res, 200, result);
     }
 
     if (mode === "plan") {
-      const result = await ask(`Build a personalized ${category} roadmap from the complete interview below. Do not make assumptions about time, ability or target. Use the selected habits only as supporting context. Make milestones specific and measurable. Return exactly {"plan":{"title":"string","summary":"string","durationDays":number,"difficulty":"string","assumptions":["string"],"milestones":[{"day":number,"title":"string","outcome":"string","actions":["string"]}],"today":["string"],"metrics":["string"],"adaptationRule":"string"}}. Keep the roadmap useful rather than enormous; create milestones across the full duration but keep actions realistic.\n\nCategory: ${category}\nAnswers:\n${JSON.stringify(answers)}\nSelected habits:\n${JSON.stringify(habits)}\nUser context:\n${JSON.stringify(context)}`);
+      const result = await ask(`Build a genuinely personalized ${category} roadmap from the complete interview below. This is the execution engine, not a motivational template. Return exactly {"plan":{"title":"string","summary":"string","durationDays":number,"difficulty":"string","assumptions":["string"],"milestones":[{"day":number,"title":"string","outcome":"string","actions":["string"]}],"today":["string"],"timetable":[{"label":"string","durationMinutes":number,"task":"string","why":"string"}],"metrics":["string"],"adaptationRule":"string"}}.
+
+Hard requirements:
+- The plan must directly serve the user's stated outcome.
+- Every action must be concrete, measurable and connected to the goal. Never fill the plan with generic wellness actions such as drinking water, walking, stretching or journaling unless the user explicitly made that part of the goal.
+- If the goal is Class 10 exam performance, the roadmap must prioritize the user's actual subjects, chapters/topics, revision, question practice, mock tests, error review and exam strategy. Use the user's target percentage, board, days remaining, baseline and weak areas. Do not invent chapter completion or marks.
+- For academic goals, today's actions must name the actual subject/topic or a clearly defined diagnostic/practice task from the user's answers. A generic "study for 2 hours" is invalid.
+- The timetable must fit the user's stated school/tuition and available study windows. Use 3 to 6 realistic blocks, with duration in minutes. Do not exceed the available daily time.
+- If the interview is missing information required to create a safe or accurate timetable, return {"needsMoreInfo":true,"questions":[...]} instead of guessing.
+- Milestones must cover the full duration with meaningful checkpoints. Day 1 must have useful actions because it becomes the user's first instant task set.
+- Integrate selected habits only when they support the goal; never let habits replace goal work.
+- Keep workload proportional to the selected difficulty.
+
+Category: ${category}\nAnswers:\n${JSON.stringify(answers)}\nSelected habits:\n${JSON.stringify(habits)}\nUser context:\n${JSON.stringify(context)}`);
       return json(res, 200, result);
     }
 
     const { data: roadmap, error: roadmapError } = await auth.client.from("ai_roadmaps").select("id,plan,title,duration_days,answers").eq("user_id", auth.userId).eq("is_active", true).maybeSingle();
     if (roadmapError) return json(res, 500, { error: "Could not load your active roadmap.", code: roadmapError.code });
     if (!roadmap) return json(res, 404, { error: "No active roadmap found." });
-
     const { data: progress } = await auth.client.from("ai_roadmap_progress").select("assigned_date,total_missions,completed_missions,completion_pct").eq("roadmap_id", roadmap.id).order("assigned_date", { ascending: false }).limit(14);
-    const result = await ask(`Adapt only the FUTURE portion of this roadmap using the real recent progress below. Never rewrite completed work. If performance is strong, increase specificity or difficulty modestly. If performance is low, reduce/split future workload and carry forward only essential missed outcomes without creating an overwhelming backlog. Return exactly {"plan":<full updated plan object>,"adapted":boolean,"reason":"short human-readable reason"}.\n\nCurrent plan:\n${JSON.stringify(roadmap.plan)}\nRecent progress:\n${JSON.stringify(progress || [])}`);
-
+    const result = await ask(`Adapt only the FUTURE portion of this roadmap using the real recent progress below. Never rewrite completed work. Keep the user's original goal and constraints. Return exactly {"plan":<full updated plan object>,"adapted":boolean,"reason":"short human-readable reason"}. Future tasks must remain concrete and goal-specific. Never add generic wellness tasks just to fill space.\n\nCurrent plan:\n${JSON.stringify(roadmap.plan)}\nRecent progress:\n${JSON.stringify(progress || [])}`);
     if ((result as any)?.adapted && (result as any)?.plan) {
       const { error: updateError } = await auth.client.from("ai_roadmaps").update({ plan: (result as any).plan }).eq("id", roadmap.id).eq("user_id", auth.userId);
       if (updateError) return json(res, 500, { error: "The AI adapted the plan but it could not be saved.", code: updateError.code });
