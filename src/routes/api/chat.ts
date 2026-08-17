@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
-import { convertToModelMessages, streamText, type UIMessage } from "ai";
+import { consumeStream, convertToModelMessages, createIdGenerator, streamText, type UIMessage } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
 
 const RequestSchema = z.object({
-  messages: z.array(z.unknown()).min(1).max(60),
+  messages: z.array(z.unknown()).min(1).max(40),
   appContext: z.unknown().optional(),
 });
 
@@ -26,7 +26,11 @@ type AuthResult = AuthSuccess | AuthFailure;
 function json(data: unknown, status = 200, headers: HeadersInit = {}) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers },
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+      ...headers,
+    },
   });
 }
 
@@ -48,26 +52,26 @@ function systemPrompt(appContext: unknown) {
   const score = typeof ctx.dopamineScore === "number" ? ctx.dopamineScore : 50;
   const habits = Array.isArray(ctx.habits) ? ctx.habits : [];
   const completed = Array.isArray(ctx.completedToday) ? ctx.completedToday : [];
+  const sessions = Array.isArray(ctx.sessions) ? ctx.sessions.length : 0;
+  const outstandItems = Array.isArray(ctx.outstand) ? ctx.outstand.length : 0;
   const habitSummary = habits
     .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
-    .slice(0, 30)
-    .map((item) => `${typeof item.name === "string" ? item.name : "Habit"} ${typeof item.id === "string" && completed.includes(item.id) ? "(done today)" : "(not done today)"}`)
+    .slice(0, 12)
+    .map((item) => `${typeof item.name === "string" ? item.name : "Habit"}: ${typeof item.id === "string" && completed.includes(item.id) ? "done" : "not done"}`)
     .join(", ");
 
-  return `You are Outstand Intelligence, a precise and encouraging productivity coach.
+  return `You are OUTSTAND Intelligence, a fast, practical productivity companion.
 User: ${name}
 XP: ${xp}
-Best streak: ${streak} days
+Best streak: ${streak}
 Dopamine score: ${score}/100
-Habits: ${habitSummary || "None yet"}
+Habits: ${habitSummary || "none"}
+Focus sessions: ${sessions}
+Outstand items: ${outstandItems}
 
-Rules:
-- Be concise but useful.
-- Give one clear next action when appropriate.
-- Never claim you performed an action unless the app actually exposes that tool/action.
-- Do not invent personal data.
-- Prefer practical, specific guidance over generic motivation.
-- Keep a calm premium tone.`;
+Answer immediately and keep simple questions short. Use the supplied app context as truth. Never invent personal data or claim actions you did not perform. Give one useful next step when appropriate.
+
+Formatting rules are strict. Never use markdown bold markers. Never use asterisks for emphasis. Never use parentheses. Do not add parenthetical asides. Prefer plain text, short paragraphs, hyphen bullets, and simple headings.`;
 }
 
 function supabaseConfig() {
@@ -87,6 +91,9 @@ async function authenticate(request: Request): Promise<AuthResult> {
     return { error: json({ error: "Authentication required.", code: "AUTH_REQUIRED" }, 401) };
   }
 
+  const token = authorization.slice(7).trim();
+  if (!token) return { error: json({ error: "Authentication required.", code: "AUTH_REQUIRED" }, 401) };
+
   const { url, key } = supabaseConfig();
   if (!url || !key) {
     return { error: json({ error: "Supabase server configuration is missing.", code: "SUPABASE_CONFIG_MISSING" }, 500) };
@@ -97,11 +104,13 @@ async function authenticate(request: Request): Promise<AuthResult> {
     global: { headers: { Authorization: authorization } },
   });
 
-  const { data, error } = await client.auth.getUser();
-  if (error || !data.user) {
+  const { data, error } = await client.auth.getClaims(token);
+  const userId = data?.claims?.sub;
+  if (error || typeof userId !== "string" || !userId) {
     return { error: json({ error: "Authentication failed.", code: "AUTH_INVALID" }, 401) };
   }
-  return { client, userId: data.user.id };
+
+  return { client, userId };
 }
 
 export const Route = createFileRoute("/api/chat")({
@@ -115,6 +124,7 @@ export const Route = createFileRoute("/api/chat")({
           service: "outstand-ai",
           supabaseConfigured: Boolean(url && key),
           geminiConfigured: Boolean(apiKey),
+          model: "gemini-3.5-flash-lite",
         });
       },
 
@@ -125,11 +135,8 @@ export const Route = createFileRoute("/api/chat")({
 
           const apiKey = geminiApiKey();
           if (!apiKey) {
-            console.error("[AI] Missing Gemini API key. Expected GEMINI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, or GOOGLE_API_KEY.");
-            return json({
-              error: "AI service is not configured on the server.",
-              code: "GEMINI_CONFIG_MISSING",
-            }, 503);
+            console.error("[AI] Missing Gemini API key.");
+            return json({ error: "AI service is not configured on the server.", code: "GEMINI_CONFIG_MISSING" }, 503);
           }
 
           const rawBody = await request.json().catch(() => null);
@@ -143,51 +150,92 @@ export const Route = createFileRoute("/api/chat")({
             if (!text) return [];
             return [{ id: parsedMessage.data.id ?? crypto.randomUUID(), role: parsedMessage.data.role, parts: [{ type: "text", text }] } as UIMessage];
           });
-          if (!uiMessages.some((message) => message.role === "user")) return json({ error: "At least one user message is required.", code: "NO_USER_MESSAGE" }, 400);
 
-          let { data: conversation, error: lookupError } = await auth.client
-            .from("chat_conversations")
-            .select("id")
-            .eq("user_id", auth.userId)
-            .order("updated_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (lookupError) return json({ error: "Could not access your AI conversation.", code: lookupError.code }, 500);
-
-          if (!conversation) {
-            const created = await auth.client.from("chat_conversations").insert({ user_id: auth.userId }).select("id").single();
-            if (created.error || !created.data) return json({ error: "Could not create your AI conversation.", code: "CONVERSATION_CREATE_FAILED" }, 500);
-            conversation = created.data;
+          if (!uiMessages.some((message) => message.role === "user")) {
+            return json({ error: "At least one user message is required.", code: "NO_USER_MESSAGE" }, 400);
           }
 
-          const latestUser = [...uiMessages].reverse().find((message) => message.role === "user");
-          const latestText = latestUser?.parts.filter((part) => part.type === "text").map((part) => part.text).join("").trim() ?? "";
-          if (latestText) {
-            const existing = await auth.client.from("chat_messages").select("id").eq("conversation_id", conversation.id).eq("user_id", auth.userId).eq("role", "user").eq("content", latestText).order("created_at", { ascending: false }).limit(1).maybeSingle();
-            if (existing.error) return json({ error: "Could not validate your message history.", code: existing.error.code }, 500);
-            if (!existing.data) {
-              const inserted = await auth.client.from("chat_messages").insert({ conversation_id: conversation.id, user_id: auth.userId, role: "user", content: latestText });
-              if (inserted.error) return json({ error: "Could not save your message.", code: inserted.error.code }, 500);
-            }
-          }
-
+          const modelMessages = uiMessages.slice(-12);
           const google = createGoogleGenerativeAI({ apiKey });
           const result = streamText({
-            model: google("gemini-2.5-flash"),
+            model: google("gemini-3.5-flash-lite"),
             system: systemPrompt(parsed.data.appContext),
-            messages: await convertToModelMessages(uiMessages),
-            temperature: 0.6,
+            messages: await convertToModelMessages(modelMessages),
+            maxOutputTokens: 700,
+            providerOptions: {
+              google: {
+                thinkingConfig: {
+                  thinkingLevel: "minimal",
+                },
+              },
+            },
+            abortSignal: request.signal,
+            onError: (error) => console.error("Outstand AI stream error:", error),
           });
 
-          void result.text.then(async (text) => {
-            if (!text.trim()) return;
-            const { error } = await auth.client.from("chat_messages").insert({ conversation_id: conversation.id, user_id: auth.userId, role: "assistant", content: text });
-            if (error) console.error("AI assistant persistence failed:", error.message);
-          }).catch((error) => {
-            console.error("AI assistant generation failed:", error);
-          });
+          return result.toUIMessageStreamResponse({
+            originalMessages: modelMessages,
+            generateMessageId: createIdGenerator({ prefix: "msg", size: 16 }),
+            onFinish: async ({ responseMessage, isAborted }) => {
+              if (isAborted) return;
 
-          return result.toUIMessageStreamResponse({ headers: { "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no" } });
+              try {
+                const { data: conversation, error: lookupError } = await auth.client
+                  .from("chat_conversations")
+                  .select("id")
+                  .eq("user_id", auth.userId)
+                  .order("updated_at", { ascending: false })
+                  .limit(1)
+                  .maybeSingle();
+
+                if (lookupError) throw lookupError;
+
+                let conversationId = conversation?.id;
+                if (!conversationId) {
+                  const created = await auth.client
+                    .from("chat_conversations")
+                    .insert({ user_id: auth.userId })
+                    .select("id")
+                    .single();
+                  if (created.error || !created.data) throw created.error ?? new Error("Conversation creation failed");
+                  conversationId = created.data.id;
+                }
+
+                const latestUser = [...uiMessages].reverse().find((message) => message.role === "user");
+                const latestText = latestUser?.parts.filter((part) => part.type === "text").map((part) => part.text).join("").trim() ?? "";
+
+                if (latestText) {
+                  const inserted = await auth.client.from("chat_messages").insert({
+                    conversation_id: conversationId,
+                    user_id: auth.userId,
+                    role: "user",
+                    content: latestText,
+                  });
+                  if (inserted.error) throw inserted.error;
+                }
+
+                const assistantText = responseMessage.parts.filter((part) => part.type === "text").map((part) => part.text).join("").trim();
+                if (assistantText) {
+                  const saved = await auth.client.from("chat_messages").insert({
+                    conversation_id: conversationId,
+                    user_id: auth.userId,
+                    role: "assistant",
+                    content: assistantText,
+                  });
+                  if (saved.error) throw saved.error;
+                }
+              } catch (error) {
+                console.error("AI assistant persistence failed:", error);
+              }
+            },
+            onError: (error) => error instanceof Error ? error.message : String(error),
+            consumeSseStream: consumeStream,
+            headers: {
+              "Cache-Control": "no-cache, no-transform",
+              "X-Accel-Buffering": "no",
+              "X-Content-Type-Options": "nosniff",
+            },
+          });
         } catch (error) {
           console.error("Outstand AI request failed", error);
           return json({ error: "AI request failed.", code: "AI_REQUEST_FAILED" }, 500);
