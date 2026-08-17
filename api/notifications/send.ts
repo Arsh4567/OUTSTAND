@@ -10,14 +10,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const authorization = req.headers.authorization;
   if (!authorization?.startsWith("Bearer ")) return res.status(401).json({ error: "Authentication required" });
 
-  const url = env("SUPABASE_URL", "VITE_SUPABASE_URL");
-  const publishable = env("SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_PUBLISHABLE_KEY");
+  // Keep server-side notification delivery on the exact Supabase project used
+  // by the browser. A stale SUPABASE_URL can otherwise create a split-brain
+  // setup where Auth succeeds but push_subscriptions appears empty.
+  const url = env("VITE_SUPABASE_URL", "SUPABASE_URL");
+  const publishable = env("VITE_SUPABASE_PUBLISHABLE_KEY", "SUPABASE_PUBLISHABLE_KEY");
   const serviceRole = env("SUPABASE_SERVICE_ROLE_KEY");
-  const vapidPublic = env("VAPID_PUBLIC_KEY", "VITE_VAPID_PUBLIC_KEY");
+  const vapidPublic = env("VITE_VAPID_PUBLIC_KEY", "VAPID_PUBLIC_KEY");
   const vapidPrivate = env("VAPID_PRIVATE_KEY");
   if (!url || !publishable || !serviceRole || !vapidPublic || !vapidPrivate) return res.status(503).json({ error: "Notification server configuration is incomplete" });
 
-  const token = authorization.slice("Bearer ".length);
+  const token = authorization.slice("Bearer ".length).trim();
   const authClient = createClient(url, publishable, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: `Bearer ${token}` } } });
   const { data: { user }, error: authError } = await authClient.auth.getUser(token);
   if (authError || !user) return res.status(401).json({ error: "Authentication failed" });
@@ -58,8 +61,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (duplicate) return res.status(200).json({ sent: false, reason: "duplicate" });
   }
 
-  const { data: subs, error: subError } = await admin.from("push_subscriptions").select("endpoint,auth_key,p256dh_key").eq("user_id", user.id);
-  if (subError || !subs?.length) return res.status(404).json({ error: "No push subscription found" });
+  const { data: subs, error: subError } = await admin.from("push_subscriptions").select("id,endpoint,auth_key,p256dh_key").eq("user_id", user.id);
+  if (subError) return res.status(500).json({ error: "Could not load push subscriptions", code: subError.code });
+  if (!subs?.length) return res.status(404).json({ error: "No active push subscription found" });
 
   webpush.setVapidDetails(env("VAPID_SUBJECT") || "mailto:notifications@outstand.app", vapidPublic, vapidPrivate);
   const payload = JSON.stringify({ title, body: message, icon: "/icon-192x192.png", badge: "/badge-72x72.png", url: targetUrl, tag: dedupeKey || `outstand-${category}` });
@@ -69,7 +73,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await webpush.sendNotification({ endpoint: sub.endpoint, keys: { auth: sub.auth_key, p256dh: sub.p256dh_key } }, payload);
       sent += 1;
     } catch (error: any) {
-      if (error?.statusCode === 404 || error?.statusCode === 410) await admin.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
+      console.error("[Push] Delivery failed", { statusCode: error?.statusCode, message: error?.message });
+      if (error?.statusCode === 404 || error?.statusCode === 410) await admin.from("push_subscriptions").delete().eq("id", sub.id);
     }
   }
 
