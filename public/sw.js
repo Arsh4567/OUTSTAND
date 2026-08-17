@@ -1,4 +1,7 @@
-// OUTSTAND service worker
+// OUTSTAND service worker — Web Push delivery
+const APP_ICON = "/outstand-logo.png";
+const APP_BADGE = "/outstand-logo.png";
+
 self.addEventListener("push", (event) => {
   if (!event.data) return;
 
@@ -12,12 +15,15 @@ self.addEventListener("push", (event) => {
   const url = typeof data.url === "string" && data.url.startsWith("/") ? data.url : "/";
   const options = {
     body: data.body || "You have a new OUTSTAND notification.",
-    icon: data.icon || "/icon-192x192.png",
-    badge: data.badge || "/badge-72x72.png",
+    icon: data.icon || APP_ICON,
+    badge: data.badge || APP_BADGE,
     tag: data.tag || "outstand-notification",
     renotify: Boolean(data.renotify),
     requireInteraction: false,
+    silent: false,
     vibrate: [80, 40, 80],
+    dir: "auto",
+    lang: "en",
     data: { url },
     actions: Array.isArray(data.actions) ? data.actions.slice(0, 2) : [],
   };
