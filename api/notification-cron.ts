@@ -2,8 +2,6 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import webpush from 'web-push';
 import { createClient } from '@supabase/supabase-js';
 
-// The browser uses VITE_SUPABASE_URL. Prefer that same value here so Auth,
-// subscriptions, preferences and scheduler all point at one database.
 const url = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '').trim();
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
 const publicKey = (process.env.VITE_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY || '').trim();
@@ -104,7 +102,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       continue;
     }
 
-    const payload = JSON.stringify({ title, body, icon: '/icon-192x192.png', badge: '/badge-72x72.png', url: path, tag: dedupeKey });
+    const payload = JSON.stringify({ title, body, icon: '/outstand-logo.png', badge: '/outstand-logo.png', url: path, tag: dedupeKey, renotify: true });
     let delivered = false;
     for (const sub of subscriptions) {
       try {
