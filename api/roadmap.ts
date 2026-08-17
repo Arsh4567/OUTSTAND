@@ -4,22 +4,37 @@ import { createClient } from "@supabase/supabase-js";
 import { getAIProvider, isRateLimitError, modelFor } from "./ai-provider";
 
 const env = (...names: string[]) => names.map((name) => process.env[name]).find((value) => typeof value === "string" && value.trim().length > 0);
-
 function json(res: VercelResponse, status: number, data: unknown) { res.status(status).setHeader("Cache-Control", "no-store").json(data); }
 function getBearer(req: VercelRequest) { const value = req.headers.authorization; return value?.startsWith("Bearer ") ? value.slice(7).trim() : ""; }
 async function body(req: VercelRequest) { if (req.body && typeof req.body === "object") return req.body; if (typeof req.body === "string") return JSON.parse(req.body); return {}; }
-async function authenticate(req: VercelRequest) { const token = getBearer(req); if (!token) return { error: { status: 401, message: "Authentication required." } }; const url = env("SUPABASE_URL", "VITE_SUPABASE_URL"); const key = env("SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_PUBLISHABLE_KEY"); if (!url || !key) return { error: { status: 500, message: "Supabase server configuration is missing." } }; const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: `Bearer ${token}` } } }); const { data, error } = await client.auth.getUser(token); if (error || !data.user) return { error: { status: 401, message: "Authentication failed." } }; return { client, userId: data.user.id }; }
+
+type AuthSuccess = { client: any; userId: string };
+type AuthFailure = { error: { status: number; message: string } };
+type AuthResult = AuthSuccess | AuthFailure;
+
+async function authenticate(req: VercelRequest): Promise<AuthResult> {
+  const token = getBearer(req);
+  if (!token) return { error: { status: 401, message: "Authentication required." } };
+  const url = env("SUPABASE_URL", "VITE_SUPABASE_URL");
+  const key = env("SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_PUBLISHABLE_KEY");
+  if (!url || !key) return { error: { status: 500, message: "Supabase server configuration is missing." } };
+  const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: `Bearer ${token}` } } });
+  const { data, error } = await client.auth.getUser(token);
+  if (error || !data.user) return { error: { status: 401, message: "Authentication failed." } };
+  return { client, userId: data.user.id };
+}
+
 function extractJson(text: string) { const cleaned = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim(); try { return JSON.parse(cleaned); } catch { const start = cleaned.indexOf("{"); const end = cleaned.lastIndexOf("}"); if (start >= 0 && end > start) return JSON.parse(cleaned.slice(start, end + 1)); throw new Error("The AI returned invalid structured data."); } }
 const baseRules = `You are OUTSTAND Intelligence, an adaptive personal planning AI. Never invent user facts. Ask for missing information before planning. Plans must be realistic, specific and measurable. Do not give generic advice such as “study maths for 2 hours”. For academics, collect class/grade, board/curriculum, target result, subjects, current level, exam/deadline, available days/time, weak areas, strong areas and constraints. For fitness, collect goal, age if relevant, height, weight, training experience, available days/time, equipment, current ability and limitations; do not prescribe unsafe or extreme targets. For business/money, collect current situation, target, timeframe, skills/resources, constraints and risk tolerance. For skill learning, collect current level, target skill/outcome, deadline, available time, resources and preferred learning style. For content creation, collect platform, niche, current audience/status, target, cadence, skills, equipment and time. For sports/chess, collect discipline, current level/rating, competition target, deadline, practice availability and constraints. For habits/productivity, collect current routine, target behavior, frequency, triggers, obstacles and available time. Keep questions concise and only ask what changes the plan. Return JSON only.`;
 
 async function ask(prompt: string) {
-  const primary = getAIProvider();
+  const primary = await getAIProvider();
   try {
     const result = await generateText({ model: modelFor(primary.name, primary.provider, "roadmap"), system: baseRules, prompt, maxRetries: 0, temperature: 0.2 });
     return extractJson(result.text);
   } catch (error: any) {
     if (primary.name === "groq" && isRateLimitError(error) && env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")) {
-      const fallback = getAIProvider("gemini");
+      const fallback = await getAIProvider("gemini");
       const result = await generateText({ model: modelFor(fallback.name, fallback.provider, "roadmap"), system: baseRules, prompt, maxRetries: 0, temperature: 0.2 });
       return extractJson(result.text);
     }
@@ -31,7 +46,8 @@ async function ask(prompt: string) {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return json(res, 405, { error: "Method not allowed." });
-  const auth = await authenticate(req); if ("error" in auth) return json(res, auth.error.status, { error: auth.error.message });
+  const auth = await authenticate(req);
+  if ("error" in auth) { const failure = auth.error; return json(res, failure.status, { error: failure.message }); }
   try {
     const input = await body(req);
     const mode = input?.mode === "plan" || input?.mode === "adapt" ? input.mode : "questions";
@@ -41,10 +57,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const context = input?.context && typeof input.context === "object" ? input.context : {};
     if (mode === "questions") {
       const answered = Object.entries(answers).map(([key, value]) => `${key}: ${String(value)}`).join("\n") || "No answers yet.";
-      const result = await ask(`Create the next 3 to 5 most useful questions for a ${category} goal. These questions must be based on the answers already given and must not repeat answered information. If this is the first turn, start with the goal, measurable outcome, timeline and the category-specific information that materially changes the plan. Return exactly {"questions":[{"id":"string","question":"string","type":"text|number|choice|multiline","required":true,"options":["..."],"placeholder":"..."}]}.\n\nAlready answered:\n${answered}\nSelected habits:\n${JSON.stringify(habits)}\nUser context:\n${JSON.stringify(context)}`); return json(res, 200, result);
+      const result = await ask(`Create the next 3 to 5 most useful questions for a ${category} goal. These questions must be based on the answers already given and must not repeat answered information. If this is the first turn, start with the goal, measurable outcome, timeline and the category-specific information that materially changes the plan. Return exactly {"questions":[{"id":"string","question":"string","type":"text|number|choice|multiline","required":true,"options":["..."],"placeholder":"..."}]}.\n\nAlready answered:\n${answered}\nSelected habits:\n${JSON.stringify(habits)}\nUser context:\n${JSON.stringify(context)}`);
+      return json(res, 200, result);
     }
     if (mode === "plan") {
-      const result = await ask(`Build a personalized ${category} roadmap from the complete interview below. Do not make assumptions about time, ability or target. Use the selected habits only as supporting context. Make milestones specific and measurable. Return exactly {"plan":{"title":"string","summary":"string","durationDays":number,"difficulty":"string","assumptions":["string"],"milestones":[{"day":number,"title":"string","outcome":"string","actions":["string"]}],"today":["string"],"metrics":["string"],"adaptationRule":"string"}}. Keep the roadmap useful rather than enormous; create milestones across the full duration but keep actions realistic.\n\nCategory: ${category}\nAnswers:\n${JSON.stringify(answers)}\nSelected habits:\n${JSON.stringify(habits)}\nUser context:\n${JSON.stringify(context)}`); return json(res, 200, result);
+      const result = await ask(`Build a personalized ${category} roadmap from the complete interview below. Do not make assumptions about time, ability or target. Use the selected habits only as supporting context. Make milestones specific and measurable. Return exactly {"plan":{"title":"string","summary":"string","durationDays":number,"difficulty":"string","assumptions":["string"],"milestones":[{"day":number,"title":"string","outcome":"string","actions":["string"]}],"today":["string"],"metrics":["string"],"adaptationRule":"string"}}. Keep the roadmap useful rather than enormous; create milestones across the full duration but keep actions realistic.\n\nCategory: ${category}\nAnswers:\n${JSON.stringify(answers)}\nSelected habits:\n${JSON.stringify(habits)}\nUser context:\n${JSON.stringify(context)}`);
+      return json(res, 200, result);
     }
     const { data: roadmap, error: roadmapError } = await auth.client.from("ai_roadmaps").select("id,plan,title,duration_days,answers").eq("user_id", auth.userId).eq("is_active", true).maybeSingle();
     if (roadmapError) return json(res, 500, { error: "Could not load your active roadmap.", code: roadmapError.code });
