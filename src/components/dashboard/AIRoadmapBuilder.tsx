@@ -42,8 +42,12 @@ export function AIRoadmapBuilder({ habits, name, level, xp, streak, onClose, onP
   const [step, setStep] = useState<"category" | "interview" | "plan">("category");
 
   const selectedCategory = useMemo(() => categories.find((item) => item.id === category) ?? categories[0], [category]);
-  const visibleQuestions = questions.filter((question) => !answers[question.id]?.trim());
-  const answeredCount = questions.length - visibleQuestions.length;
+  // Keep every question mounted while the user types. The previous implementation
+  // filtered answered questions out of the render tree, so the first character made
+  // the field disappear and appear to lose focus/value.
+  const visibleQuestions = questions;
+  const unansweredRequired = questions.filter((question) => question.required && !answers[question.id]?.trim());
+  const answeredCount = questions.filter((question) => Boolean(answers[question.id]?.trim())).length;
 
   useEffect(() => {
     setQuestions([]);
@@ -89,9 +93,8 @@ export function AIRoadmapBuilder({ habits, name, level, xp, streak, onClose, onP
   }
 
   function askNext() {
-    const missingRequired = questions.find((question) => question.required && !answers[question.id]?.trim());
-    if (missingRequired) {
-      setError(`Please answer: ${missingRequired.question}`);
+    if (unansweredRequired.length > 0) {
+      setError(`Please answer: ${unansweredRequired[0].question}`);
       return;
     }
     void callRoadmap("questions");
@@ -114,7 +117,7 @@ export function AIRoadmapBuilder({ habits, name, level, xp, streak, onClose, onP
 
           {step === "interview" && <motion.div key="interview" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
             <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-300">AI interview · {selectedCategory.label}</p><h3 className="mt-2 text-2xl font-black tracking-tight text-white">Let's make this specific to you.</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Answer honestly. The AI will ask follow-up questions when your answer changes what the roadmap should look like.</p></div><div className="rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2 text-[10px] font-bold text-slate-500">{answeredCount} answered</div></div>
-            {questions.length === 0 ? <div className="mt-10 flex items-center justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-cyan-300" /><span className="ml-3 text-sm text-slate-400">AI is preparing the right questions…</span></div> : <div className="mt-7 space-y-4">{visibleQuestions.slice(0, 3).map((question) => <QuestionField key={question.id} question={question} value={answers[question.id] ?? ""} onChange={(value) => setAnswers((current) => ({ ...current, [question.id]: value }))} />)}</div>}
+            {questions.length === 0 ? <div className="mt-10 flex items-center justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-cyan-300" /><span className="ml-3 text-sm text-slate-400">AI is preparing the right questions…</span></div> : <div className="mt-7 space-y-4">{visibleQuestions.map((question) => <QuestionField key={question.id} question={question} value={answers[question.id] ?? ""} onChange={(value) => setAnswers((current) => ({ ...current, [question.id]: value }))} />)}</div>}
             {error && <p className="mt-4 rounded-xl border border-red-300/10 bg-red-300/[0.04] px-4 py-3 text-sm text-red-200">{error}</p>}
           </motion.div>}
 
@@ -131,14 +134,14 @@ export function AIRoadmapBuilder({ habits, name, level, xp, streak, onClose, onP
 
       <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-white/[0.07] px-5 py-4 sm:px-7">
         {step === "category" && <><span className="text-xs text-slate-600">The AI will interview you before planning.</span><button type="button" onClick={startInterview} disabled={loading} className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-black text-slate-950 transition hover:bg-cyan-50 disabled:opacity-50">Start AI interview <ArrowRight className="h-4 w-4" /></button></>}
-        {step === "interview" && <><button type="button" onClick={() => setStep("category")} className="inline-flex items-center gap-2 rounded-xl border border-white/[0.07] px-4 py-2.5 text-sm font-bold text-slate-400 hover:bg-white/[0.04] hover:text-white"><ArrowLeft className="h-4 w-4" /> Back</button><button type="button" onClick={askNext} disabled={loading || visibleQuestions.length === 0} className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-black text-slate-950 transition hover:bg-cyan-50 disabled:opacity-50">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />} {loading ? "Thinking…" : "Continue"}</button></>}
-        {step === "plan" && <><span className="text-xs text-slate-600">Built from your answers and selected habits.</span><button type="button" onClick={onClose} className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-black text-slate-950"><Check className="h-4 w-4" /> Use this roadmap</button></>}
+        {step === "interview" && <><button type="button" onClick={() => setStep("category")} className="inline-flex items-center gap-2 rounded-xl border border-white/[0.07] px-4 py-2.5 text-sm font-bold text-slate-400 hover:bg-white/[0.04] hover:text-white"><ArrowLeft className="h-4 w-4" /> Back</button><button type="button" onClick={askNext} disabled={loading || questions.length === 0} className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-black text-slate-950 transition hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-50">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} {loading ? "Thinking…" : "Continue interview"} <ArrowRight className="h-4 w-4" /></button></>}
+        {step === "plan" && <><span className="text-xs text-slate-600">Your roadmap is ready to become your daily path.</span><button type="button" onClick={onClose} className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-black text-slate-950 transition hover:bg-cyan-50"><Check className="h-4 w-4" /> Done</button></>}
       </footer>
     </motion.div>
   </div>;
 }
 
 function QuestionField({ question, value, onChange }: { question: Question; value: string; onChange: (value: string) => void }) {
-  const common = "mt-2 w-full rounded-2xl border border-white/[0.08] bg-black/20 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-700 focus:border-cyan-300/25 focus:bg-white/[0.035]";
-  return <label className="block rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4"><span className="flex items-center gap-2 text-sm font-black text-white">{question.question}{question.required && <span className="text-cyan-300">*</span>}</span>{question.type === "choice" ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{(question.options ?? []).map((option) => <button key={option} type="button" onClick={() => onChange(option)} className={`rounded-xl border px-3 py-2.5 text-left text-sm font-bold transition ${value === option ? "border-cyan-300/25 bg-cyan-300/[0.08] text-cyan-100" : "border-white/[0.07] text-slate-400 hover:bg-white/[0.04] hover:text-white"}`}>{option}</button>)}</div> : question.type === "multiline" ? <textarea className={`${common} min-h-24 resize-y`} value={value} onChange={(event) => onChange(event.target.value)} placeholder={question.placeholder} /> : <input className={common} type={question.type === "number" ? "number" : "text"} value={value} onChange={(event) => onChange(event.target.value)} placeholder={question.placeholder} />}</label>;
+  const common = "mt-2 w-full rounded-2xl border border-white/[0.08] bg-[#0d121d] px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-300/30 focus:ring-2 focus:ring-cyan-300/10";
+  return <label className="block rounded-2xl border border-white/[0.06] bg-white/[0.018] p-4"><span className="text-sm font-bold text-slate-200">{question.question}{question.required && <span className="ml-1 text-cyan-300">*</span>}</span>{question.type === "choice" && question.options?.length ? <select value={value} onChange={(event) => onChange(event.target.value)} className={common}><option value="">Select an option</option>{question.options.map((option) => <option key={option} value={option}>{option}</option>)}</select> : question.type === "multiline" ? <textarea value={value} onChange={(event) => onChange(event.target.value)} placeholder={question.placeholder} rows={4} className={common} /> : <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={question.placeholder} type={question.type === "number" ? "number" : "text"} className={common} />}</label>;
 }
