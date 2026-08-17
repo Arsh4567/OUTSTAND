@@ -7,8 +7,9 @@ import { OUTSTAND_10M_CHALLENGES } from "@/lib/outstand-10m.data";
 import type { OutstandChallenge } from "@/lib/challenges.types";
 import { supabase } from "@/integrations/supabase/client";
 
-const pickChallenge = (currentId?: string) => {
-  const pool = OUTSTAND_10M_CHALLENGES.filter((item) => item.id !== currentId);
+const pickChallenge = (currentId?: string, category?: string) => {
+  const categoryPool = category ? OUTSTAND_10M_CHALLENGES.filter((item) => item.category === category && item.id !== currentId) : OUTSTAND_10M_CHALLENGES;
+  const pool = categoryPool.length > 0 ? categoryPool : OUTSTAND_10M_CHALLENGES.filter((item) => item.id !== currentId);
   return pool[Math.floor(Math.random() * pool.length)] ?? OUTSTAND_10M_CHALLENGES[0];
 };
 
@@ -43,9 +44,9 @@ export function useOutstand() {
     }
   }, []);
 
-  const generate = useCallback(() => {
+  const generate = useCallback((category?: string) => {
     stopCompletionTimer();
-    const next = pickChallenge(challenge?.id);
+    const next = pickChallenge(challenge?.id, category);
     setRunning(false);
     setCompletionStage(0);
     setIsShuffling(false);
@@ -95,7 +96,6 @@ export function useOutstand() {
 
     const xpEarned = Math.max(0, Number(challenge.xpReward ?? 50));
     const challengeTitle = challenge.title;
-    const challengeDuration = 10;
     const challengeId = challenge.id;
 
     setRunning(false);
@@ -109,7 +109,7 @@ export function useOutstand() {
         challenge_id: challengeId,
         title: challengeTitle,
         xp_earned: xpEarned,
-        duration_minutes: challengeDuration,
+        duration_minutes: 10,
       });
       if (error) console.error("Outstand sync failed:", error.message);
     });
