@@ -47,7 +47,7 @@ function Scene({ accent, active, reducedMotion }: Required<Props>) {
       </mesh>
       <points>
         <bufferGeometry>
-          <bufferAttribute attach="attributes-position" args={[points, 3]} count={points.length / 3} array={points} itemSize={3} />
+          <bufferAttribute attach="attributes-position" args={[points, 3]} />
         </bufferGeometry>
         <pointsMaterial color={accent} size={0.026} sizeAttenuation transparent opacity={active ? 0.62 : 0.34} depthWrite={false} />
       </points>
