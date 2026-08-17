@@ -7,7 +7,7 @@ import { z } from "zod";
 const MODEL = "gemini-2.5-flash-lite";
 
 const RequestSchema = z.object({
-  mode: z.enum(["questions", "plan"]),
+  mode: z.enum(["questions", "plan", "adapt"]),
   category: z.string().min(1).max(80),
   answers: z.record(z.string(), z.unknown()).default({}),
   habits: z.array(z.object({ id: z.string(), name: z.string(), emoji: z.string().optional() })).max(30).default([]),
@@ -65,16 +65,29 @@ const QuestionSchema = z.object({
   placeholder: z.string().optional(),
 });
 
+const MilestoneSchema = z.object({
+  day: z.number().int().positive(),
+  title: z.string(),
+  outcome: z.string(),
+  actions: z.array(z.string()).min(1).max(6),
+});
+
 const PlanSchema = z.object({
   title: z.string(),
   summary: z.string(),
   durationDays: z.number().int().positive(),
   difficulty: z.string(),
   assumptions: z.array(z.string()).max(6),
-  milestones: z.array(z.object({ day: z.number().int().positive(), title: z.string(), outcome: z.string(), actions: z.array(z.string()).min(1).max(6) })).min(1).max(20),
+  milestones: z.array(MilestoneSchema).min(1).max(20),
   today: z.array(z.string()).min(1).max(8),
   metrics: z.array(z.string()).min(1).max(8),
   adaptationRule: z.string(),
+});
+
+const AdaptationSchema = z.object({
+  changed: z.boolean(),
+  reason: z.string(),
+  plan: PlanSchema,
 });
 
 function extractJson(text: string) {
@@ -130,6 +143,85 @@ Universal requirements:
             const data = extractJson(result.text);
             const questions = z.array(QuestionSchema).parse(data.questions ?? []);
             return json({ questions });
+          }
+
+          if (parsed.data.mode === "adapt") {
+            const { data: roadmap, error: roadmapError } = await auth.client
+              .from("ai_roadmaps")
+              .select("id,category,title,summary,duration_days,difficulty,answers,plan,updated_at")
+              .eq("user_id", auth.userId)
+              .eq("is_active", true)
+              .order("updated_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (roadmapError) throw roadmapError;
+            if (!roadmap) return json({ changed: false, reason: "No active roadmap.", plan: null });
+
+            const { data: progress, error: progressError } = await auth.client
+              .from("ai_roadmap_progress")
+              .select("roadmap_day,assigned_date,total_missions,completed_missions,completion_pct,updated_at")
+              .eq("user_id", auth.userId)
+              .eq("roadmap_id", roadmap.id)
+              .order("roadmap_day", { ascending: false })
+              .limit(14);
+            if (progressError) throw progressError;
+
+            const latestProgressAt = progress?.reduce((latest, row) => row.updated_at > latest ? row.updated_at : latest, "") ?? "";
+            if (!latestProgressAt || new Date(latestProgressAt) <= new Date(roadmap.updated_at)) {
+              return json({ changed: false, reason: "Roadmap is already adapted to the latest recorded progress.", plan: roadmap.plan });
+            }
+
+            const currentPlan = PlanSchema.parse(roadmap.plan);
+            const history = JSON.stringify(progress ?? [], null, 2);
+            const adaptationPrompt = `You are OUTSTAND's adaptive roadmap engine. The user already has an active personalized roadmap. Their actual mission performance has now changed since the roadmap was last generated.
+
+Current roadmap:
+${JSON.stringify(currentPlan, null, 2)}
+
+Original interview answers:
+${JSON.stringify(roadmap.answers, null, 2)}
+
+Recent real performance history:
+${history}
+
+Category rules:
+${categoryRules[roadmap.category] ?? categoryRules.custom}
+
+Adaptation requirements:
+- Do NOT restart the roadmap from scratch.
+- Preserve completed/past milestones conceptually. Only change future milestones and today's unfinished actions when performance clearly warrants it.
+- Use the actual completion percentages and dates as the primary evidence.
+- If completion is consistently high (>=80%), increase challenge slightly or advance the next useful milestone, but never make the workload unreasonable.
+- If completion is moderate (50-79%), keep the difficulty roughly stable and make the next actions clearer or better sequenced.
+- If completion is low (<50%) or repeated days are incomplete, reduce workload, split large actions into smaller steps, and move missed work forward without creating a punishment backlog.
+- Never double the workload to compensate for missed work.
+- Preserve the user's original deadline and constraints unless the evidence makes the original target unrealistic; if so, adjust the path rather than inventing extra available time.
+- Keep the plan measurable and specific to the original goal.
+- For academics, adapt topic sequencing and practice/revision workload from the observed completion pattern; do not invent marks or syllabus progress that is not present.
+- For fitness, remain age-appropriate and health-focused; do not introduce extreme exercise or restrictive eating.
+- Update adaptationRule so it describes the new evidence-based behavior.
+- Return ONLY valid JSON matching {"changed":boolean,"reason":string,"plan":<full plan>}. Set changed=false only if the existing plan genuinely remains appropriate. When changed=true, return the complete replacement plan, not a patch.`;
+
+            const result = await generateText({ model: google(MODEL), prompt: adaptationPrompt, maxOutputTokens: 2200, maxRetries: 0 });
+            const adaptation = AdaptationSchema.parse(extractJson(result.text));
+            const nextPlan = adaptation.plan;
+
+            if (adaptation.changed) {
+              const { error: updateError } = await auth.client
+                .from("ai_roadmaps")
+                .update({
+                  title: nextPlan.title,
+                  summary: nextPlan.summary,
+                  duration_days: nextPlan.durationDays,
+                  difficulty: nextPlan.difficulty,
+                  plan: nextPlan,
+                })
+                .eq("id", roadmap.id)
+                .eq("user_id", auth.userId);
+              if (updateError) throw updateError;
+            }
+
+            return json({ changed: adaptation.changed, reason: adaptation.reason, plan: nextPlan });
           }
 
           const prompt = `You are the roadmap engine inside OUTSTAND. Build a genuinely personalized ${parsed.data.category} roadmap from the user's answers. This is not a generic productivity template.
