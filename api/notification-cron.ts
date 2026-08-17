@@ -55,20 +55,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (clock.minute > 10) continue;
 
     const { data: state } = await admin.from('user_productivity_state').select('habits,sessions,outstand').eq('user_id', pref.user_id).maybeSingle();
-    if (!state) continue;
-
     const date = localDate(now, tz);
     const since = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
     const { count } = await admin.from('notification_events').select('id', { count: 'exact', head: true }).eq('user_id', pref.user_id).gte('created_at', since);
     if ((count ?? 0) >= Math.max(1, Number(pref.max_daily) || 3)) continue;
 
-    let category: 'habit' | 'motivation' | null = null;
+    let category: 'habit' | 'goal' | 'motivation' | null = null;
     let title = '';
     let body = '';
-    let path = '/outstand';
+    let path = '/dashboard';
 
-    if (pref.habits_enabled && clock.hour === 19) {
-      const habit = chooseHabit(Array.isArray(state.habits) ? state.habits : [], date);
+    if (pref.goals_enabled && (clock.hour === 8 || clock.hour === 19)) {
+      const { data: missions } = await admin.from('daily_quests').select('id, completed, quests(title, category)').eq('user_id', pref.user_id).eq('assigned_date', date).eq('completed', false).order('id').limit(1);
+      const row = missions?.[0] as any;
+      const task = Array.isArray(row?.quests) ? row.quests[0] : row?.quests;
+      if (task?.category === 'Roadmap') {
+        category = 'goal';
+        title = clock.hour === 8 ? 'Your OUTSTAND plan is ready 🎯' : 'Your roadmap is waiting for you';
+        body = `Next up: ${task.title}. Open OUTSTAND and take the smallest useful step now.`;
+      }
+    }
+
+    if (!category && pref.habits_enabled && clock.hour === 19) {
+      const habit = chooseHabit(Array.isArray(state?.habits) ? state.habits : [], date);
       if (habit) {
         category = 'habit';
         title = `${habit.emoji || '🔵'} ${habit.name} is still waiting`;
@@ -110,9 +119,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         delivered = true;
       } catch (error: any) {
         console.error('[Push] Scheduled delivery failed', { statusCode: error?.statusCode, message: error?.message });
-        if (error?.statusCode === 404 || error?.statusCode === 410) {
-          await admin.from('push_subscriptions').delete().eq('id', sub.id);
-        }
+        if (error?.statusCode === 404 || error?.statusCode === 410) await admin.from('push_subscriptions').delete().eq('id', sub.id);
       }
     }
 
