@@ -1,7 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { generateText } from "ai";
 import { createClient } from "@supabase/supabase-js";
-import { getAIProvider, isRateLimitError, modelFor } from "./ai-provider.js";
 
 const env = (...names: string[]) => names.map((name) => process.env[name]).find((value) => typeof value === "string" && value.trim().length > 0);
 function json(res: VercelResponse, status: number, data: unknown) { res.status(status).setHeader("Cache-Control", "no-store").json(data); }
@@ -24,21 +22,89 @@ async function authenticate(req: VercelRequest): Promise<AuthResult> {
   return { client, userId: data.user.id };
 }
 
-function extractJson(text: string) { const cleaned = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim(); try { return JSON.parse(cleaned); } catch { const start = cleaned.indexOf("{"); const end = cleaned.lastIndexOf("}"); if (start >= 0 && end > start) return JSON.parse(cleaned.slice(start, end + 1)); throw new Error("The AI returned invalid structured data."); } }
+function extractJson(text: string) {
+  const cleaned = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
+  try { return JSON.parse(cleaned); } catch {
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start >= 0 && end > start) return JSON.parse(cleaned.slice(start, end + 1));
+    throw new Error("The AI returned invalid structured data.");
+  }
+}
+
 const baseRules = `You are OUTSTAND Intelligence, an adaptive personal planning AI. Never invent user facts. Ask for missing information before planning. Plans must be realistic, specific and measurable. Do not give generic advice such as “study maths for 2 hours”. For academics, collect class/grade, board/curriculum, target result, subjects, current level, exam/deadline, available days/time, weak areas, strong areas and constraints. For fitness, collect goal, age if relevant, height, weight, training experience, available days/time, equipment, current ability and limitations; do not prescribe unsafe or extreme targets. For business/money, collect current situation, target, timeframe, skills/resources, constraints and risk tolerance. For skill learning, collect current level, target skill/outcome, deadline, available time, resources and preferred learning style. For content creation, collect platform, niche, current audience/status, target, cadence, skills, equipment and time. For sports/chess, collect discipline, current level/rating, competition target, deadline, practice availability and constraints. For habits/productivity, collect current routine, target behavior, frequency, triggers, obstacles and available time. Keep questions concise and only ask what changes the plan. Return JSON only.`;
 
+type AIJsonResult = unknown;
+
+function isRateLimit(status: number, text: string) {
+  return status === 429 || /rate.?limit|quota|too many requests|resource.?exhausted/i.test(text);
+}
+
+async function askGroq(prompt: string): Promise<AIJsonResult> {
+  const apiKey = env("GROQ_API_KEY");
+  if (!apiKey) throw Object.assign(new Error("Groq API configuration is missing."), { code: "GROQ_CONFIG_MISSING", status: 503 });
+
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "llama-3.1-8b-instant",
+      temperature: 0.2,
+      max_tokens: 2500,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: baseRules },
+        { role: "user", content: prompt },
+      ],
+    }),
+  });
+
+  const raw = await response.text();
+  if (!response.ok) {
+    const error = new Error(`Groq request failed (${response.status}).`);
+    Object.assign(error, { status: response.status, code: isRateLimit(response.status, raw) ? "AI_QUOTA_EXCEEDED" : "GROQ_REQUEST_FAILED" });
+    throw error;
+  }
+
+  const parsed = JSON.parse(raw);
+  const content = parsed?.choices?.[0]?.message?.content;
+  if (typeof content !== "string" || !content.trim()) throw new Error("Groq returned an empty AI response.");
+  return extractJson(content);
+}
+
+async function askGemini(prompt: string): Promise<AIJsonResult> {
+  const apiKey = env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY");
+  if (!apiKey) throw Object.assign(new Error("Gemini API configuration is missing."), { code: "GEMINI_CONFIG_MISSING", status: 503 });
+
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: `${baseRules}\n\n${prompt}` }] }],
+      generationConfig: { temperature: 0.2, responseMimeType: "application/json" },
+    }),
+  });
+
+  const raw = await response.text();
+  if (!response.ok) {
+    const error = new Error(`Gemini request failed (${response.status}).`);
+    Object.assign(error, { status: response.status, code: isRateLimit(response.status, raw) ? "AI_QUOTA_EXCEEDED" : "GEMINI_REQUEST_FAILED" });
+    throw error;
+  }
+
+  const parsed = JSON.parse(raw);
+  const content = parsed?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text || "").join("");
+  if (typeof content !== "string" || !content.trim()) throw new Error("Gemini returned an empty AI response.");
+  return extractJson(content);
+}
+
 async function ask(prompt: string) {
-  const primary = await getAIProvider();
   try {
-    const result = await generateText({ model: modelFor(primary.name, primary.provider, "roadmap"), system: baseRules, prompt, maxRetries: 0, temperature: 0.2 });
-    return extractJson(result.text);
+    return await askGroq(prompt);
   } catch (error: any) {
-    if (primary.name === "groq" && isRateLimitError(error) && env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")) {
-      const fallback = await getAIProvider("gemini");
-      const result = await generateText({ model: modelFor(fallback.name, fallback.provider, "roadmap"), system: baseRules, prompt, maxRetries: 0, temperature: 0.2 });
-      return extractJson(result.text);
+    if (isRateLimit(error?.status || 0, error?.message || "") && env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")) {
+      return await askGemini(prompt);
     }
-    if (isRateLimitError(error)) throw Object.assign(new Error("AI is temporarily at capacity. Please try again shortly."), { code: "AI_QUOTA_EXCEEDED", status: 429 });
     throw error;
   }
 }
@@ -48,6 +114,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return json(res, 405, { error: "Method not allowed." });
   const auth = await authenticate(req);
   if ("error" in auth) { const failure = auth.error; return json(res, failure.status, { error: failure.message }); }
+
   try {
     const input = await body(req);
     const mode = input?.mode === "plan" || input?.mode === "adapt" ? input.mode : "questions";
@@ -55,26 +122,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const answers = input?.answers && typeof input.answers === "object" ? input.answers : {};
     const habits = Array.isArray(input?.habits) ? input.habits.slice(0, 30) : [];
     const context = input?.context && typeof input.context === "object" ? input.context : {};
+
     if (mode === "questions") {
       const answered = Object.entries(answers).map(([key, value]) => `${key}: ${String(value)}`).join("\n") || "No answers yet.";
       const result = await ask(`Create the next 3 to 5 most useful questions for a ${category} goal. These questions must be based on the answers already given and must not repeat answered information. If this is the first turn, start with the goal, measurable outcome, timeline and the category-specific information that materially changes the plan. Return exactly {"questions":[{"id":"string","question":"string","type":"text|number|choice|multiline","required":true,"options":["..."],"placeholder":"..."}].\n\nAlready answered:\n${answered}\nSelected habits:\n${JSON.stringify(habits)}\nUser context:\n${JSON.stringify(context)}`);
       return json(res, 200, result);
     }
+
     if (mode === "plan") {
       const result = await ask(`Build a personalized ${category} roadmap from the complete interview below. Do not make assumptions about time, ability or target. Use the selected habits only as supporting context. Make milestones specific and measurable. Return exactly {"plan":{"title":"string","summary":"string","durationDays":number,"difficulty":"string","assumptions":["string"],"milestones":[{"day":number,"title":"string","outcome":"string","actions":["string"]}],"today":["string"],"metrics":["string"],"adaptationRule":"string"}}. Keep the roadmap useful rather than enormous; create milestones across the full duration but keep actions realistic.\n\nCategory: ${category}\nAnswers:\n${JSON.stringify(answers)}\nSelected habits:\n${JSON.stringify(habits)}\nUser context:\n${JSON.stringify(context)}`);
       return json(res, 200, result);
     }
+
     const { data: roadmap, error: roadmapError } = await auth.client.from("ai_roadmaps").select("id,plan,title,duration_days,answers").eq("user_id", auth.userId).eq("is_active", true).maybeSingle();
     if (roadmapError) return json(res, 500, { error: "Could not load your active roadmap.", code: roadmapError.code });
     if (!roadmap) return json(res, 404, { error: "No active roadmap found." });
+
     const { data: progress } = await auth.client.from("ai_roadmap_progress").select("assigned_date,total_missions,completed_missions,completion_pct").eq("roadmap_id", roadmap.id).order("assigned_date", { ascending: false }).limit(14);
     const result = await ask(`Adapt only the FUTURE portion of this roadmap using the real recent progress below. Never rewrite completed work. If performance is strong, increase specificity or difficulty modestly. If performance is low, reduce/split future workload and carry forward only essential missed outcomes without creating an overwhelming backlog. Return exactly {"plan":<full updated plan object>,"adapted":boolean,"reason":"short human-readable reason"}.\n\nCurrent plan:\n${JSON.stringify(roadmap.plan)}\nRecent progress:\n${JSON.stringify(progress || [])}`);
-    if (result?.adapted && result?.plan) { const { error: updateError } = await auth.client.from("ai_roadmaps").update({ plan: result.plan }).eq("id", roadmap.id).eq("user_id", auth.userId); if (updateError) return json(res, 500, { error: "The AI adapted the plan but it could not be saved.", code: updateError.code }); }
+
+    if ((result as any)?.adapted && (result as any)?.plan) {
+      const { error: updateError } = await auth.client.from("ai_roadmaps").update({ plan: (result as any).plan }).eq("id", roadmap.id).eq("user_id", auth.userId);
+      if (updateError) return json(res, 500, { error: "The AI adapted the plan but it could not be saved.", code: updateError.code });
+    }
     return json(res, 200, result);
   } catch (error: any) {
     console.error("OUTSTAND roadmap request failed", error);
     const status = error?.status === 429 || error?.code === "AI_QUOTA_EXCEEDED" ? 429 : error?.status === 503 ? 503 : 500;
-    if (status === 429) res.setHeader("Retry-After", "60");
+    if (status === 429) res.setHeader("Retry-After", "30");
     return json(res, status, { error: error?.message || "AI roadmap service failed.", code: error?.code || "ROADMAP_REQUEST_FAILED" });
   }
 }
