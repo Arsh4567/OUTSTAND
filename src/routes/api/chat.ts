@@ -4,6 +4,8 @@ import { consumeStream, convertToModelMessages, createIdGenerator, streamText, t
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
 
+const MODEL = "gemini-2.5-flash-lite";
+
 const RequestSchema = z.object({
   messages: z.array(z.unknown()).min(1).max(40),
   appContext: z.unknown().optional(),
@@ -113,6 +115,11 @@ async function authenticate(request: Request): Promise<AuthResult> {
   return { client, userId };
 }
 
+function isQuotaError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /429|quota|resource[_ -]?exhausted|rate[_ -]?limit|free[_ -]?tier/i.test(message);
+}
+
 export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
@@ -124,7 +131,7 @@ export const Route = createFileRoute("/api/chat")({
           service: "outstand-ai",
           supabaseConfigured: Boolean(url && key),
           geminiConfigured: Boolean(apiKey),
-          model: "gemini-3.5-flash-lite",
+          model: MODEL,
         });
       },
 
@@ -155,13 +162,14 @@ export const Route = createFileRoute("/api/chat")({
             return json({ error: "At least one user message is required.", code: "NO_USER_MESSAGE" }, 400);
           }
 
-          const modelMessages = uiMessages.slice(-12);
+          const modelMessages = uiMessages.slice(-10);
           const google = createGoogleGenerativeAI({ apiKey });
           const result = streamText({
-            model: google("gemini-3.5-flash-lite"),
+            model: google(MODEL),
             system: systemPrompt(parsed.data.appContext),
             messages: await convertToModelMessages(modelMessages),
-            maxOutputTokens: 700,
+            maxOutputTokens: 500,
+            maxRetries: 0,
             providerOptions: {
               google: {
                 thinkingConfig: {
@@ -170,7 +178,13 @@ export const Route = createFileRoute("/api/chat")({
               },
             },
             abortSignal: request.signal,
-            onError: (error) => console.error("Outstand AI stream error:", error),
+            onError: (error) => {
+              if (isQuotaError(error)) {
+                console.warn("[AI] Gemini quota/rate limit reached. No retry will be attempted.");
+              } else {
+                console.error("Outstand AI stream error:", error);
+              }
+            },
           });
 
           return result.toUIMessageStreamResponse({
@@ -228,7 +242,10 @@ export const Route = createFileRoute("/api/chat")({
                 console.error("AI assistant persistence failed:", error);
               }
             },
-            onError: (error) => error instanceof Error ? error.message : String(error),
+            onError: (error) => {
+              if (isQuotaError(error)) return "AI is temporarily rate-limited. Please try again after the quota window resets.";
+              return error instanceof Error ? error.message : String(error);
+            },
             consumeSseStream: consumeStream,
             headers: {
               "Cache-Control": "no-cache, no-transform",
@@ -236,7 +253,12 @@ export const Route = createFileRoute("/api/chat")({
               "X-Content-Type-Options": "nosniff",
             },
           });
+
+          return result;
         } catch (error) {
+          if (isQuotaError(error)) {
+            return json({ error: "AI is temporarily rate-limited. Please try again after the quota window resets.", code: "AI_QUOTA_EXCEEDED" }, 429, { "Retry-After": "20" });
+          }
           console.error("Outstand AI request failed", error);
           return json({ error: "AI request failed.", code: "AI_REQUEST_FAILED" }, 500);
         }
