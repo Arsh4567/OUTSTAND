@@ -50,15 +50,17 @@ async function askGemini(prompt: string): Promise<AIJsonResult> {
   const apiKey = env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY");
   if (!apiKey) throw Object.assign(new Error("Gemini API configuration is missing."), { code: "GEMINI_CONFIG_MISSING", status: 503 });
 
-  // Use the stable Gemini 2.5 Flash-Lite model and the documented x-goog-api-key header.
-  // This avoids treating a malformed/unsupported model URL as a generic AI failure.
-  const model = "gemini-2.5-flash-lite";
+  // Gemini 2.5 Flash-Lite is no longer available to new users. Use the current
+  // stable, cost-efficient Gemini 3.1 Flash-Lite model for roadmap JSON generation.
+  // Gemini 3.x also deprecates sampling parameters such as temperature, so none
+  // are sent here. The existing generateContent API remains supported.
+  const model = "gemini-3.1-flash-lite";
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: `${baseRules}\n\n${prompt}` }] }],
-      generationConfig: { temperature: 0.2, responseMimeType: "application/json" },
+      generationConfig: { responseMimeType: "application/json" },
     }),
   });
   const raw = await response.text();
