@@ -90,9 +90,27 @@ export function AppSettingsSheet(props: AppSettingsSheetProps) {
       }
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Please sign in first.");
+
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        throw new Error("No active push subscription on this device. Enable notifications first.");
+      }
+
+      const json = subscription.toJSON();
+      if (!json.endpoint || !json.keys?.auth || !json.keys?.p256dh) {
+        throw new Error("This device returned an invalid push subscription. Please disable and re-enable notifications.");
+      }
+
       const response = await fetch("/api/send-test-push", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({
+          subscription: {
+            endpoint: json.endpoint,
+            keys: { auth: json.keys.auth, p256dh: json.keys.p256dh },
+          },
+        }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Test notification failed.");
