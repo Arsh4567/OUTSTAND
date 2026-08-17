@@ -1,15 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { MutableRefObject } from "react";
 import { toast } from "sonner";
 import { useAppState } from "@/hooks/use-app-state";
 import { useDailyLog } from "@/hooks/use-dopamine";
 import { CHALLENGES } from "@/lib/challenges.data";
+import { OUTSTAND_10M_CHALLENGES } from "@/lib/outstand-10m.data";
 import type { OutstandChallenge } from "@/lib/challenges.types";
 import { supabase } from "@/integrations/supabase/client";
 
-const randomChallenge = (currentTitle?: string): OutstandChallenge => {
-  const available = CHALLENGES.filter((item) => item.title !== currentTitle);
-  return available[Math.floor(Math.random() * available.length)] ?? CHALLENGES[0];
+const pickChallenge = (currentId?: string) => {
+  const pool = OUTSTAND_10M_CHALLENGES.filter((item) => item.id !== currentId);
+  return pool[Math.floor(Math.random() * pool.length)] ?? OUTSTAND_10M_CHALLENGES[0];
+};
+
+const tenMinuteChallengeById = (id: string) => {
+  const focused = OUTSTAND_10M_CHALLENGES.find((item) => item.id === id);
+  if (focused) return focused;
+  const legacy = CHALLENGES.find((item) => item.id === id && item.durationMinutes === 10);
+  return legacy ?? null;
 };
 
 export function useOutstand() {
@@ -19,111 +26,87 @@ export function useOutstand() {
   const [remaining, setRemaining] = useState(600);
   const [running, setRunning] = useState(false);
   const [isShuffling, setIsShuffling] = useState(false);
-  const [shuffleDisplay, setShuffleDisplay] = useState({ emoji: "⚡", title: "Locating Mission..." });
+  const [shuffleDisplay] = useState({ emoji: "⚡", title: "Your next move" });
   const [completionStage, setCompletionStage] = useState<0 | 1 | 2>(0);
-
-  const intervalRef = useRef<number | null>(null);
-  const shuffleRef = useRef<number | null>(null);
-  const completionTimersRef = useRef<number[]>([]);
+  const remainingRef = useRef(remaining);
+  const completionTimerRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
 
-  const clearTimer = useCallback((ref: MutableRefObject<number | null>) => {
-    if (ref.current !== null) {
-      window.clearInterval(ref.current);
-      ref.current = null;
-    }
-  }, []);
+  useEffect(() => {
+    remainingRef.current = remaining;
+  }, [remaining]);
 
-  const clearCompletionTimers = useCallback(() => {
-    completionTimersRef.current.forEach((timer) => window.clearTimeout(timer));
-    completionTimersRef.current = [];
+  const stopCompletionTimer = useCallback(() => {
+    if (completionTimerRef.current !== null) {
+      window.clearTimeout(completionTimerRef.current);
+      completionTimerRef.current = null;
+    }
   }, []);
 
   const generate = useCallback(() => {
-    clearTimer(intervalRef);
-    clearTimer(shuffleRef);
-    clearCompletionTimers();
+    stopCompletionTimer();
+    const next = pickChallenge(challenge?.id);
     setRunning(false);
     setCompletionStage(0);
-    setIsShuffling(true);
-    setChallenge(null);
-
-    let ticks = 0;
-    shuffleRef.current = window.setInterval(() => {
-      const temp = CHALLENGES[Math.floor(Math.random() * CHALLENGES.length)];
-      if (temp) setShuffleDisplay({ emoji: temp.emoji, title: temp.title });
-      ticks += 1;
-      if (ticks > 12) {
-        clearTimer(shuffleRef);
-        const next = randomChallenge(challenge?.title);
-        setChallenge(next);
-        setRemaining(Math.max(1, Number(next.durationMinutes ?? 10)) * 60);
-        setIsShuffling(false);
-      }
-    }, 80);
-  }, [challenge?.title, clearCompletionTimers, clearTimer]);
+    setIsShuffling(false);
+    setChallenge(next);
+    const nextSeconds = Math.max(1, next?.durationMinutes ?? 10) * 60;
+    remainingRef.current = nextSeconds;
+    setRemaining(nextSeconds);
+  }, [challenge?.id, stopCompletionTimer]);
 
   const loadChallenge = useCallback((id: string) => {
-    const specificChallenge = CHALLENGES.find((item) => item.id === id);
+    const specificChallenge = tenMinuteChallengeById(id);
     if (!specificChallenge) {
-      console.warn(`Outstand challenge with ID "${id}" not found.`);
+      console.warn(`Outstand ten-minute challenge with ID "${id}" not found.`);
       return;
     }
-    clearTimer(intervalRef);
-    clearTimer(shuffleRef);
-    clearCompletionTimers();
+    stopCompletionTimer();
     setChallenge(specificChallenge);
-    setRemaining(Math.max(1, Number(specificChallenge.durationMinutes ?? 10)) * 60);
+    setRemaining(600);
+    remainingRef.current = 600;
     setRunning(false);
     setIsShuffling(false);
     setCompletionStage(0);
-  }, [clearCompletionTimers, clearTimer]);
+  }, [stopCompletionTimer]);
 
   useEffect(() => {
-    if (!running || remaining <= 0) return;
-    clearTimer(intervalRef);
-    intervalRef.current = window.setInterval(() => {
-      setRemaining((current) => {
-        if (current <= 1) {
-          clearTimer(intervalRef);
-          setRunning(false);
-          if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([200, 100, 200]);
-          toast.success("Time's up! Mission complete.");
-          return 0;
-        }
-        return current - 1;
-      });
+    if (!running) return;
+    const interval = window.setInterval(() => {
+      const next = Math.max(0, remainingRef.current - 1);
+      remainingRef.current = next;
+      setRemaining(next);
+      if (next === 0) {
+        setRunning(false);
+        if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([120, 80, 120]);
+        toast.success("Ten minutes complete. Nice work.");
+      }
     }, 1000);
-    return () => clearTimer(intervalRef);
-  }, [clearTimer, running, remaining]);
+    return () => window.clearInterval(interval);
+  }, [running]);
 
   useEffect(() => () => {
     mountedRef.current = false;
-    clearTimer(intervalRef);
-    clearTimer(shuffleRef);
-    clearCompletionTimers();
-  }, [clearCompletionTimers, clearTimer]);
+    stopCompletionTimer();
+  }, [stopCompletionTimer]);
 
   const complete = useCallback(() => {
-    if (!challenge || completionStage !== 0) return;
-    const xpEarned = Math.max(0, Number(challenge.xpReward ?? 50));
-    const challengeEmoji = challenge.emoji;
-    const challengeColor = challenge.theme.particleColors[0] || "#4f46e5";
-    const challengeTitle = challenge.title;
-    const challengeDuration = Math.max(1, Number(challenge.durationMinutes ?? 10));
+    if (!challenge || remainingRef.current !== 0 || completionStage !== 0) return;
 
-    clearTimer(intervalRef);
-    clearTimer(shuffleRef);
-    clearCompletionTimers();
+    const xpEarned = Math.max(0, Number(challenge.xpReward ?? 50));
+    const challengeTitle = challenge.title;
+    const challengeDuration = 10;
+    const challengeId = challenge.id;
+
     setRunning(false);
     setCompletionStage(1);
-    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([20, 100, 30, 80, 50, 50, 100]);
+    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([20, 70, 30]);
 
     void supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session?.user || !mountedRef.current) return;
       const { error } = await supabase.from("outstand_logs").insert({
         user_id: session.user.id,
-        challenge_id: challenge.id,
+        challenge_id: challengeId,
         title: challengeTitle,
         xp_earned: xpEarned,
         duration_minutes: challengeDuration,
@@ -131,33 +114,26 @@ export function useOutstand() {
       if (error) console.error("Outstand sync failed:", error.message);
     });
 
-    completionTimersRef.current.push(window.setTimeout(() => {
-      if (mountedRef.current) setCompletionStage(2);
-    }, 1500));
-
-    completionTimersRef.current.push(window.setTimeout(() => {
+    completionTimerRef.current = window.setTimeout(() => {
       if (!mountedRef.current) return;
       recordOutstand(challengeTitle, xpEarned);
       addPositive("outstand");
-      toast.custom(() => (
-        <div className="relative mx-auto flex w-full max-w-[360px] items-center gap-4 overflow-hidden rounded-2xl border border-white/10 bg-[#050810] p-4" style={{ boxShadow: `0 20px 40px -10px ${challengeColor}60` }}>
-          <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-50" />
-          <div className="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/50 text-3xl shadow-[inset_0_0_20px_rgba(255,255,255,0.1)]">{challengeEmoji}</div>
-          <div className="relative z-10 flex-1"><h3 className="text-xs font-black uppercase tracking-[0.2em] text-white/70">Mission Cleared</h3><div className="mt-1 font-mono text-2xl font-black leading-none text-white">+{xpEarned} <span className="text-sm opacity-50">XP</span></div></div>
-        </div>
-      ), { id: `outstand-${challenge.id}`, duration: 4000 });
+      toast.success(`Mission cleared · +${xpEarned} XP`);
       setChallenge(null);
       setCompletionStage(0);
-      completionTimersRef.current = [];
-    }, 2800));
-  }, [addPositive, challenge, clearCompletionTimers, clearTimer, completionStage, recordOutstand]);
+      completionTimerRef.current = null;
+    }, 1200);
+  }, [addPositive, challenge, completionStage, recordOutstand]);
 
   return {
     challenge,
     remaining,
     running,
     setRunning,
-    setRemaining,
+    setRemaining: (value: number) => {
+      remainingRef.current = value;
+      setRemaining(value);
+    },
     isShuffling,
     shuffleDisplay,
     completionStage,
