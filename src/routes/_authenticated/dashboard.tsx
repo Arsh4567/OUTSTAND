@@ -8,6 +8,7 @@ import { useDailyLog } from "@/hooks/use-dopamine";
 import { DashboardWelcome, DashboardMomentum, DashboardHabits, DashboardActivity } from "@/components/dashboard/DashboardSections";
 import { DashboardAISection } from "@/components/dashboard/DashboardAISection";
 import { RoadmapDailyPath } from "@/components/dashboard/RoadmapDailyPath";
+import type { RoadmapProgress } from "@/hooks/useDashboard";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: DashboardPage });
 
@@ -25,13 +26,14 @@ function DashboardPage() {
   const completedHabits = habits.filter((habit) => habit.history?.includes(today)).length;
   const focusMinutes = sessions.filter((session) => session.completed).reduce((sum, session) => sum + Math.max(0, session.durationMin || 0), 0);
   const nextMission = snapshot.missions.find((mission) => !mission.completed);
+  const roadmapProgress: RoadmapProgress | null = snapshot.roadmapProgress;
 
   return <MotionConfig reducedMotion="user">
     <div className="relative min-h-screen overflow-x-hidden bg-[#05070d] text-slate-100">
       <div className="pointer-events-none fixed inset-0 overflow-hidden"><div className="absolute left-[12%] top-[-18rem] h-[42rem] w-[42rem] rounded-full bg-cyan-500/[0.055] blur-[130px]" /><div className="absolute right-[-14rem] top-[28%] h-[34rem] w-[34rem] rounded-full bg-violet-500/[0.045] blur-[130px]" /><div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.014)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.014)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:linear-gradient(to_bottom,black,transparent_78%)]" /></div>
       <main className="relative z-10 mx-auto w-full max-w-none space-y-5 px-4 pb-20 pt-6 sm:px-6 lg:px-8 lg:pt-9 xl:px-0">
         <DashboardWelcome name={name} quote={snapshot.quote} />
-        <DashboardAISection habits={habits} sessions={sessions} completedHabits={completedHabits} focusMinutes={focusMinutes} bestStreak={bestStreak} nextMission={nextMission} name={name} level={snapshot.level} xp={Math.max(xp, snapshot.totalXp)} />
+        <DashboardAISection habits={habits} sessions={sessions} completedHabits={completedHabits} focusMinutes={focusMinutes} bestStreak={bestStreak} nextMission={nextMission} name={name} level={snapshot.level} xp={Math.max(xp, snapshot.totalXp)} roadmapProgress={roadmapProgress} />
         <DashboardMomentum xp={Math.max(xp, snapshot.totalXp)} level={snapshot.level} xpPct={snapshot.xpPct} streak={Math.max(bestStreak, snapshot.streak)} completedHabits={completedHabits} habitCount={habits.length} focusMinutes={focusMinutes} />
         <div className="grid gap-5 lg:grid-cols-2 2xl:grid-cols-[1.08fr_0.92fr]">
           <DashboardHabits habits={habits} onToggle={toggleToday} />
