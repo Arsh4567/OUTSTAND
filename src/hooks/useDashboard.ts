@@ -75,6 +75,12 @@ export function useDashboard() {
     const meta = session.user.user_metadata || {};
     const rawName = meta.display_name || meta.full_name || meta.first_name || meta.username || session.user.email?.split("@")[0] || "there";
     setSnapshot((prev) => ({ ...prev, userName: String(rawName).trim().split(/\s+/)[0] || "there" }));
+
+    // The roadmap is the source of truth for today's missions. This RPC is idempotent,
+    // so opening/refreshing the dashboard never creates duplicate missions.
+    await supabase.rpc("sync_ai_roadmap_today_missions" as never);
+    if (signal?.aborted) return;
+
     const localDate = new Date().toISOString().slice(0, 10);
     const [statsResult, questsResult] = await Promise.allSettled([
       ensureStats(session.user.id),
