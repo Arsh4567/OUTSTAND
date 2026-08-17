@@ -1,4 +1,10 @@
-import type { AppContext } from "@/components/chat-assistant";
+export type AppContext = {
+  habits: { completed: boolean }[];
+  xp: number;
+  streak: number;
+  dopamineScore?: number | null;
+  focusSessions: number;
+};
 
 export type IntelligenceSignal = {
   id: string;
