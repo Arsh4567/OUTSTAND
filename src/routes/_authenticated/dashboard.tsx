@@ -9,6 +9,7 @@ import { DashboardWelcome, DashboardMomentum, DashboardHabits, DashboardActivity
 import { DashboardAISection } from "@/components/dashboard/DashboardAISection";
 import { RoadmapDailyPath } from "@/components/dashboard/RoadmapDailyPath";
 import { RoadmapProgressHistory } from "@/components/dashboard/RoadmapProgressHistory";
+import { OutstandMotionCore } from "@/components/outstand/OutstandMotionCore";
 import type { RoadmapProgress } from "@/hooks/useDashboard";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: DashboardPage });
@@ -32,6 +33,7 @@ function DashboardPage() {
   return <MotionConfig reducedMotion="user">
     <div className="relative min-h-screen overflow-x-hidden bg-[#05070d] text-slate-100">
       <div className="pointer-events-none fixed inset-0 overflow-hidden"><div className="absolute left-[12%] top-[-18rem] h-[42rem] w-[42rem] rounded-full bg-cyan-500/[0.055] blur-[130px]" /><div className="absolute right-[-14rem] top-[28%] h-[34rem] w-[34rem] rounded-full bg-violet-500/[0.045] blur-[130px]" /><div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.014)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.014)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:linear-gradient(to_bottom,black,transparent_78%)]" /></div>
+      <div className="pointer-events-none fixed right-6 top-24 z-[1] hidden opacity-80 lg:block"><OutstandMotionCore size="lg" /></div>
       <main className="relative z-10 mx-auto w-full max-w-none space-y-5 px-4 pb-20 pt-6 sm:px-6 lg:px-8 lg:pt-9 xl:px-0">
         <DashboardWelcome name={name} quote={snapshot.quote} />
         <DashboardAISection habits={habits} sessions={sessions} completedHabits={completedHabits} focusMinutes={focusMinutes} bestStreak={bestStreak} nextMission={nextMission} name={name} level={snapshot.level} xp={Math.max(xp, snapshot.totalXp)} roadmapProgress={roadmapProgress} />
