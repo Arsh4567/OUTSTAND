@@ -10,9 +10,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const authorization = req.headers.authorization;
   if (!authorization?.startsWith("Bearer ")) return res.status(401).json({ error: "Authentication required" });
 
-  // Keep server-side notification delivery on the exact Supabase project used
-  // by the browser. A stale SUPABASE_URL can otherwise create a split-brain
-  // setup where Auth succeeds but push_subscriptions appears empty.
   const url = env("VITE_SUPABASE_URL", "SUPABASE_URL");
   const publishable = env("VITE_SUPABASE_PUBLISHABLE_KEY", "SUPABASE_PUBLISHABLE_KEY");
   const serviceRole = env("SUPABASE_SERVICE_ROLE_KEY");
@@ -66,7 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!subs?.length) return res.status(404).json({ error: "No active push subscription found" });
 
   webpush.setVapidDetails(env("VAPID_SUBJECT") || "mailto:notifications@outstand.app", vapidPublic, vapidPrivate);
-  const payload = JSON.stringify({ title, body: message, icon: "/icon-192x192.png", badge: "/badge-72x72.png", url: targetUrl, tag: dedupeKey || `outstand-${category}` });
+  const payload = JSON.stringify({ title, body: message, icon: "/outstand-logo.png", badge: "/outstand-logo.png", url: targetUrl, tag: dedupeKey || `outstand-${category}`, renotify: true });
   let sent = 0;
   for (const sub of subs) {
     try {
