@@ -30,8 +30,6 @@ const categories: Category[] = [
   { id: "custom", label: "Something else", description: "A goal that does not fit the categories above" },
 ];
 
-const difficultyOptions = ["Gentle", "Balanced", "Challenging"];
-
 export function AIRoadmapBuilder({ habits, name, level, xp, streak, onClose, onPlanCreated }: { habits: Habit[]; name: string; level: number; xp: number; streak: number; onClose: () => void; onPlanCreated: (plan: Plan) => void }) {
   const [category, setCategory] = useState("academics");
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -42,12 +40,8 @@ export function AIRoadmapBuilder({ habits, name, level, xp, streak, onClose, onP
   const [step, setStep] = useState<"category" | "interview" | "plan">("category");
 
   const selectedCategory = useMemo(() => categories.find((item) => item.id === category) ?? categories[0], [category]);
-  // Keep every question mounted while the user types. The previous implementation
-  // filtered answered questions out of the render tree, so the first character made
-  // the field disappear and appear to lose focus/value.
-  const visibleQuestions = questions;
-  const unansweredRequired = questions.filter((question) => question.required && !answers[question.id]?.trim());
-  const answeredCount = questions.filter((question) => Boolean(answers[question.id]?.trim())).length;
+  const unansweredQuestions = questions.filter((question) => !answers[question.id]?.trim());
+  const answeredCount = questions.length - unansweredQuestions.length;
 
   useEffect(() => {
     setQuestions([]);
@@ -93,8 +87,9 @@ export function AIRoadmapBuilder({ habits, name, level, xp, streak, onClose, onP
   }
 
   function askNext() {
-    if (unansweredRequired.length > 0) {
-      setError(`Please answer: ${unansweredRequired[0].question}`);
+    const missingRequired = questions.find((question) => question.required && !answers[question.id]?.trim());
+    if (missingRequired) {
+      setError(`Please answer: ${missingRequired.question}`);
       return;
     }
     void callRoadmap("questions");
@@ -117,7 +112,7 @@ export function AIRoadmapBuilder({ habits, name, level, xp, streak, onClose, onP
 
           {step === "interview" && <motion.div key="interview" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}>
             <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-300">AI interview · {selectedCategory.label}</p><h3 className="mt-2 text-2xl font-black tracking-tight text-white">Let's make this specific to you.</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Answer honestly. The AI will ask follow-up questions when your answer changes what the roadmap should look like.</p></div><div className="rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2 text-[10px] font-bold text-slate-500">{answeredCount} answered</div></div>
-            {questions.length === 0 ? <div className="mt-10 flex items-center justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-cyan-300" /><span className="ml-3 text-sm text-slate-400">AI is preparing the right questions…</span></div> : <div className="mt-7 space-y-4">{visibleQuestions.map((question) => <QuestionField key={question.id} question={question} value={answers[question.id] ?? ""} onChange={(value) => setAnswers((current) => ({ ...current, [question.id]: value }))} />)}</div>}
+            {questions.length === 0 ? <div className="mt-10 flex items-center justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-cyan-300" /><span className="ml-3 text-sm text-slate-400">AI is preparing the right questions…</span></div> : <div className="mt-7 space-y-4">{questions.map((question) => <QuestionField key={question.id} question={question} value={answers[question.id] ?? ""} onChange={(value) => setAnswers((current) => ({ ...current, [question.id]: value }))} />)}</div>}
             {error && <p className="mt-4 rounded-xl border border-red-300/10 bg-red-300/[0.04] px-4 py-3 text-sm text-red-200">{error}</p>}
           </motion.div>}
 
