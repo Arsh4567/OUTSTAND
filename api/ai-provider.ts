@@ -42,9 +42,7 @@ export async function getAIProvider(preferred?: AIProviderName): Promise<Provide
 }
 
 export function modelFor(providerName: AIProviderName, provider: any, task: "chat" | "roadmap") {
-  if (providerName === "groq") {
-    return provider(task === "chat" ? "openai/gpt-oss-20b" : "openai/gpt-oss-120b");
-  }
+  if (providerName === "groq") return provider(task === "chat" ? "llama-3.1-8b-instant" : "openai/gpt-oss-20b");
   return provider("gemini-2.5-flash-lite");
 }
 
