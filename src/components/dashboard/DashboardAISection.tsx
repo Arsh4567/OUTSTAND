@@ -11,22 +11,45 @@ export function DashboardAISection({ habits, sessions, completedHabits, focusMin
   const [builderOpen, setBuilderOpen] = useState(false);
   const [plan, setPlan] = useState<AIRoadmapPlan | null>(null);
   const [loadingSavedPlan, setLoadingSavedPlan] = useState(true);
+  const [adapting, setAdapting] = useState(false);
+  const [adaptationNote, setAdaptationNote] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     async function loadSavedRoadmap() {
       setLoadingSavedPlan(true);
       const { data, error } = await supabase.from("ai_roadmaps").select("plan").eq("is_active", true).order("updated_at", { ascending: false }).limit(1).maybeSingle();
-      if (!cancelled) {
-        if (error) console.warn("[OUTSTAND] Could not load saved AI roadmap:", error.message);
-        const savedPlan = data?.plan;
-        if (savedPlan && typeof savedPlan === "object" && !Array.isArray(savedPlan)) setPlan(savedPlan as unknown as AIRoadmapPlan);
-        setLoadingSavedPlan(false);
+      if (cancelled) return;
+      if (error) console.warn("[OUTSTAND] Could not load saved AI roadmap:", error.message);
+      const savedPlan = data?.plan;
+      if (savedPlan && typeof savedPlan === "object" && !Array.isArray(savedPlan)) setPlan(savedPlan as unknown as AIRoadmapPlan);
+      setLoadingSavedPlan(false);
+
+      if (!savedPlan) return;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) return;
+      setAdapting(true);
+      try {
+        const response = await fetch("/api/roadmap", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ mode: "adapt", category: "custom", answers: {}, habits: habits.map((h) => ({ id: h.id, name: h.name, emoji: h.emoji })), context: { name, level, xp, streak: bestStreak } }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!cancelled && response.ok && result.plan && typeof result.plan === "object") {
+          setPlan(result.plan as AIRoadmapPlan);
+          if (result.changed && result.reason) setAdaptationNote(result.reason);
+        }
+      } catch (adaptError) {
+        console.warn("[OUTSTAND] Roadmap adaptation check failed:", adaptError);
+      } finally {
+        if (!cancelled) setAdapting(false);
       }
     }
     void loadSavedRoadmap();
     return () => { cancelled = true; };
-  }, []);
+  }, [bestStreak, habits, level, name, xp]);
 
   return <>
     <section className={`${panel} relative overflow-hidden p-5 sm:p-7`}>
@@ -47,7 +70,7 @@ export function DashboardAISection({ habits, sessions, completedHabits, focusMin
         {habits.length > 0 && <div className="mt-5 border-t border-white/[0.07] pt-5"><p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-600">Habits you selected</p><div className="mt-3 flex flex-wrap gap-2">{habits.map((habit) => <span key={habit.id} className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.07] bg-black/10 px-3 py-1.5 text-xs font-bold text-slate-300">{habit.emoji} {habit.name}</span>)}</div></div>}
 
         {loadingSavedPlan && <div className="mt-5 rounded-2xl border border-white/[0.07] bg-black/10 p-4"><p className="text-xs text-slate-500">Loading your saved roadmap…</p></div>}
-        {!loadingSavedPlan && plan && <div className="mt-5 rounded-2xl border border-cyan-300/10 bg-cyan-300/[0.025] p-4"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-cyan-300" /><p className="text-sm font-black text-white">{plan.title}</p></div><p className="mt-1 text-xs leading-5 text-slate-500">{plan.durationDays} days · {plan.difficulty} · saved to your account</p></div><div className="flex items-center gap-3"><div className="min-w-[150px]"><div className="flex items-center justify-between text-[9px] font-black uppercase tracking-[0.14em] text-slate-600"><span>{roadmapProgress ? `Day ${roadmapProgress.day}` : "Ready"}</span><span>{Math.round(roadmapProgress?.completionPct ?? 0)}%</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/5"><div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-violet-400 transition-all" style={{ width: `${Math.min(100, Math.max(0, roadmapProgress?.completionPct ?? 0))}%` }} /></div></div><button type="button" onClick={() => setBuilderOpen(true)} className="inline-flex items-center gap-1 text-left text-[10px] font-black uppercase tracking-[0.16em] text-cyan-300 hover:text-cyan-200">Refine <TrendingUp className="h-3.5 w-3.5" /></button></div></div><div className="mt-4 grid grid-cols-3 gap-2"><ProgressStat label="Day" value={String(roadmapProgress?.day ?? 1)} /><ProgressStat label="Done" value={String(roadmapProgress?.completed ?? 0)} /><ProgressStat label="Today's missions" value={String(roadmapProgress?.total ?? 0)} /></div></div>}
+        {!loadingSavedPlan && plan && <div className="mt-5 rounded-2xl border border-cyan-300/10 bg-cyan-300/[0.025] p-4"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-cyan-300" /><p className="text-sm font-black text-white">{plan.title}</p></div><p className="mt-1 text-xs leading-5 text-slate-500">{plan.durationDays} days · {plan.difficulty} · saved to your account</p></div><div className="flex items-center gap-3"><div className="min-w-[150px]"><div className="flex items-center justify-between text-[9px] font-black uppercase tracking-[0.14em] text-slate-600"><span>{roadmapProgress ? `Day ${roadmapProgress.day}` : "Ready"}</span><span>{Math.round(roadmapProgress?.completionPct ?? 0)}%</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/5"><div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-violet-400 transition-all" style={{ width: `${Math.min(100, Math.max(0, roadmapProgress?.completionPct ?? 0))}%` }} /></div></div><button type="button" onClick={() => setBuilderOpen(true)} className="inline-flex items-center gap-1 text-left text-[10px] font-black uppercase tracking-[0.16em] text-cyan-300 hover:text-cyan-200">Refine <TrendingUp className="h-3.5 w-3.5" /></button></div></div><div className="mt-4 grid grid-cols-3 gap-2"><ProgressStat label="Day" value={String(roadmapProgress?.day ?? 1)} /><ProgressStat label="Done" value={String(roadmapProgress?.completed ?? 0)} /><ProgressStat label="Today's missions" value={String(roadmapProgress?.total ?? 0)} /></div>{(adapting || adaptationNote) && <div className="mt-3 rounded-xl border border-violet-300/10 bg-violet-300/[0.035] px-3 py-2 text-[10px] font-semibold text-violet-200/80">{adapting ? "AI is checking your recent performance and adjusting future work…" : `Adaptive update: ${adaptationNote}`}</div>}</div>}
       </div>
     </section>
 
