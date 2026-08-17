@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { generateText } from "ai";
 import { createClient } from "@supabase/supabase-js";
-import { getAIProvider, isRateLimitError, modelFor } from "./ai-provider";
+import { getAIProvider, isRateLimitError, modelFor } from "./ai-provider.js";
 
 const env = (...names: string[]) => names.map((name) => process.env[name]).find((value) => typeof value === "string" && value.trim().length > 0);
 function json(res: VercelResponse, status: number, data: unknown) { res.status(status).setHeader("Cache-Control", "no-store").json(data); }
@@ -57,7 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const context = input?.context && typeof input.context === "object" ? input.context : {};
     if (mode === "questions") {
       const answered = Object.entries(answers).map(([key, value]) => `${key}: ${String(value)}`).join("\n") || "No answers yet.";
-      const result = await ask(`Create the next 3 to 5 most useful questions for a ${category} goal. These questions must be based on the answers already given and must not repeat answered information. If this is the first turn, start with the goal, measurable outcome, timeline and the category-specific information that materially changes the plan. Return exactly {"questions":[{"id":"string","question":"string","type":"text|number|choice|multiline","required":true,"options":["..."],"placeholder":"..."}]}.\n\nAlready answered:\n${answered}\nSelected habits:\n${JSON.stringify(habits)}\nUser context:\n${JSON.stringify(context)}`);
+      const result = await ask(`Create the next 3 to 5 most useful questions for a ${category} goal. These questions must be based on the answers already given and must not repeat answered information. If this is the first turn, start with the goal, measurable outcome, timeline and the category-specific information that materially changes the plan. Return exactly {"questions":[{"id":"string","question":"string","type":"text|number|choice|multiline","required":true,"options":["..."],"placeholder":"..."}].\n\nAlready answered:\n${answered}\nSelected habits:\n${JSON.stringify(habits)}\nUser context:\n${JSON.stringify(context)}`);
       return json(res, 200, result);
     }
     if (mode === "plan") {
