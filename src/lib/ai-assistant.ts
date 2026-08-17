@@ -46,15 +46,12 @@ export async function checkAiHealth(accessToken?: string): Promise<AiHealth> {
 }
 
 export function formatAiError(error: unknown): string {
-  if (error instanceof Error) {
-    const message = error.message;
-    if (/NOT_FOUND|bom1::/i.test(message)) return "AI endpoint could not be reached. Please retry while the service recovers.";
-    if (/api key|apikey|configuration|configured/i.test(message)) return "AI service is not configured correctly on the server.";
-    return message;
+  const raw = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+
+  if (/429|quota|resource[_ -]?exhausted|rate[_ -]?limit|free[_ -]?tier/i.test(raw)) {
+    return "AI is temporarily rate-limited. Please try again after the quota window resets.";
   }
-  if (typeof error === "string") {
-    if (/NOT_FOUND|bom1::/i.test(error)) return "AI endpoint could not be reached. Please retry while the service recovers.";
-    return error;
-  }
-  return "An unexpected AI error occurred.";
+  if (/NOT_FOUND|bom1::/i.test(raw)) return "AI endpoint could not be reached. Please retry while the service recovers.";
+  if (/api key|apikey|configuration|configured/i.test(raw)) return "AI service is not configured correctly on the server.";
+  return raw || "An unexpected AI error occurred.";
 }
