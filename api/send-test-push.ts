@@ -14,8 +14,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const authorization = req.headers.authorization;
   if (!authorization?.startsWith("Bearer ")) return send(res, 401, { error: "Authentication required" });
 
-  // Prefer the VITE_* values used by the browser. This prevents a stale
-  // server-only SUPABASE_URL from pointing this function at a different DB.
   const supabaseUrl = env("VITE_SUPABASE_URL", "SUPABASE_URL");
   const publishableKey = env("VITE_SUPABASE_PUBLISHABLE_KEY", "SUPABASE_PUBLISHABLE_KEY");
   const serviceRoleKey = env("SUPABASE_SERVICE_ROLE_KEY");
@@ -41,8 +39,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const userId = authData.user.id;
-  console.log("[Push] authenticated user", userId, "supabase", new URL(supabaseUrl).hostname);
-
   const admin = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -68,11 +64,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ? { endpoint: candidate.endpoint, auth_key: candidate.keys.auth, p256dh_key: candidate.keys.p256dh }
     : null;
 
-  console.log("[Push] subscription lookup", { userId, count: subs?.length ?? 0, hasDirectSubscription: Boolean(directSubscription) });
-
-  // The browser is the source of truth for the device currently being tested.
-  // If production's server-side DB is temporarily out of sync, send directly
-  // to that active subscription instead of falsely reporting "none found".
   const deliverySubscriptions = subs?.length
     ? subs.map((sub) => ({ endpoint: sub.endpoint, auth_key: sub.auth_key, p256dh_key: sub.p256dh_key, id: sub.id }))
     : directSubscription
@@ -85,13 +76,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   webpush.setVapidDetails(env("VAPID_SUBJECT") || "mailto:notifications@outstand.app", publicKey, privateKey);
 
+  // Keep the payload deliberately clean and app-branded. Android/Brave controls
+  // the surrounding notification card, but these values control the OUTSTAND
+  // identity shown inside it.
   const payload = JSON.stringify({
-    title: "OUTSTAND 🤖",
-    body: "Your notifications are working. You're ready for smarter reminders! 🎉",
-    icon: "/icon-192x192.png",
-    badge: "/badge-72x72.png",
+    title: "OUTSTAND",
+    body: "Push notifications are working. Your smarter reminders are ready.",
+    icon: "/outstand-logo.png",
+    badge: "/outstand-logo.png",
     url: "/",
     tag: "outstand-test",
+    renotify: true,
   });
 
   let sent = 0;
@@ -119,6 +114,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  if (sent > 0) return send(res, 200, { success: true, sent, usedDirectSubscription: !subs?.length && Boolean(directSubscription) });
+  if (sent > 0) return send(res, 200, { success: true, sent });
   return send(res, 502, { error: "All push deliveries failed", sent: 0, failures });
 }
