@@ -1,5 +1,3 @@
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-
 const env = (...names: string[]) => names.map((name) => process.env[name]).find((value) => typeof value === "string" && value.trim().length > 0);
 
 export type AIProviderName = "groq" | "gemini";
@@ -9,16 +7,22 @@ type ProviderResult = {
   provider: any;
 };
 
+/**
+ * Resolve AI providers only after a request reaches the function.
+ * Do not import provider packages at module scope: a serverless module-load
+ * failure happens before our handler can catch it and Vercel reports only
+ * FUNCTION_INVOCATION_FAILED.
+ */
 export async function getAIProvider(preferred?: AIProviderName): Promise<ProviderResult> {
   const groqKey = env("GROQ_API_KEY");
   const geminiKey = env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY");
-  const order: AIProviderName[] = preferred ? [preferred, preferred === "groq" ? "gemini" : "groq"] : ["groq", "gemini"];
+  const order: AIProviderName[] = preferred
+    ? [preferred, preferred === "groq" ? "gemini" : "groq"]
+    : ["groq", "gemini"];
 
   for (const providerName of order) {
     if (providerName === "groq" && groqKey) {
       try {
-        // Load the OpenAI-compatible adapter only when Groq is actually selected.
-        // This keeps the serverless module graph safe when a deployment has no Groq key.
         const { createOpenAICompatible } = await import("@ai-sdk/openai-compatible");
         return {
           name: "groq",
@@ -35,7 +39,16 @@ export async function getAIProvider(preferred?: AIProviderName): Promise<Provide
     }
 
     if (providerName === "gemini" && geminiKey) {
-      return { name: "gemini", provider: createGoogleGenerativeAI({ apiKey: geminiKey }) };
+      try {
+        const { createGoogleGenerativeAI } = await import("@ai-sdk/google");
+        return {
+          name: "gemini",
+          provider: createGoogleGenerativeAI({ apiKey: geminiKey }),
+        };
+      } catch (error) {
+        console.error("Gemini provider initialization failed:", error);
+        if (preferred === "gemini") throw error;
+      }
     }
   }
 
