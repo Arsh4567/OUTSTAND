@@ -1,20 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
-import {
-  Menu,
-  X,
-  Home,
-  Trophy,
-  ShieldAlert,
-  Timer,
-  Zap,
-  Brain,
-  BookOpen,
-  Sparkles,
-  ChevronRight,
-  Bot,
-} from "lucide-react";
+import { Menu, X, Home, Trophy, ShieldAlert, Timer, Zap, Brain, BookOpen, Sparkles, ChevronRight, Bot } from "lucide-react";
 import { useAuth, displayNameOf } from "@/hooks/use-auth";
 import { useAppState } from "@/hooks/use-app-state";
 import { levelFromXP } from "@/lib/habits";
@@ -23,7 +10,7 @@ import { AppSettingsSheet } from "@/components/app-settings-sheet";
 import { ChatAssistant } from "@/components/chat-assistant";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Dashboard", icon: Home },
+  { to: "/dashboard", label: "Dashboard", icon: Home },
   { to: "/study", label: "Study Hub", icon: BookOpen },
   { to: "/focus", label: "Focus", icon: Timer },
   { to: "/dopamine", label: "Dopamine", icon: Brain },
@@ -40,7 +27,6 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { user, profile } = useAuth();
   const { xp } = useAppState();
-
   const safeXp = xp || 0;
   const { level } = levelFromXP(safeXp);
   const safeName = displayNameOf(user, profile) || "Student";
@@ -48,19 +34,12 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
+    return () => { document.body.style.overflow = ""; };
   }, [isOpen]);
 
-  useEffect(() => {
-    setIsOpen(false);
-  }, [pathname]);
+  useEffect(() => { setIsOpen(false); }, [pathname]);
 
-  const openAssistant = () => {
-    setIsOpen(false);
-    setAiOpen(true);
-  };
+  const openAssistant = () => { setIsOpen(false); setAiOpen(true); };
 
   return (
     <MotionConfig reducedMotion="user">
@@ -71,7 +50,7 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
               <motion.button type="button" whileTap={{ scale: 0.94 }} whileHover={{ scale: 1.03 }} onClick={() => setIsOpen(true)} aria-label="Open navigation" aria-expanded={isOpen} className="group grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-white/[0.04] text-slate-300 shadow-lg shadow-black/10 transition hover:border-cyan-400/20 hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">
                 <Menu className="h-5 w-5 transition-transform duration-300 group-hover:scale-105" />
               </motion.button>
-              <Link to="/" className="group hidden items-center gap-3 sm:flex" aria-label="Go to dashboard">
+              <Link to="/dashboard" className="group hidden items-center gap-3 sm:flex" aria-label="Go to dashboard">
                 <div className="relative grid h-9 w-9 place-items-center overflow-hidden rounded-xl border border-cyan-300/20 bg-gradient-to-br from-cyan-400/20 via-blue-500/20 to-fuchsia-500/20 shadow-[0_0_24px_rgba(34,211,238,0.12)]"><Sparkles className="relative z-10 h-4 w-4 text-cyan-200 transition-transform duration-500 group-hover:rotate-12 group-hover:scale-110" /><div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-70" /></div>
                 <div className="leading-none"><div className="text-[11px] font-black uppercase tracking-[0.34em] text-slate-500">Outstand</div><div className="mt-1 text-[10px] font-semibold tracking-[0.16em] text-slate-400">PERSONAL OS</div></div>
               </Link>
@@ -98,7 +77,7 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
                 <Link to="/profile" className="group relative z-10 mx-4 mt-4 flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.035] p-3 transition hover:border-cyan-300/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"><div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-cyan-300/20 bg-cyan-950/50">{profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" /> : <div className="grid h-full w-full place-items-center text-sm font-black text-cyan-200">{initial}</div>}<span className="absolute bottom-1 right-1 h-2.5 w-2.5 rounded-full border-2 border-[#07101a] bg-emerald-400 shadow-[0_0_9px_rgba(52,211,153,0.8)]" /></div><div className="min-w-0 flex-1"><div className="truncate text-base font-black text-white group-hover:text-cyan-200">{safeName}</div><div className="mt-1 flex items-center gap-2"><span className="rounded-full border border-cyan-300/15 bg-cyan-300/8 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.16em] text-cyan-200">Level {level}</span><span className="text-[10px] font-medium text-slate-500">Personal space</span></div></div><ChevronRight className="h-4 w-4 text-slate-600 transition group-hover:translate-x-0.5 group-hover:text-slate-300" /></Link>
                 <nav className="relative z-10 flex-1 overflow-y-auto px-4 py-6" aria-label="Main navigation"><div className="mb-3 px-3 text-[10px] font-black uppercase tracking-[0.24em] text-slate-600">Workspace</div><div className="space-y-1.5">
                   {NAV_ITEMS.map((item, index) => {
-                    const isActive = pathname === item.to || (item.to !== "/" && pathname.startsWith(item.to));
+                    const isActive = pathname === item.to || (item.to !== "/dashboard" && pathname.startsWith(item.to));
                     if (item.action === "ai") {
                       return <motion.div key={item.to} initial={{ opacity: 0, x: -14 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.04 + index * 0.035, duration: 0.28, ease: customEase }}><button type="button" onClick={openAssistant} className={cn("group relative flex w-full items-center gap-3 overflow-hidden rounded-2xl border px-3 py-3 text-left transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70", isActive ? "border-cyan-300/15 bg-gradient-to-r from-cyan-400/10 via-blue-500/[0.06] to-transparent" : "border-transparent hover:border-white/8 hover:bg-white/[0.045]")}><div className={cn("grid h-10 w-10 place-items-center rounded-xl border transition-all", isActive ? "border-cyan-300/15 bg-cyan-300/10 text-cyan-200" : "border-white/7 bg-white/[0.025] text-slate-500 group-hover:border-white/10 group-hover:bg-white/[0.05] group-hover:text-slate-200")}><Bot className="h-[18px] w-[18px]" /></div><div className="min-w-0 flex-1"><div className={cn("text-sm font-bold", isActive ? "text-white" : "text-slate-300 group-hover:text-white")}>Intelligence</div><div className={cn("mt-0.5 text-[10px] font-medium", isActive ? "text-cyan-200/70" : "text-slate-600 group-hover:text-slate-500")}>Open AI assistant</div></div><ChevronRight className={cn("h-4 w-4 transition-all", isActive ? "text-cyan-200/70" : "text-slate-700 group-hover:translate-x-0.5 group-hover:text-slate-500")} /></button></motion.div>;
                     }
@@ -118,8 +97,6 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
             </>
           )}
         </AnimatePresence>
-
-        <ChatAssistant openSignal={aiOpen} onOpenSignalHandled={() => setAiOpen(false)} />
       </div>
     </MotionConfig>
   );
