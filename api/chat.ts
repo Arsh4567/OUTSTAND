@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 import { convertToModelMessages, pipeUIMessageStreamToResponse, streamText, type UIMessage } from "ai";
-import { getAIProvider, isRateLimitError, modelFor } from "./ai-provider";
+import { getAIProvider, isRateLimitError, modelFor } from "./ai-provider.js";
 
 const env = (...names: string[]) => names.map((name) => process.env[name]).find((value) => typeof value === "string" && value.trim().length > 0);
 function sendJson(res: VercelResponse, status: number, data: unknown) { res.status(status).setHeader("Cache-Control", "no-store").json(data); }
