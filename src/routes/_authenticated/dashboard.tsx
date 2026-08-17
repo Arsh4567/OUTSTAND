@@ -8,6 +8,7 @@ import { useDailyLog } from "@/hooks/use-dopamine";
 import { DashboardWelcome, DashboardMomentum, DashboardHabits, DashboardActivity } from "@/components/dashboard/DashboardSections";
 import { DashboardAISection } from "@/components/dashboard/DashboardAISection";
 import { RoadmapDailyPath } from "@/components/dashboard/RoadmapDailyPath";
+import { RoadmapProgressHistory } from "@/components/dashboard/RoadmapProgressHistory";
 import type { RoadmapProgress } from "@/hooks/useDashboard";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: DashboardPage });
@@ -39,6 +40,7 @@ function DashboardPage() {
           <DashboardHabits habits={habits} onToggle={toggleToday} />
           <RoadmapDailyPath missions={snapshot.missions} nextMission={nextMission} onCompleteMission={completeMission} />
         </div>
+        <RoadmapProgressHistory />
         <DashboardActivity sessions={sessions} outstand={outstand} dailyScore={log?.score ?? null} />
       </main>
     </div>
