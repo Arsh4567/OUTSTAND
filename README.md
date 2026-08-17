@@ -1,19 +1,17 @@
-# Outstand
-
 <div align="center">
 
-### Turn focus into momentum.
+# OUTSTAND
 
-**Outstand** is a premium productivity and habit-building experience built around focused work, daily consistency, gamification, and immersive interaction.
+### Turn attention into momentum.
 
-It combines a distraction-resistant focus workflow with XP, levels, streaks, daily missions, progress visualization, and cinematic UI to make productive behavior feel clear, rewarding, and repeatable.
+**A cinematic productivity system for focus, consistency, and meaningful progress.**
 
 <p>
-  <a href="https://outstand-by-arsh.vercel.app"><strong>Live App</strong></a>
+  <a href="https://outstand-by-arsh.vercel.app"><strong>Launch OUTSTAND ↗</strong></a>
   ·
-  <a href="https://github.com/Arsh4567/OUTSTAND/issues">Issues</a>
+  <a href="https://github.com/Arsh4567/OUTSTAND/issues">Report an issue</a>
   ·
-  <a href="https://github.com/Arsh4567/OUTSTAND/pulls">Pull Requests</a>
+  <a href="https://github.com/Arsh4567/OUTSTAND/pulls">Contribute</a>
 </p>
 
 <p>
@@ -30,109 +28,135 @@ It combines a distraction-resistant focus workflow with XP, levels, streaks, dai
 
 ---
 
-## Overview
+## The idea
 
-Outstand is designed for people who want a stronger relationship with their attention.
+Most productivity tools are built around lists, timers, and reminders.
 
-Instead of treating productivity as a plain timer or checklist, the application turns progress into a visible system:
+**OUTSTAND is built around momentum.**
 
-- Focus sessions become intentional missions.
-- Completed habits contribute to XP and progression.
-- Streaks provide a simple signal of consistency.
-- The dashboard surfaces the next useful action instead of overwhelming users with information.
-- Immersive visual effects and micro-interactions make important moments feel rewarding without turning the interface into noise.
+It turns focused work and daily habits into a visible progression loop: complete meaningful actions, earn XP, maintain streaks, advance through levels, and watch your progress become tangible.
 
-The product is especially suited to students, creators, developers, and anyone building disciplined daily routines.
+The goal is not to make productivity feel like a game for the sake of gaming. The goal is to make **good behavior easier to see, easier to repeat, and more rewarding to sustain.**
 
-## Product Highlights
-
-### Focus Mode
-
-A focused workspace for completing a challenge without unnecessary distractions.
-
-### Gamified Progress
-
-Track XP, levels, streaks, daily missions, and completion progress so long-term consistency is easier to see.
-
-### Personalized Dashboard
-
-The dashboard greets users by their onboarding/sign-up name and acts as a personal command center for the day.
-
-### My City
-
-A visual progress layer that uses 3D rendering to turn growth into something users can see rather than only measure.
-
-### Cinematic Interaction
-
-Framer Motion and Three.js power carefully used transitions, portal effects, focus states, and reward moments.
-
-### Cloud-Backed State
-
-Supabase handles authentication and persistent user/productivity data, allowing progress to stay synchronized across sessions.
-
-### Responsive Experience
-
-The interface is designed to adapt across desktop and mobile layouts while keeping the primary actions obvious and accessible.
+> **Focus → Complete → Earn → Progress → Repeat**
 
 ---
 
-## Core Features
+## Why OUTSTAND feels different
 
-| Area | Capabilities |
+### 🎯 Focus over friction
+
+A dedicated focus experience keeps the next useful action front and center instead of turning productivity into dashboard archaeology.
+
+### ⚡ Progress you can feel
+
+XP, levels, streaks, missions, completion states, and visual feedback make consistency visible instead of abstract.
+
+### 🌆 Your progress has a world
+
+**My City** transforms progression into a 3D visual layer, giving users something more memorable than another percentage bar.
+
+### ✨ Motion with purpose
+
+Animations, portal transitions, hover states, loading feedback, and reward moments are designed to reinforce state changes—not compete with the task.
+
+### ☁️ Built around persistent state
+
+Authentication and application data are backed by Supabase so a user's progress can survive sessions and stay synchronized with the product.
+
+### 📱 Designed for the real world
+
+Responsive layouts and clear primary actions keep the experience useful across desktop and mobile screens.
+
+---
+
+## Product surface
+
+| Experience | What it does |
 | --- | --- |
-| Authentication | Email/password authentication, Google sign-in, onboarding profile setup |
-| Dashboard | Personalized greeting, XP, level, streak, daily missions, progress pulse, quick actions |
-| Focus | Dedicated focus workflow, challenge generation, timers, completion states |
-| Habits | Daily quests, completion tracking, XP rewards, optimistic UI updates |
-| Progress | XP progression, levels, streaks, completion percentage, visual feedback |
-| 3D Experience | Three.js-based city and portal effects |
-| UX | Micro-animations, hover/tap states, loading states, toast feedback |
-| Data | Supabase authentication, profile metadata, stats, daily quest persistence |
-| Deployment | Vercel-ready production build |
+| **Dashboard** | Personalized home base for XP, levels, streaks, missions, progress, and quick actions |
+| **Focus** | Dedicated workflow for focused challenges and completion states |
+| **Outstand** | Challenge-driven productivity flow connected to the dashboard experience |
+| **Habits & Quests** | Daily actions, completion tracking, and XP rewards |
+| **Progression** | Levels, streaks, completion signals, and visual reinforcement |
+| **My City** | 3D progress visualization built with Three.js / React Three Fiber |
+| **Immersive UI** | Portal effects, transitions, micro-interactions, toasts, and visual feedback |
+| **Authentication** | Supabase-backed sign-in, onboarding, and profile state |
+| **AI Layer** | AI SDK integrations and assistant-oriented UI infrastructure already present in the stack |
 
 ---
 
-## Tech Stack
+## Experience architecture
 
-### Frontend
+```text
+                    ┌─────────────────────┐
+                    │       OUTSTAND      │
+                    │   Personal system   │
+                    │     for momentum    │
+                    └──────────┬──────────┘
+                               │
+          ┌────────────────────┼────────────────────┐
+          │                    │                    │
+          ▼                    ▼                    ▼
+     FOCUS LOOP          PROGRESS LOOP        WORLD LOOP
+          │                    │                    │
+   Missions / Focus      XP / Levels /       My City / 3D
+   Completion states     Streaks / Quests   Visual feedback
+          │                    │                    │
+          └────────────────────┼────────────────────┘
+                               ▼
+                      Consistent daily action
+```
 
-- React 19
-- TypeScript
-- TanStack Start / TanStack Router
-- Vite
-- Tailwind CSS 4
-- Radix UI primitives
-- Lucide React
+The codebase follows the same product philosophy: route-level flows are separated from reusable UI, hooks, integrations, and specialized visual engines.
 
-### Motion & Visuals
+---
 
-- Framer Motion
-- Motion
-- Three.js
-- React Three Fiber
-- React Three Drei
-- Custom WebGL / shader-based visual effects
+## Tech stack
 
-### Backend & Data
+### Core
 
-- Supabase Auth
-- Supabase database / realtime features
-- Supabase JavaScript client
+- **React 19** — component-driven UI
+- **TypeScript** — type-safe application code
+- **TanStack Start** — full-stack React application framework
+- **TanStack Router** — route and navigation architecture
+- **Vite** — development and build tooling
+- **Tailwind CSS 4** — utility-first styling
+- **Radix UI** — accessible UI primitives
+- **Lucide React** — iconography
 
-### Tooling
+### Motion & 3D
 
-- ESLint
-- Prettier
-- TypeScript
-- Bun / npm-compatible package workflows
+- **Framer Motion / Motion** — product motion and interaction states
+- **Three.js** — 3D rendering
+- **React Three Fiber** — React renderer for Three.js
+- **React Three Drei** — reusable 3D helpers
+- **Canvas / shader-style effects** — immersive visual layers
+
+### Data & product infrastructure
+
+- **Supabase Auth** — authentication
+- **Supabase** — persistent application state and backend services
+- **TanStack Query** — client-side data fetching and caching
+- **Zod** — runtime validation
+- **React Hook Form** — structured form state
+
+### AI & interactive systems
+
+- **Vercel AI SDK ecosystem**
+- **Google / Groq / OpenAI-compatible AI providers**
+- **CopilotKit UI infrastructure**
+- **Markdown, code, math, and streaming-oriented rendering support**
 
 ### Deployment
 
-- Vercel
+- **Vercel** — production deployment
+
+_Source of truth for the stack: [`package.json`](./package.json)._ 
 
 ---
 
-## Architecture at a Glance
+## Repository structure
 
 ```text
 src/
@@ -144,71 +168,71 @@ src/
 │       ├── outstand.tsx
 │       ├── focus.tsx
 │       └── ...
+│
 ├── components/
 │   ├── city/
 │   ├── outstand/
 │   ├── ai-elements/
 │   └── ui/
+│
 ├── hooks/
 │   ├── use-auth.ts
 │   ├── use-outstand.tsx
 │   └── ...
+│
 ├── lib/
 │   ├── portal-effect.ts
 │   └── ...
+│
 └── integrations/
     └── supabase/
 ```
 
-The application keeps route-level product flows separate from reusable UI, hooks, and visual engines. This makes it easier to evolve the dashboard and focus experience independently.
+This separation keeps product experiences, reusable components, application hooks, backend integrations, and visual effects maintainable as OUTSTAND grows.
 
 ---
 
-## Getting Started
+## Quick start
 
 ### Prerequisites
 
-Make sure you have:
-
-- Node.js 20+ or Bun
+- Node.js 20+ **or** Bun
 - A Supabase project
 - Git
 
-### 1. Clone the repository
+### 1. Clone
 
 ```bash
 git clone https://github.com/Arsh4567/OUTSTAND.git
 cd OUTSTAND
 ```
 
-### 2. Install dependencies
-
-Using Bun:
+### 2. Install
 
 ```bash
 bun install
 ```
 
-Or npm:
+Or:
 
 ```bash
 npm install
 ```
 
-### 3. Configure environment variables
+### 3. Configure environment
 
-Create a local environment file based on the variables used by your Supabase integration.
-
-Typical client-side values include:
+Create a local environment file with the Supabase values expected by the application.
 
 ```env
 VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_or_publishable_key
+VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_key
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_key
 ```
 
-> Never commit private keys, service-role keys, database passwords, or other secrets to the repository.
+> **Security:** never commit service-role keys, database passwords, private tokens, or other secrets.
 
-### 4. Start the development server
+### 4. Run locally
 
 ```bash
 bun run dev
@@ -220,150 +244,175 @@ Or:
 npm run dev
 ```
 
-The local development server will expose the app through the Vite/TanStack Start workflow configured in the project.
-
 ---
 
-## Available Scripts
+## Scripts
 
 | Command | Purpose |
 | --- | --- |
 | `bun run dev` | Start the development server |
 | `bun run build` | Create a production build |
 | `bun run build:vercel` | Build with the Vercel Nitro preset |
-| `bun run build:dev` | Build using development mode |
+| `bun run build:dev` | Build in development mode |
 | `bun run preview` | Preview the production build locally |
 | `bun run lint` | Run ESLint |
-| `bun run format` | Format the project with Prettier |
+| `bun run typecheck` | Run TypeScript checks |
+| `bun run format` | Format the repository with Prettier |
 
-If you use npm, replace `bun run` with `npm run`.
+Using npm? Replace `bun run` with `npm run`.
 
 ---
 
-## Supabase Setup
+## Supabase
 
-Outstand relies on Supabase for authentication and persisted application state.
+OUTSTAND uses Supabase as a core part of its product architecture.
 
-At a high level, the project uses Supabase for:
+The application uses the backend for authentication and persisted product state, including progression-oriented data and user-specific activity.
 
-1. User authentication and profile metadata.
-2. User progression and statistics.
-3. Daily quest assignments and completion state.
-4. Outstand/focus activity logging.
-5. Realtime updates for selected dashboard data.
-
-Your local Supabase project should match the schema and RPC functions expected by the application code.
+For local development, make sure your Supabase project matches the tables, policies, RPCs, and server/client expectations referenced by the application code.
 
 ---
 
 ## Deployment
 
-The repository is configured for Vercel-oriented deployment.
-
-A typical production flow is:
+OUTSTAND is configured for **Vercel + TanStack Start** deployment.
 
 ```text
-GitHub push to main
-        ↓
+Git push
+   ↓
 Vercel detects commit
-        ↓
+   ↓
 Install dependencies
-        ↓
-Production build
-        ↓
-Deploy
+   ↓
+bun run build:vercel
+   ↓
+TanStack Start server output
+   ↓
+Production deployment
 ```
 
-For deployment-specific guidance, see [`VERCEL_DEPLOYMENT.md`](./VERCEL_DEPLOYMENT.md).
+For the repository's exact deployment requirements, read [`VERCEL_DEPLOYMENT.md`](./VERCEL_DEPLOYMENT.md).
+
+The current deployment flow specifically accounts for server-rendered routes and refreshes on protected pages; Vercel should build the TanStack Start server output rather than treating the app as a static SPA.
 
 ---
 
-## Performance Principles
+## Design principles
 
-Outstand intentionally uses animation as product feedback rather than decoration everywhere.
+### 01 — Product clarity
 
-The project emphasizes:
+Every screen should make the next useful action obvious.
 
-- GPU-heavy effects only where they add meaningful value.
-- Short, purposeful micro-interactions.
-- Optimistic updates for responsive UI feedback.
-- Reusable components instead of duplicated visual logic.
-- Lazy or conditional rendering for immersive experiences.
-- Responsive layouts that avoid unnecessary work on smaller screens.
+### 02 — Motion as feedback
 
-When adding new visual effects, prefer a small number of high-quality interactions over many constantly running animations.
+Animation should explain state, reward completion, or guide attention—not create noise.
+
+### 03 — Progress should be tangible
+
+Numbers matter, but memorable visual feedback helps users understand momentum.
+
+### 04 — Optimistic interaction
+
+When safe, interfaces should acknowledge user intent immediately and synchronize persistent state afterward.
+
+### 05 — Responsive by default
+
+A premium experience should survive narrow screens, touch interactions, and less powerful hardware.
+
+### 06 — Build for maintainability
+
+Reusable components, focused hooks, typed data boundaries, and clear route structure matter as much as visual polish.
 
 ---
 
-## Project Status
+## Performance mindset
 
-Outstand is an actively evolving project.
+OUTSTAND uses rich motion and 3D rendering, so performance is treated as part of the product experience.
 
-Current product areas include:
+When extending the app, prefer:
 
-- Personalized onboarding
-- Dashboard command center
-- Focus / Outstand challenges
-- Habit and XP progression
-- Streak tracking
-- 3D visual progress systems
-- Immersive portal effects
+- Purposeful animation over continuously running effects.
+- Conditional or lazy rendering for expensive visual experiences.
+- Reusable primitives over duplicated visual logic.
+- Small, efficient data flows over unnecessary client work.
+- Responsive behavior that respects lower-powered devices.
+- Profiling before optimizing based on assumptions.
+
+**Premium UI should still feel fast.**
+
+---
+
+## Project status
+
+OUTSTAND is an actively evolving product and codebase.
+
+The repository currently contains a substantial foundation across:
+
+- Authentication and onboarding
+- Personalized dashboard experiences
+- Focus and Outstand workflows
+- Habit / quest progression
+- XP, levels, and streak-oriented state
+- 3D city and immersive visual systems
 - Supabase-backed persistence
+- AI-oriented UI and SDK infrastructure
+- Vercel deployment configuration
 
-Some advanced analytics, content systems, and additional integrations may continue to evolve as the product matures.
+The product is intentionally being built as a system that can expand without losing its core identity: **clear action, visible progress, and momentum.**
 
 ---
 
-## Roadmap
+## Roadmap direction
 
-Potential future improvements include:
+The exact roadmap will evolve with the product, but the north-star direction includes:
 
-- Deeper productivity analytics
-- More configurable focus sessions
-- Expanded achievement and reward systems
-- Better historical progress views
-- More interactive city/progress states
-- Accessibility refinements
-- Automated testing and stronger CI coverage
-- Performance profiling across low-end mobile devices
+- Deeper productivity analytics and history
+- More flexible focus workflows
+- Richer achievements and reward systems
+- More expressive city/progression states
+- Stronger accessibility coverage
+- Automated tests and broader CI confidence
+- Performance profiling across lower-end mobile hardware
+- More capable AI-assisted productivity workflows
 
 ---
 
 ## Contributing
 
-Contributions, bug reports, and thoughtful product feedback are welcome.
+OUTSTAND is open to thoughtful engineering and product feedback.
 
 Before opening a pull request:
 
-1. Keep changes focused and easy to review.
-2. Preserve existing product behavior unless the change intentionally updates it.
-3. Run linting and a production build when possible.
-4. Avoid committing secrets or generated local artifacts.
-5. Include enough context in the pull request description for someone else to understand the change.
+1. Keep the change focused.
+2. Preserve existing behavior unless the change intentionally modifies it.
+3. Run `bun run lint` and `bun run typecheck` where applicable.
+4. Run a production build for changes that affect routing, rendering, deployment, or shared infrastructure.
+5. Never commit secrets or generated local artifacts.
+6. Explain **why** the change matters, not only what files changed.
 
-For larger changes, open an issue first so the direction can be discussed before implementation.
+For large product changes, an issue or design discussion first can make implementation and review much smoother.
 
 ---
 
 ## Security
 
-Please do not commit credentials or sensitive configuration to the repository.
+Never publish credentials, private keys, service-role secrets, database passwords, or other sensitive configuration.
 
-If you discover a security issue, avoid posting exploitable details publicly. Contact the project maintainer privately so the issue can be investigated responsibly.
+For security-sensitive issues, use a private disclosure route rather than posting exploitable details publicly.
 
 ---
 
 ## License
 
-This project is currently presented as an MIT-licensed project. See the repository license file for the authoritative license text.
+See the repository's license file for the authoritative licensing terms.
 
 ---
 
 <div align="center">
 
-### Outstand
+### OUTSTAND
 
-**Build focus. Stack consistency. Become someone you're proud of.**
+**Focus with intention. Build with consistency. Become someone you're proud of.**
 
 Built by **Arsh**.
 
