@@ -2,11 +2,17 @@ name: Quality Gate
 
 on:
   pull_request:
-  push:
+  # Main-branch quality runs after the lockfile sync workflow completes.
+  # This prevents the initial push check from racing the lockfile update.
+  workflow_run:
+    workflows: ["Sync Bun lockfile"]
+    types: [completed]
     branches: [main]
 
 jobs:
   quality:
+    # Only validate successful lockfile-sync runs; PRs still run directly.
+    if: github.event_name == 'pull_request' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
