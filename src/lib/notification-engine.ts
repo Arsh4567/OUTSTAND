@@ -83,45 +83,25 @@ export async function getNotificationHistory(limit = 30) {
   return data ?? [];
 }
 
-/** Convert a VAPID public key from the usual base64url form into bytes.
- * Also tolerates accidental whitespace/quotes and standard base64 pasted into
- * an environment variable, so a malformed env value produces a useful error
- * instead of an opaque `atob` exception.
- */
 function base64UrlToUint8Array(value: string) {
   const cleaned = value.trim().replace(/^['"]|['"]$/g, "").replace(/\s+/g, "");
   if (!cleaned) throw new Error("VAPID public key is empty.");
-  if (!/^[A-Za-z0-9+/_-]+={0,2}$/.test(cleaned)) {
-    throw new Error("VAPID public key contains invalid characters.");
-  }
-
+  if (!/^[A-Za-z0-9+/_-]+={0,2}$/.test(cleaned)) throw new Error("VAPID public key contains invalid characters.");
   const base64 = cleaned.replace(/-/g, "+").replace(/_/g, "/");
   const remainder = base64.length % 4;
   if (remainder === 1) throw new Error("VAPID public key has an invalid length.");
   const padded = base64 + "=".repeat((4 - remainder) % 4);
-
   let binary: string;
-  try {
-    binary = atob(padded);
-  } catch {
-    throw new Error("VAPID public key is not valid base64/base64url. Check VITE_VAPID_PUBLIC_KEY in your deployment settings.");
-  }
-
+  try { binary = atob(padded); } catch { throw new Error("VAPID public key is not valid base64/base64url. Check VITE_VAPID_PUBLIC_KEY in your deployment settings."); }
   const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-  if (bytes.length !== 65 || bytes[0] !== 4) {
-    throw new Error("VAPID public key is invalid. It must be the 65-byte uncompressed public key generated for Web Push.");
-  }
+  if (bytes.length !== 65 || bytes[0] !== 4) throw new Error("VAPID public key is invalid. It must be the 65-byte uncompressed public key generated for Web Push.");
   return bytes;
 }
 
 export async function requestPushPermission() {
-  if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
-    throw new Error("Push notifications aren't supported by this browser.");
-  }
+  if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) throw new Error("Push notifications aren't supported by this browser.");
 
-  const permission = Notification.permission === "default"
-    ? await Notification.requestPermission()
-    : Notification.permission;
+  const permission = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
   if (permission !== "granted") throw new Error("Notification permission was not granted.");
 
   const { data: { session } } = await supabase.auth.getSession();
@@ -130,30 +110,17 @@ export async function requestPushPermission() {
   const registration = await navigator.serviceWorker.register("/sw.js").then(() => navigator.serviceWorker.ready);
   const vapid = import.meta.env.VITE_VAPID_PUBLIC_KEY;
   if (!vapid) throw new Error("Push notifications are not configured yet.");
-
   const applicationServerKey = base64UrlToUint8Array(vapid);
 
-  // If a subscription was created with an older VAPID key, replace it with
-  // one created from the currently deployed public key.
   const existing = await registration.pushManager.getSubscription();
   if (existing) await existing.unsubscribe();
 
-  const subscription = await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey,
-  });
+  const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
   const json = subscription.toJSON();
-  if (!json.endpoint || !json.keys?.auth || !json.keys?.p256dh) {
-    throw new Error("The browser returned an invalid push subscription.");
-  }
+  if (!json.endpoint || !json.keys?.auth || !json.keys?.p256dh) throw new Error("The browser returned an invalid push subscription.");
 
   const { error: subscriptionError } = await supabase.from("push_subscriptions").upsert(
-    {
-      user_id: session.user.id,
-      endpoint: json.endpoint,
-      auth_key: json.keys.auth,
-      p256dh_key: json.keys.p256dh,
-    },
+    { user_id: session.user.id, endpoint: json.endpoint, auth_key: json.keys.auth, p256dh_key: json.keys.p256dh },
     { onConflict: "user_id,endpoint" },
   );
   if (subscriptionError) {
@@ -178,6 +145,6 @@ export async function disablePushNotifications() {
 
 export function notifyWhileAppIsOpen(title: string, body: string, url = "/") {
   if (!("Notification" in window) || Notification.permission !== "granted") return;
-  const notification = new Notification(title, { body, icon: "/icon-192x192.png", badge: "/badge-72x72.png" });
+  const notification = new Notification(title, { body, icon: "/outstand-logo.png", badge: "/outstand-logo.png" });
   notification.onclick = () => { window.location.assign(url); };
 }
