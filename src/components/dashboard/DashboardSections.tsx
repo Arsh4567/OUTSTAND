@@ -1,57 +1,83 @@
-import type { ReactNode } from "react";
 import { motion } from "framer-motion";
-import { CheckCircle2, Flame, Target, Trophy, Zap, ArrowRight } from "lucide-react";
-import { XpBadge } from "@/components/xp-badge";
-import type { DashboardMission, DashboardSnapshot } from "@/hooks/useDashboard";
+import { ArrowRight, Brain, Check, Flame, Focus, Lightbulb, ListChecks, Sparkles, Target, Timer, Trophy, Zap } from "lucide-react";
+import type { Habit, FocusSession, OutstandCompletion } from "@/lib/habits";
+import type { DashboardMission } from "@/hooks/useDashboard";
 
 const ease = [0.22, 1, 0.36, 1] as const;
-const fadeUp = { hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0, transition: { duration: 0.45, ease } } };
+const panel = "rounded-[28px] border border-white/[0.08] bg-white/[0.035] shadow-[0_24px_80px_-56px_rgba(34,211,238,.45)] backdrop-blur-xl";
 
-function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_20px_80px_-50px_rgba(34,211,238,0.35)] backdrop-blur-xl sm:p-7 ${className}`}>{children}</div>;
+function initialsColor(index: number) {
+  const classes = ["border-cyan-300/15 bg-cyan-300/[0.07] text-cyan-200", "border-violet-300/15 bg-violet-300/[0.07] text-violet-200", "border-emerald-300/15 bg-emerald-300/[0.07] text-emerald-200", "border-amber-300/15 bg-amber-300/[0.07] text-amber-200"];
+  return classes[index % classes.length];
 }
 
-export function DashboardHero({ snapshot }: { snapshot: DashboardSnapshot }) {
-  return <motion.section variants={fadeUp} initial="hidden" animate="show" className="mb-7">
-    <div className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.28em] text-cyan-300/80"><Zap className="h-3.5 w-3.5" /> Personal command center</div>
-    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-      <div><h1 className="text-4xl font-black tracking-[-0.04em] text-white sm:text-5xl lg:text-6xl">Welcome back, <span className="bg-gradient-to-r from-cyan-300 via-white to-fuchsia-300 bg-clip-text text-transparent">{snapshot.userName}</span></h1><p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">One meaningful action at a time. Your momentum is built today, not someday.</p></div>
-      <div className="flex items-center gap-3"><div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3"><p className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-500">Current level</p><p className="mt-1 text-xl font-black text-white">{snapshot.level}</p></div><XpBadge xp={snapshot.totalXp} /></div>
-    </div>
+export function DashboardWelcome({ name, quote }: { name: string; quote: { quote: string; author: string } }) {
+  return <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55, ease }} className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+    <div className="max-w-3xl"><p className="text-[11px] font-black uppercase tracking-[0.28em] text-cyan-300/70">Welcome back</p><h1 className="mt-2 text-[2.35rem] font-black tracking-[-0.055em] text-white sm:text-5xl">{name}<span className="text-cyan-300">.</span></h1><div className="mt-4 flex max-w-2xl gap-3"><span className="mt-1 h-7 w-px shrink-0 bg-gradient-to-b from-cyan-300/70 to-transparent" /><div><p className="text-sm leading-6 text-slate-300">{quote.quote}</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600">{quote.author}</p></div></div></div>
+    <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-white/[0.07] bg-white/[0.025] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500"><span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,.7)]" /> Your day is live</div>
   </motion.section>;
 }
 
-export function DashboardStats({ snapshot }: { snapshot: DashboardSnapshot }) {
-  const stats = [[<Zap />, "Total XP", snapshot.totalXp.toLocaleString()], [<Trophy />, "Level", String(snapshot.level)], [<Flame />, "Streak", `${snapshot.streak}d`], [<Target />, "Missions", `${snapshot.completedCount}/${snapshot.missions.length}`]];
-  return <motion.section variants={fadeUp} initial="hidden" animate="show" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-    {stats.map(([icon, label, value]) => <div key={String(label)} className="rounded-2xl border border-white/10 bg-white/[0.035] p-4 transition-transform duration-300 hover:-translate-y-0.5 hover:bg-white/[0.055]"><div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-white/5 text-cyan-300">{icon}</span><div><p className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">{label}</p><p className="mt-0.5 text-lg font-black text-white">{value}</p></div></div></div>)}
+export function DashboardIntelligence({ habits, sessions, completedHabits, focusMinutes, bestStreak, nextMission }: { habits: Habit[]; sessions: FocusSession[]; completedHabits: number; focusMinutes: number; bestStreak: number; nextMission?: DashboardMission }) {
+  const hasSystem = habits.length > 0;
+  const weakHabit = habits.find((habit) => !habit.history?.includes(new Date().toISOString().slice(0, 10)));
+  const insight = !hasSystem
+    ? "You haven't built your personal system yet. Start with a few habits that actually matter to you, and OUTSTAND can turn them into a daily rhythm."
+    : completedHabits === habits.length
+      ? `You have completed every habit you selected today. Your next advantage is protecting the streak with one focused block.`
+      : weakHabit
+        ? `${weakHabit.name} is still open today. Completing it would close one of the gaps in your current routine.`
+        : "Your routine is moving. The next useful step is a focused session, not another task on the list.";
+  const action = !hasSystem ? "Build your system" : nextMission?.title || "Start a focused session";
+
+  return <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .08, duration: .5, ease }} className={`${panel} relative overflow-hidden p-5 sm:p-7`}>
+    <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-cyan-400/[0.07] blur-3xl" />
+    <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+      <div className="max-w-2xl"><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300"><span className="grid h-7 w-7 place-items-center rounded-lg border border-cyan-300/15 bg-cyan-300/[0.07]"><Brain className="h-3.5 w-3.5" /></span> Your intelligence</div><h2 className="mt-4 text-xl font-black tracking-tight text-white sm:text-2xl">Here is what matters right now.</h2><p className="mt-2 text-sm leading-6 text-slate-400">{insight}</p></div>
+      <div className="grid min-w-0 gap-2 sm:grid-cols-3 lg:w-[410px]"><MiniSignal icon={<Flame />} label="Streak" value={`${bestStreak}d`} /><MiniSignal icon={<Timer />} label="Focused" value={`${focusMinutes}m`} /><MiniSignal icon={<ListChecks />} label="Today" value={`${completedHabits}/${habits.length || 0}`} /></div>
+    </div>
+    <div className="relative mt-6 flex flex-col gap-3 border-t border-white/[0.07] pt-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl border border-violet-300/15 bg-violet-300/[0.07] text-violet-200"><Lightbulb className="h-4 w-4" /></span><div><p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-600">Recommended next move</p><p className="mt-1 text-sm font-bold text-white">{action}</p></div></div><span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-cyan-300">Based on your activity <Sparkles className="h-3.5 w-3.5" /></span></div>
   </motion.section>;
 }
 
-export function DashboardProgress({ snapshot }: { snapshot: DashboardSnapshot }) {
-  return <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
-    <Panel><div className="flex items-center justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">Level progress</p><p className="mt-2 text-2xl font-black text-white">Level {snapshot.level}</p></div><span className="text-sm font-bold text-cyan-300">{snapshot.xpPct}%</span></div><div className="mt-5 h-2.5 overflow-hidden rounded-full bg-white/5"><motion.div initial={{ width: 0 }} animate={{ width: `${snapshot.xpPct}%` }} transition={{ duration: 0.8, ease }} className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-fuchsia-400" /></div><p className="mt-2 text-xs text-slate-500">Keep stacking actions to reach the next level.</p></Panel>
-    <Panel><p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">Today’s signal</p><p className="mt-3 text-base font-bold leading-6 text-white">{snapshot.quote.quote}</p><p className="mt-2 text-xs text-slate-500">— {snapshot.quote.author}</p></Panel>
-  </div>;
+function MiniSignal({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return <div className="rounded-2xl border border-white/[0.07] bg-black/10 p-3"><div className="flex items-center gap-2 text-slate-500">{icon}<span className="text-[9px] font-black uppercase tracking-[0.16em]">{label}</span></div><p className="mt-2 text-xl font-black text-white">{value}</p></div>;
 }
 
-export function DashboardMissions({ snapshot, onComplete, onFocus }: { snapshot: DashboardSnapshot; onComplete: (id: string) => void; onFocus: () => void }) {
-  return <Panel className="overflow-hidden"><div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-300/80">Daily missions</p><h2 className="mt-1 text-2xl font-black text-white">Build momentum</h2></div><div className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold text-slate-300">{snapshot.completionPct}% complete</div></div>
-    <div className="mt-5 space-y-2">
-      {snapshot.missions.map((mission) => <MissionRow key={mission.id} mission={mission} onComplete={() => onComplete(mission.id)} />)}
-    </div>
-    <button type="button" onClick={onFocus} className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3.5 text-sm font-bold text-slate-950 transition-transform hover:scale-[1.01]">Enter focus mode <ArrowRight className="h-4 w-4" /></button>
-  </Panel>;
+export function DashboardMomentum({ xp, level, xpPct, streak, completedHabits, habitCount, focusMinutes }: { xp: number; level: number; xpPct: number; streak: number; completedHabits: number; habitCount: number; focusMinutes: number }) {
+  return <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <MomentumCard icon={<Zap />} label="Momentum" value={`${xp.toLocaleString()} XP`} detail={`Level ${level} · ${Math.round(xpPct)}% to next`} progress={xpPct} />
+    <MomentumCard icon={<Flame />} label="Consistency" value={`${streak} day${streak === 1 ? "" : "s"}`} detail="Best active rhythm" />
+    <MomentumCard icon={<Target />} label="Habits" value={`${completedHabits}/${habitCount}`} detail={habitCount ? "Completed today" : "Choose what matters"} progress={habitCount ? (completedHabits / habitCount) * 100 : 0} />
+    <MomentumCard icon={<Focus />} label="Focus" value={`${focusMinutes} min`} detail="Completed sessions" />
+  </section>;
 }
 
-function MissionRow({ mission, onComplete }: { mission: DashboardMission; onComplete: () => void }) {
-  return <div className="flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-black/10 p-3 transition-colors hover:bg-white/[0.035]">
-    <button type="button" onClick={onComplete} disabled={mission.completed || mission.mutating} aria-label={mission.completed ? `${mission.title} completed` : `Complete ${mission.title}`} className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border transition-all ${mission.completed ? "border-emerald-300/30 bg-emerald-300/10 text-emerald-300" : "border-white/10 bg-white/5 text-slate-500 hover:border-cyan-300/30 hover:text-cyan-300"}`}>{mission.completed ? <CheckCircle2 className="h-5 w-5" /> : <Target className="h-5 w-5" />}</button>
-    <div className="min-w-0 flex-1"><p className={`truncate text-sm font-bold ${mission.completed ? "text-slate-500 line-through" : "text-white"}`}>{mission.title}</p><p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600">{mission.category} · +{mission.xpReward} XP</p></div>
-    {mission.mutating && <span className="text-[10px] font-bold text-cyan-300">Saving…</span>}
-  </div>;
+function MomentumCard({ icon, label, value, detail, progress }: { icon: React.ReactNode; label: string; value: string; detail: string; progress?: number }) {
+  return <motion.div whileHover={{ y: -2 }} className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4"><div className="flex items-center gap-2 text-slate-500"><span className="text-cyan-300">{icon}</span><span className="text-[9px] font-black uppercase tracking-[0.18em]">{label}</span></div><p className="mt-3 text-xl font-black tracking-tight text-white">{value}</p><p className="mt-1 text-[10px] font-medium text-slate-600">{detail}</p>{progress !== undefined && <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/5"><motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(100, Math.max(0, progress))}%` }} transition={{ duration: .8, ease }} className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-violet-400" /></div>}</motion.div>;
 }
 
-export function DashboardNextMission({ mission }: { mission?: DashboardMission }) {
-  return <Panel className="flex min-h-full flex-col justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[0.22em] text-fuchsia-300/80">Your next move</p><h2 className="mt-2 text-2xl font-black text-white">{mission?.title || "You’re all caught up"}</h2><p className="mt-3 text-sm leading-6 text-slate-400">{mission ? `A ${mission.category.toLowerCase()} mission worth ${mission.xpReward} XP. Finish it before adding more noise.` : "Take the win. Protect the rest of your day."}</p></div><div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-4"><p className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">Progress</p><p className="mt-1 text-3xl font-black text-white">{mission ? "1 next action" : "Complete"}</p></div></Panel>;
+export function DashboardHabits({ habits, onToggle }: { habits: Habit[]; onToggle: (id: string) => void }) {
+  const today = new Date().toISOString().slice(0, 10);
+  return <section className={`${panel} p-5 sm:p-6`}><div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-600">Your rhythm</p><h2 className="mt-1 text-xl font-black text-white">Habits that you chose</h2></div><span className="rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1.5 text-[10px] font-bold text-slate-500">{habits.length} active</span></div>
+    {habits.length === 0 ? <div className="mt-5 rounded-2xl border border-dashed border-cyan-300/15 bg-cyan-300/[0.025] p-5"><div className="grid h-10 w-10 place-items-center rounded-xl border border-cyan-300/15 bg-cyan-300/[0.06] text-cyan-200"><Sparkles className="h-4 w-4" /></div><h3 className="mt-4 text-base font-black text-white">Start with what matters to you.</h3><p className="mt-2 max-w-md text-sm leading-6 text-slate-500">Choose a few habits from the Outstand system. The dashboard will use them to shape recommendations instead of forcing a generic routine on you.</p></div> : <div className="mt-5 grid gap-2 sm:grid-cols-2">{habits.map((habit, index) => { const done = habit.history?.includes(today); return <button key={habit.id} type="button" onClick={() => onToggle(habit.id)} className={`group flex items-center gap-3 rounded-2xl border p-3 text-left transition ${done ? "border-emerald-300/15 bg-emerald-300/[0.045]" : "border-white/[0.07] bg-black/10 hover:border-cyan-300/15 hover:bg-white/[0.035]"}`}><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border text-base ${initialsColor(index)}`}>{habit.emoji}</span><span className="min-w-0 flex-1"><span className={`block truncate text-sm font-bold ${done ? "text-emerald-200" : "text-white"}`}>{habit.name}</span><span className="mt-1 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-600">{done ? "Completed today" : "Tap when done"}</span></span><span className={`grid h-7 w-7 place-items-center rounded-lg border ${done ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-300" : "border-white/10 text-slate-700 group-hover:text-cyan-300"}`}>{done ? <Check className="h-4 w-4" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}</span></button>; })}</div>}
+  </section>;
+}
+
+export function DashboardRoadmap({ habits, missions, nextMission, onCompleteMission }: { habits: Habit[]; missions: DashboardMission[]; nextMission?: DashboardMission; onCompleteMission: (id: string) => void }) {
+  const done = missions.filter((m) => m.completed).length;
+  return <section className={`${panel} p-5 sm:p-6`}><div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-600">Your path today</p><h2 className="mt-1 text-xl font-black text-white">A few meaningful moves</h2></div><span className="text-xs font-bold text-cyan-300">{done}/{missions.length}</span></div>
+    <div className="mt-5 space-y-2">{missions.slice(0, 4).map((mission, index) => <div key={mission.id} className={`flex items-center gap-3 rounded-2xl border p-3 ${mission.completed ? "border-emerald-300/10 bg-emerald-300/[0.025]" : "border-white/[0.07] bg-black/10"}`}><button type="button" onClick={() => onCompleteMission(mission.id)} disabled={mission.completed || mission.mutating} className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border ${mission.completed ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-300" : "border-white/10 text-slate-600 hover:border-cyan-300/20 hover:text-cyan-300"}`}>{mission.completed ? <Check className="h-4 w-4" /> : <span className="text-[10px] font-black">{index + 1}</span>}</button><div className="min-w-0 flex-1"><p className={`truncate text-sm font-bold ${mission.completed ? "text-slate-500 line-through" : "text-white"}`}>{mission.title}</p><p className="mt-1 text-[9px] font-black uppercase tracking-[0.15em] text-slate-600">{mission.category} · +{mission.xpReward} XP</p></div>{mission.mutating ? <span className="text-[9px] font-bold text-cyan-300">Saving</span> : null}</div>)}</div>
+    <div className="mt-5 rounded-2xl border border-violet-300/10 bg-violet-300/[0.035] p-4"><div className="flex items-start gap-3"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-violet-300/15 bg-violet-300/[0.07] text-violet-200"><Sparkles className="h-4 w-4" /></div><div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-200/70">Why this path</p><p className="mt-1 text-xs leading-5 text-slate-400">{habits.length ? `Your selected habits give OUTSTAND a signal about what matters to you. ${nextMission ? "The next action keeps today's workload focused." : "You are clear for today."}` : "Once you choose habits, recommendations can become personal instead of generic."}</p></div></div></div>
+  </section>;
+}
+
+export function DashboardActivity({ sessions, outstand, dailyScore }: { sessions: FocusSession[]; outstand: OutstandCompletion[]; dailyScore: number | null }) {
+  const recentSessions = sessions.filter((s) => s.completed).slice(0, 3);
+  const recentWins = outstand.slice(0, 3);
+  return <section className={`${panel} p-5 sm:p-6`}><div className="grid gap-5 md:grid-cols-3"><ActivityBlock icon={<Timer />} title="Recent focus" empty="No completed focus sessions yet." items={recentSessions.map((s) => `${s.durationMin} minute focus session`)} /><ActivityBlock icon={<Trophy />} title="Recent wins" empty="Your wins will appear here." items={recentWins.map((w) => w.title)} /><ActivityBlock icon={<Zap />} title="Today's signal" empty="Complete your daily check-in to get a signal." items={dailyScore === null ? [] : [`Daily score ${dailyScore}/100`, dailyScore >= 70 ? "Strong momentum" : "Room to reset and recover"]} /></div></section>;
+}
+
+function ActivityBlock({ icon, title, items, empty }: { icon: React.ReactNode; title: string; items: string[]; empty: string }) {
+  return <div><div className="flex items-center gap-2 text-slate-400"><span className="text-cyan-300">{icon}</span><h3 className="text-sm font-black text-white">{title}</h3></div><div className="mt-3 space-y-2">{items.length ? items.map((item, index) => <div key={`${item}-${index}`} className="rounded-xl border border-white/[0.06] bg-black/10 px-3 py-2.5 text-xs text-slate-400">{item}</div>) : <p className="rounded-xl border border-dashed border-white/[0.06] px-3 py-3 text-xs leading-5 text-slate-600">{empty}</p>}</div></div>;
 }
