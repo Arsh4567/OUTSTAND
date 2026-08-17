@@ -2,9 +2,11 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import webpush from 'web-push';
 import { createClient } from '@supabase/supabase-js';
 
-const url = process.env.VITE_SUPABASE_URL as string;
+// The browser uses VITE_SUPABASE_URL. Prefer that same value here so Auth,
+// subscriptions, preferences and scheduler all point at one database.
+const url = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '').trim();
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
-const publicKey = process.env.VITE_VAPID_PUBLIC_KEY as string;
+const publicKey = (process.env.VITE_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY || '').trim();
 const privateKey = process.env.VAPID_PRIVATE_KEY as string;
 
 function minutesInZone(date: Date, timeZone: string) {
@@ -96,8 +98,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { data: existing } = await admin.from('notification_delivery_log').select('id').eq('user_id', pref.user_id).eq('dedupe_key', dedupeKey).maybeSingle();
     if (existing) continue;
 
-    const { data: subscriptions } = await admin.from('push_subscriptions').select('endpoint,auth_key,p256dh_key').eq('user_id', pref.user_id);
-    if (!subscriptions?.length) continue;
+    const { data: subscriptions, error: subscriptionError } = await admin.from('push_subscriptions').select('id,endpoint,auth_key,p256dh_key').eq('user_id', pref.user_id);
+    if (subscriptionError || !subscriptions?.length) {
+      console.warn('[Push] No subscription for scheduled notification', { userId: pref.user_id, code: subscriptionError?.code });
+      continue;
+    }
 
     const payload = JSON.stringify({ title, body, icon: '/icon-192x192.png', badge: '/badge-72x72.png', url: path, tag: dedupeKey });
     let delivered = false;
@@ -106,8 +111,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await webpush.sendNotification({ endpoint: sub.endpoint, keys: { auth: sub.auth_key, p256dh: sub.p256dh_key } }, payload);
         delivered = true;
       } catch (error: any) {
+        console.error('[Push] Scheduled delivery failed', { statusCode: error?.statusCode, message: error?.message });
         if (error?.statusCode === 404 || error?.statusCode === 410) {
-          await admin.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+          await admin.from('push_subscriptions').delete().eq('id', sub.id);
         }
       }
     }
