@@ -7,12 +7,6 @@ type ProviderResult = {
   provider: any;
 };
 
-/**
- * Resolve AI providers only after a request reaches the function.
- * Do not import provider packages at module scope: a serverless module-load
- * failure happens before our handler can catch it and Vercel reports only
- * FUNCTION_INVOCATION_FAILED.
- */
 export async function getAIProvider(preferred?: AIProviderName): Promise<ProviderResult> {
   const groqKey = env("GROQ_API_KEY");
   const geminiKey = env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY");
@@ -23,15 +17,8 @@ export async function getAIProvider(preferred?: AIProviderName): Promise<Provide
   for (const providerName of order) {
     if (providerName === "groq" && groqKey) {
       try {
-        const { createOpenAICompatible } = await import("@ai-sdk/openai-compatible");
-        return {
-          name: "groq",
-          provider: createOpenAICompatible({
-            name: "groq",
-            apiKey: groqKey,
-            baseURL: "https://api.groq.com/openai/v1",
-          }),
-        };
+        const { createGroq } = await import("@ai-sdk/groq");
+        return { name: "groq", provider: createGroq({ apiKey: groqKey }) };
       } catch (error) {
         console.error("Groq provider initialization failed:", error);
         if (preferred === "groq") throw error;
@@ -41,10 +28,7 @@ export async function getAIProvider(preferred?: AIProviderName): Promise<Provide
     if (providerName === "gemini" && geminiKey) {
       try {
         const { createGoogleGenerativeAI } = await import("@ai-sdk/google");
-        return {
-          name: "gemini",
-          provider: createGoogleGenerativeAI({ apiKey: geminiKey }),
-        };
+        return { name: "gemini", provider: createGoogleGenerativeAI({ apiKey: geminiKey }) };
       } catch (error) {
         console.error("Gemini provider initialization failed:", error);
         if (preferred === "gemini") throw error;
@@ -58,9 +42,7 @@ export async function getAIProvider(preferred?: AIProviderName): Promise<Provide
 }
 
 export function modelFor(providerName: AIProviderName, provider: any, task: "chat" | "roadmap") {
-  if (providerName === "groq") {
-    return provider(task === "chat" ? "llama-3.1-8b-instant" : "openai/gpt-oss-20b");
-  }
+  if (providerName === "groq") return provider(task === "chat" ? "llama-3.1-8b-instant" : "openai/gpt-oss-20b");
   return provider("gemini-2.5-flash-lite");
 }
 
