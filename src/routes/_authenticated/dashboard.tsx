@@ -5,7 +5,8 @@ import { useDashboard } from "@/hooks/useDashboard";
 import { useAuth, displayNameOf } from "@/hooks/use-auth";
 import { useAppState } from "@/hooks/use-app-state";
 import { useDailyLog } from "@/hooks/use-dopamine";
-import { DashboardWelcome, DashboardIntelligence, DashboardMomentum, DashboardHabits, DashboardRoadmap, DashboardActivity } from "@/components/dashboard/DashboardSections";
+import { DashboardWelcome, DashboardMomentum, DashboardHabits, DashboardRoadmap, DashboardActivity } from "@/components/dashboard/DashboardSections";
+import { DashboardAISection } from "@/components/dashboard/DashboardAISection";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: DashboardPage });
 
@@ -29,7 +30,7 @@ function DashboardPage() {
       <div className="pointer-events-none fixed inset-0 overflow-hidden"><div className="absolute left-[12%] top-[-18rem] h-[42rem] w-[42rem] rounded-full bg-cyan-500/[0.055] blur-[130px]" /><div className="absolute right-[-14rem] top-[28%] h-[34rem] w-[34rem] rounded-full bg-violet-500/[0.045] blur-[130px]" /><div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.014)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.014)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:linear-gradient(to_bottom,black,transparent_78%)]" /></div>
       <main className="relative z-10 mx-auto w-full max-w-none space-y-5 px-4 pb-20 pt-6 sm:px-6 lg:px-8 lg:pt-9 xl:px-0">
         <DashboardWelcome name={name} quote={snapshot.quote} />
-        <DashboardIntelligence habits={habits} sessions={sessions} completedHabits={completedHabits} focusMinutes={focusMinutes} bestStreak={bestStreak} nextMission={nextMission} />
+        <DashboardAISection habits={habits} sessions={sessions} completedHabits={completedHabits} focusMinutes={focusMinutes} bestStreak={bestStreak} nextMission={nextMission} name={name} level={snapshot.level} xp={Math.max(xp, snapshot.totalXp)} />
         <DashboardMomentum xp={Math.max(xp, snapshot.totalXp)} level={snapshot.level} xpPct={snapshot.xpPct} streak={Math.max(bestStreak, snapshot.streak)} completedHabits={completedHabits} habitCount={habits.length} focusMinutes={focusMinutes} />
         <div className="grid gap-5 lg:grid-cols-2 2xl:grid-cols-[1.08fr_0.92fr]">
           <DashboardHabits habits={habits} onToggle={toggleToday} />
