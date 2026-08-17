@@ -5,8 +5,9 @@ import { useDashboard } from "@/hooks/useDashboard";
 import { useAuth, displayNameOf } from "@/hooks/use-auth";
 import { useAppState } from "@/hooks/use-app-state";
 import { useDailyLog } from "@/hooks/use-dopamine";
-import { DashboardWelcome, DashboardMomentum, DashboardHabits, DashboardRoadmap, DashboardActivity } from "@/components/dashboard/DashboardSections";
+import { DashboardWelcome, DashboardMomentum, DashboardHabits, DashboardActivity } from "@/components/dashboard/DashboardSections";
 import { DashboardAISection } from "@/components/dashboard/DashboardAISection";
+import { RoadmapDailyPath } from "@/components/dashboard/RoadmapDailyPath";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: DashboardPage });
 
@@ -34,7 +35,7 @@ function DashboardPage() {
         <DashboardMomentum xp={Math.max(xp, snapshot.totalXp)} level={snapshot.level} xpPct={snapshot.xpPct} streak={Math.max(bestStreak, snapshot.streak)} completedHabits={completedHabits} habitCount={habits.length} focusMinutes={focusMinutes} />
         <div className="grid gap-5 lg:grid-cols-2 2xl:grid-cols-[1.08fr_0.92fr]">
           <DashboardHabits habits={habits} onToggle={toggleToday} />
-          <DashboardRoadmap habits={habits} missions={snapshot.missions} nextMission={nextMission} onCompleteMission={completeMission} />
+          <RoadmapDailyPath missions={snapshot.missions} nextMission={nextMission} onCompleteMission={completeMission} />
         </div>
         <DashboardActivity sessions={sessions} outstand={outstand} dailyScore={log?.score ?? null} />
       </main>
