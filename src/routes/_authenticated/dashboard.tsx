@@ -10,6 +10,7 @@ import { DashboardAISection } from "@/components/dashboard/DashboardAISection";
 import { RoadmapDailyPath } from "@/components/dashboard/RoadmapDailyPath";
 import { RoadmapProgressHistory } from "@/components/dashboard/RoadmapProgressHistory";
 import { OutstandMotionCore } from "@/components/outstand/OutstandMotionCore";
+import { todayISO, levelFromXP } from "@/lib/habits";
 import type { RoadmapProgress } from "@/hooks/useDashboard";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: DashboardPage });
@@ -24,11 +25,13 @@ function DashboardPage() {
   if (loadError) return <div className="grid min-h-screen place-items-center bg-[#05070d] px-4 text-white"><div className="max-w-md rounded-3xl border border-red-400/15 bg-white/[0.04] p-7 text-center backdrop-blur-xl"><p className="text-xs font-bold uppercase tracking-[0.2em] text-red-300">Something went wrong</p><p className="mt-3 text-sm leading-6 text-slate-300">{loadError}</p><button type="button" onClick={() => window.location.reload()} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-950"><RefreshCw className="h-4 w-4" /> Try again</button></div></div>;
 
   const name = displayNameOf(user, profile) || snapshot.userName || "there";
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
   const completedHabits = habits.filter((habit) => habit.history?.includes(today)).length;
   const focusMinutes = sessions.filter((session) => session.completed).reduce((sum, session) => sum + Math.max(0, session.durationMin || 0), 0);
   const nextMission = snapshot.missions.find((mission) => !mission.completed);
   const roadmapProgress: RoadmapProgress | null = snapshot.roadmapProgress;
+  const progress = levelFromXP(xp);
+  const displayXp = xp;
 
   return <MotionConfig reducedMotion="user">
     <div className="relative min-h-screen overflow-x-hidden bg-[#05070d] text-slate-100">
@@ -36,8 +39,8 @@ function DashboardPage() {
       <div className="pointer-events-none fixed right-6 top-24 z-[1] hidden opacity-80 lg:block"><OutstandMotionCore size="lg" /></div>
       <main className="relative z-10 mx-auto w-full max-w-none space-y-5 px-4 pb-20 pt-6 sm:px-6 lg:px-8 lg:pt-9 xl:px-0">
         <DashboardWelcome name={name} quote={snapshot.quote} />
-        <DashboardAISection habits={habits} sessions={sessions} completedHabits={completedHabits} focusMinutes={focusMinutes} bestStreak={bestStreak} nextMission={nextMission} name={name} level={snapshot.level} xp={Math.max(xp, snapshot.totalXp)} roadmapProgress={roadmapProgress} />
-        <DashboardMomentum xp={Math.max(xp, snapshot.totalXp)} level={snapshot.level} xpPct={snapshot.xpPct} streak={Math.max(bestStreak, snapshot.streak)} completedHabits={completedHabits} habitCount={habits.length} focusMinutes={focusMinutes} />
+        <DashboardAISection habits={habits} sessions={sessions} completedHabits={completedHabits} focusMinutes={focusMinutes} bestStreak={bestStreak} nextMission={nextMission} name={name} level={progress.level} xp={displayXp} roadmapProgress={roadmapProgress} />
+        <DashboardMomentum xp={displayXp} level={progress.level} xpPct={progress.progressPct} streak={bestStreak} completedHabits={completedHabits} habitCount={habits.length} focusMinutes={focusMinutes} />
         <div className="grid gap-5 lg:grid-cols-2 2xl:grid-cols-[1.08fr_0.92fr]">
           <DashboardHabits habits={habits} onToggle={toggleToday} />
           <RoadmapDailyPath missions={snapshot.missions} nextMission={nextMission} onCompleteMission={completeMission} />
