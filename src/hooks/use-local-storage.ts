@@ -2,30 +2,25 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 export function useLocalStorage<T>(key: string, initialValue: T) {
-  // 1. TRAP THE INITIAL VALUE
   const initialValueRef = useRef<T>(initialValue);
 
-  // 2. Read from the browser's storage safely
   const readValue = useCallback((): T => {
     if (typeof window === "undefined") return initialValueRef.current;
     try {
       const item = window.localStorage.getItem(key);
       if (!item) return initialValueRef.current;
-
-      // Safely parse. If the data is fundamentally broken/null, fallback.
       const parsed = JSON.parse(item);
       return parsed !== null ? (parsed as T) : initialValueRef.current;
     } catch (error) {
-      console.warn(`[Storage Warning] Error parsing key “${key}”. Resetting to default.`, error);
-      // If parsing fails (corrupted data), wipe it and return the default
-      window.localStorage.removeItem(key);
+      // Keep the raw value intact so a future migration/recovery can inspect it.
+      // Returning the safe default prevents corrupted storage from crashing the app.
+      console.warn(`[Storage Warning] Could not parse key “${key}”. Using the default value.`, error);
       return initialValueRef.current;
     }
   }, [key]);
 
   const [storedValue, setStoredValue] = useState<T>(readValue);
 
-  // 3. Write to storage AND broadcast a live signal
   const setValue = useCallback((value: T | ((val: T) => T)) => {
     try {
       setStoredValue((prev) => {
@@ -41,7 +36,6 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
     }
   }, [key]);
 
-  // 4. Expose a way to completely delete the key (Crucial for resets)
   const removeValue = useCallback(() => {
     try {
       if (typeof window !== "undefined") {
@@ -54,10 +48,7 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
     }
   }, [key]);
 
-  // 5. Listen for the live signal
   useEffect(() => {
-    setStoredValue(readValue());
-
     const handleStorageChange = (e: StorageEvent | CustomEvent) => {
       if ((e as StorageEvent).key === key || (e as CustomEvent).detail?.key === key) {
         setStoredValue(readValue());
@@ -73,6 +64,5 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
     };
   }, [key, readValue]);
 
-  // Return as a tuple with the new remove function
   return [storedValue, setValue, removeValue] as const;
 }
