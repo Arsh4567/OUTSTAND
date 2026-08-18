@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-export function ExperienceLayer({ children }: { children: React.ReactNode }) {
+export function ExperienceLayer({ children }: { children: ReactNode }) {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
@@ -27,20 +27,11 @@ export function ExperienceLayer({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <a
-        href="#main-content"
-        className="fixed left-3 top-3 z-[100] -translate-y-24 rounded-xl border border-cyan-300/25 bg-slate-950/95 px-4 py-2 text-xs font-bold text-cyan-100 shadow-2xl backdrop-blur-xl transition-transform focus:translate-y-0"
-      >
+      <a href="#main-content" className="fixed left-3 top-3 z-[100] -translate-y-24 rounded-xl border border-cyan-300/25 bg-slate-950/95 px-4 py-2 text-xs font-bold text-cyan-100 shadow-2xl backdrop-blur-xl transition-transform focus:translate-y-0">
         Skip to main content
       </a>
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-x-0 top-0 z-[90] h-px bg-white/[0.04]"
-      >
-        <div
-          className="h-full origin-left bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 shadow-[0_0_12px_rgba(34,211,238,0.55)]"
-          style={{ transform: `scaleX(${progress})` }}
-        />
+      <div aria-hidden="true" className="pointer-events-none fixed inset-x-0 top-0 z-[90] h-px bg-white/[0.04]">
+        <div className="h-full origin-left bg-gradient-to-r from-cyan-300 via-blue-400 to-fuchsia-400 shadow-[0_0_12px_rgba(34,211,238,0.55)]" style={{ transform: `scaleX(${progress})` }} />
       </div>
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-[-1] overflow-hidden">
         <div className="absolute -left-48 top-[-18rem] h-[38rem] w-[38rem] rounded-full bg-cyan-500/[0.045] blur-[120px]" />
