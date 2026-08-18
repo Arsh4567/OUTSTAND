@@ -2,9 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import { consumeStream, convertToModelMessages, createIdGenerator, streamText, type UIMessage } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createGroq } from "@ai-sdk/groq";
 import { z } from "zod";
-
-const MODEL = "gemini-2.5-flash-lite";
 
 const RequestSchema = z.object({
   messages: z.array(z.unknown()).min(1).max(40),
@@ -25,14 +24,12 @@ type AuthSuccess = { client: ReturnType<typeof createClient>; userId: string };
 type AuthFailure = { error: Response };
 type AuthResult = AuthSuccess | AuthFailure;
 
+type ProviderChoice = { name: "groq" | "gemini"; model: ReturnType<ReturnType<typeof createGroq>> | ReturnType<ReturnType<typeof createGoogleGenerativeAI>> };
+
 function json(data: unknown, status = 200, headers: HeadersInit = {}) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store",
-      ...headers,
-    },
+    headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers },
   });
 }
 
@@ -56,11 +53,7 @@ function systemPrompt(appContext: unknown) {
   const completed = Array.isArray(ctx.completedToday) ? ctx.completedToday : [];
   const sessions = Array.isArray(ctx.sessions) ? ctx.sessions.length : 0;
   const outstandItems = Array.isArray(ctx.outstand) ? ctx.outstand.length : 0;
-  const habitSummary = habits
-    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
-    .slice(0, 12)
-    .map((item) => `${typeof item.name === "string" ? item.name : "Habit"}: ${typeof item.id === "string" && completed.includes(item.id) ? "done" : "not done"}`)
-    .join(", ");
+  const habitSummary = habits.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object").slice(0, 12).map((item) => `${typeof item.name === "string" ? item.name : "Habit"}: ${typeof item.id === "string" && completed.includes(item.id) ? "done" : "not done"}`).join(", ");
 
   return `You are OUTSTAND Intelligence, a fast, practical productivity companion.
 User: ${name}
@@ -83,41 +76,34 @@ function supabaseConfig() {
   };
 }
 
-function geminiApiKey() {
-  return env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY");
+function getProvider(): ProviderChoice {
+  const groqKey = env("GROQ_API_KEY");
+  const geminiKey = env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY");
+  if (groqKey) return { name: "groq", model: createGroq({ apiKey: groqKey })("openai/gpt-oss-20b") };
+  if (geminiKey) return { name: "gemini", model: createGoogleGenerativeAI({ apiKey: geminiKey })("gemini-2.5-flash-lite") };
+  const error = new Error("No AI provider is configured on the server.");
+  Object.assign(error, { status: 503, code: "AI_PROVIDER_CONFIG_MISSING" });
+  throw error;
 }
 
 async function authenticate(request: Request): Promise<AuthResult> {
   const authorization = request.headers.get("authorization");
-  if (!authorization?.startsWith("Bearer ")) {
-    return { error: json({ error: "Authentication required.", code: "AUTH_REQUIRED" }, 401) };
-  }
-
+  if (!authorization?.startsWith("Bearer ")) return { error: json({ error: "Authentication required.", code: "AUTH_REQUIRED" }, 401) };
   const token = authorization.slice(7).trim();
   if (!token) return { error: json({ error: "Authentication required.", code: "AUTH_REQUIRED" }, 401) };
-
   const { url, key } = supabaseConfig();
-  if (!url || !key) {
-    return { error: json({ error: "AI service is temporarily unavailable.", code: "SERVICE_UNAVAILABLE" }, 503) };
-  }
-
-  const client = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: authorization } },
-  });
-
+  if (!url || !key) return { error: json({ error: "AI service is temporarily unavailable.", code: "SERVICE_UNAVAILABLE" }, 503) };
+  const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: authorization } } });
   const { data, error } = await client.auth.getClaims(token);
   const userId = data?.claims?.sub;
-  if (error || typeof userId !== "string" || !userId) {
-    return { error: json({ error: "Authentication failed.", code: "AUTH_INVALID" }, 401) };
-  }
-
+  if (error || typeof userId !== "string" || !userId) return { error: json({ error: "Authentication failed.", code: "AUTH_INVALID" }, 401) };
   return { client, userId };
 }
 
 function isQuotaError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
-  return /429|quota|resource[_ -]?exhausted|rate[_ -]?limit|free[_ -]?tier/i.test(message);
+  const candidate = error as { statusCode?: number; status?: number };
+  return candidate?.statusCode === 429 || candidate?.status === 429 || /429|quota|resource[_ -]?exhausted|rate[_ -]?limit|free[_ -]?tier/i.test(message);
 }
 
 export const Route = createFileRoute("/api/chat")({
@@ -126,25 +112,18 @@ export const Route = createFileRoute("/api/chat")({
       GET: async ({ request }) => {
         const auth = await authenticate(request);
         if ("error" in auth) return auth.error;
-
-        const configured = Boolean(geminiApiKey());
-        return json({
-          ok: configured,
-          service: "outstand-ai",
-          status: configured ? "ready" : "unavailable",
-        }, configured ? 200 : 503);
+        try {
+          const provider = getProvider();
+          return json({ ok: true, service: "outstand-ai", status: "ready", provider: provider.name });
+        } catch {
+          return json({ ok: false, service: "outstand-ai", status: "unavailable" }, 503);
+        }
       },
 
       POST: async ({ request }) => {
         try {
           const auth = await authenticate(request);
           if ("error" in auth) return auth.error;
-
-          const apiKey = geminiApiKey();
-          if (!apiKey) {
-            console.error("[AI] Missing Gemini API key.");
-            return json({ error: "AI service is not configured on the server.", code: "GEMINI_CONFIG_MISSING" }, 503);
-          }
 
           const rawBody = await request.json().catch(() => null);
           const parsed = RequestSchema.safeParse(rawBody);
@@ -157,30 +136,20 @@ export const Route = createFileRoute("/api/chat")({
             if (!text) return [];
             return [{ id: parsedMessage.data.id ?? crypto.randomUUID(), role: parsedMessage.data.role, parts: [{ type: "text", text }] } as UIMessage];
           });
+          if (!uiMessages.some((message) => message.role === "user")) return json({ error: "At least one user message is required.", code: "NO_USER_MESSAGE" }, 400);
 
-          if (!uiMessages.some((message) => message.role === "user")) {
-            return json({ error: "At least one user message is required.", code: "NO_USER_MESSAGE" }, 400);
-          }
-
+          const provider = getProvider();
           const modelMessages = uiMessages.slice(-10);
-          const google = createGoogleGenerativeAI({ apiKey });
           const result = streamText({
-            model: google(MODEL),
+            model: provider.model,
             system: systemPrompt(parsed.data.appContext),
             messages: await convertToModelMessages(modelMessages),
             maxOutputTokens: 500,
             maxRetries: 0,
-            providerOptions: {
-              google: {
-                thinkingConfig: {
-                  thinkingLevel: "minimal",
-                },
-              },
-            },
             abortSignal: request.signal,
             onError: (error) => {
-              if (isQuotaError(error)) console.warn("[AI] Gemini quota/rate limit reached.");
-              else console.error("Outstand AI stream error:", error);
+              if (isQuotaError(error)) console.warn(`[AI] ${provider.name} quota/rate limit reached.`);
+              else console.error(`[AI] ${provider.name} stream error:`, error);
             },
           });
 
@@ -189,50 +158,28 @@ export const Route = createFileRoute("/api/chat")({
             generateMessageId: createIdGenerator({ prefix: "msg", size: 16 }),
             onFinish: async ({ responseMessage, isAborted }) => {
               if (isAborted) return;
-
               try {
-                const { data: conversation, error: lookupError } = await auth.client
-                  .from("chat_conversations")
-                  .select("id")
-                  .eq("user_id", auth.userId)
-                  .order("updated_at", { ascending: false })
-                  .limit(1)
-                  .maybeSingle();
-
+                const { data: conversation, error: lookupError } = await auth.client.from("chat_conversations").select("id").eq("user_id", auth.userId).order("updated_at", { ascending: false }).limit(1).maybeSingle();
                 if (lookupError) throw lookupError;
-
                 let conversationId = conversation?.id;
                 if (!conversationId) {
-                  const created = await auth.client
-                    .from("chat_conversations")
-                    .insert({ user_id: auth.userId })
-                    .select("id")
-                    .single();
+                  const created = await auth.client.from("chat_conversations").insert({ user_id: auth.userId }).select("id").single();
                   if (created.error || !created.data) throw created.error ?? new Error("Conversation creation failed");
                   conversationId = created.data.id;
                 }
-
                 const latestUser = [...uiMessages].reverse().find((message) => message.role === "user");
                 const latestText = latestUser?.parts.filter((part) => part.type === "text").map((part) => part.text).join("").trim() ?? "";
-
                 if (latestText) {
-                  const inserted = await auth.client.from("chat_messages").insert({
-                    conversation_id: conversationId,
-                    user_id: auth.userId,
-                    role: "user",
-                    content: latestText,
-                  });
-                  if (inserted.error) throw inserted.error;
+                  const duplicate = await auth.client.from("chat_messages").select("id").eq("conversation_id", conversationId).eq("user_id", auth.userId).eq("role", "user").eq("content", latestText).limit(1).maybeSingle();
+                  if (duplicate.error) throw duplicate.error;
+                  if (!duplicate.data) {
+                    const inserted = await auth.client.from("chat_messages").insert({ conversation_id: conversationId, user_id: auth.userId, role: "user", content: latestText });
+                    if (inserted.error) throw inserted.error;
+                  }
                 }
-
                 const assistantText = responseMessage.parts.filter((part) => part.type === "text").map((part) => part.text).join("").trim();
                 if (assistantText) {
-                  const saved = await auth.client.from("chat_messages").insert({
-                    conversation_id: conversationId,
-                    user_id: auth.userId,
-                    role: "assistant",
-                    content: assistantText,
-                  });
+                  const saved = await auth.client.from("chat_messages").insert({ conversation_id: conversationId, user_id: auth.userId, role: "assistant", content: assistantText });
                   if (saved.error) throw saved.error;
                 }
               } catch (error) {
@@ -245,20 +192,14 @@ export const Route = createFileRoute("/api/chat")({
               return "AI could not complete that request. Please try again.";
             },
             consumeSseStream: consumeStream,
-            headers: {
-              "Cache-Control": "no-cache, no-transform",
-              "X-Accel-Buffering": "no",
-              "X-Content-Type-Options": "nosniff",
-            },
+            headers: { "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no", "X-Content-Type-Options": "nosniff" },
           });
-
           return result;
         } catch (error) {
-          if (isQuotaError(error)) {
-            return json({ error: "AI is temporarily rate-limited. Please try again after the quota window resets.", code: "AI_QUOTA_EXCEEDED" }, 429, { "Retry-After": "20" });
-          }
+          if (isQuotaError(error)) return json({ error: "AI is temporarily rate-limited. Please try again after the quota window resets.", code: "AI_QUOTA_EXCEEDED" }, 429, { "Retry-After": "20" });
           console.error("Outstand AI request failed", error);
-          return json({ error: "AI request failed.", code: "AI_REQUEST_FAILED" }, 500);
+          const status = typeof (error as { status?: unknown })?.status === "number" ? Number((error as { status: number }).status) : 500;
+          return json({ error: status === 503 ? "AI service is temporarily unavailable." : "AI request failed.", code: status === 503 ? "SERVICE_UNAVAILABLE" : "AI_REQUEST_FAILED" }, status === 503 ? 503 : 500);
         }
       },
 
@@ -266,12 +207,7 @@ export const Route = createFileRoute("/api/chat")({
         try {
           const auth = await authenticate(request);
           if ("error" in auth) return auth.error;
-
-          const removed = await auth.client
-            .from("chat_messages")
-            .delete()
-            .eq("user_id", auth.userId);
-
+          const removed = await auth.client.from("chat_messages").delete().eq("user_id", auth.userId);
           if (removed.error) return json({ error: "Could not clear AI memory.", code: "MEMORY_CLEAR_FAILED" }, 500);
           return new Response(null, { status: 204 });
         } catch (error) {
