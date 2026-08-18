@@ -9,6 +9,11 @@ on:
     types: [completed]
     branches: [main]
 
+# Avoid wasting CI capacity on stale validation runs when new commits arrive.
+concurrency:
+  group: quality-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     # Only validate successful lockfile-sync runs; PRs still run directly.
