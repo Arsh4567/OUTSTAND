@@ -4,16 +4,6 @@ import { supabase } from "../integrations/supabase/client";
 type TimerState = "idle" | "running" | "paused" | "completed";
 
 const DEFAULT_DURATION_MS = 25 * 60 * 1000;
-const STORAGE_END = "outstand_timer_end";
-const STORAGE_DURATION = "outstand_timer_duration";
-
-function readNumber(key: string): number | null {
-  if (typeof window === "undefined") return null;
-  const raw = window.localStorage.getItem(key);
-  if (!raw) return null;
-  const value = Number(raw);
-  return Number.isFinite(value) && value > 0 ? value : null;
-}
 
 export function useFocusTimer(onSuccessSync?: () => void) {
   const [state, setState] = useState<TimerState>("idle");
@@ -24,33 +14,7 @@ export function useFocusTimer(onSuccessSync?: () => void) {
   const completionHandledRef = useRef(false);
   const mountedRef = useRef(true);
 
-  useEffect(() => {
-    mountedRef.current = true;
-    const savedEnd = readNumber(STORAGE_END);
-    const savedDuration = readNumber(STORAGE_DURATION);
-
-    if (!savedEnd || !savedDuration) {
-      window.localStorage.removeItem(STORAGE_END);
-      window.localStorage.removeItem(STORAGE_DURATION);
-      return () => { mountedRef.current = false; };
-    }
-
-    const remaining = savedEnd - Date.now();
-    if (remaining > 0) {
-      setDurationMs(savedDuration);
-      setEndTime(savedEnd);
-      setRemainingMs(Math.min(savedDuration, remaining));
-      setState("running");
-    } else {
-      window.localStorage.removeItem(STORAGE_END);
-      window.localStorage.removeItem(STORAGE_DURATION);
-      setDurationMs(savedDuration);
-      setRemainingMs(0);
-      setState("completed");
-    }
-
-    return () => { mountedRef.current = false; };
-  }, []);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   const setDuration = useCallback((minutes: number) => {
     if ((state !== "idle" && state !== "paused") || !Number.isFinite(minutes) || minutes <= 0 || minutes > 240) return;
@@ -60,19 +24,14 @@ export function useFocusTimer(onSuccessSync?: () => void) {
     setEndTime(null);
     setState("idle");
     completionHandledRef.current = false;
-    window.localStorage.removeItem(STORAGE_END);
-    window.localStorage.setItem(STORAGE_DURATION, String(ms));
   }, [state]);
 
   const start = useCallback(() => {
     if ((state !== "idle" && state !== "paused") || remainingMs <= 0) return;
-    const end = Date.now() + remainingMs;
     completionHandledRef.current = false;
-    setEndTime(end);
+    setEndTime(Date.now() + remainingMs);
     setState("running");
-    window.localStorage.setItem(STORAGE_END, String(end));
-    window.localStorage.setItem(STORAGE_DURATION, String(durationMs));
-  }, [durationMs, remainingMs, state]);
+  }, [remainingMs, state]);
 
   const pause = useCallback(() => {
     if (state !== "running") return;
@@ -80,7 +39,6 @@ export function useFocusTimer(onSuccessSync?: () => void) {
     setRemainingMs(nextRemaining);
     setEndTime(null);
     setState(nextRemaining === 0 ? "completed" : "paused");
-    window.localStorage.removeItem(STORAGE_END);
   }, [endTime, remainingMs, state]);
 
   const reset = useCallback(() => {
@@ -89,8 +47,6 @@ export function useFocusTimer(onSuccessSync?: () => void) {
     setEndTime(null);
     setIsSaving(false);
     completionHandledRef.current = false;
-    window.localStorage.removeItem(STORAGE_END);
-    window.localStorage.setItem(STORAGE_DURATION, String(durationMs));
   }, [durationMs]);
 
   useEffect(() => {
@@ -99,7 +55,6 @@ export function useFocusTimer(onSuccessSync?: () => void) {
     const complete = async () => {
       if (completionHandledRef.current) return;
       completionHandledRef.current = true;
-      window.localStorage.removeItem(STORAGE_END);
       setState("completed");
       setEndTime(null);
       setRemainingMs(0);
@@ -111,7 +66,6 @@ export function useFocusTimer(onSuccessSync?: () => void) {
         });
         if (error) {
           console.error("Failed to persist focus session:", error);
-          if (mountedRef.current) setIsSaving(false);
           return;
         }
         onSuccessSync?.();
