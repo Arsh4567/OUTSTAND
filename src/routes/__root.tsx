@@ -9,6 +9,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import SidebarLayout from "@/components/layout/SidebarLayout";
 import { QuickActions } from "@/components/global/QuickActions";
+import { ExperienceLayer } from "@/components/global/ExperienceLayer";
 
 function NotFoundComponent() {
   return (
@@ -93,7 +94,7 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en" className="dark bg-[#050508] text-slate-100 antialiased">
       <head><HeadContent /></head>
       <body className="min-h-screen bg-[#050508] text-slate-100 selection:bg-indigo-500/30">
-        {children}<Scripts />
+        <ExperienceLayer>{children}</ExperienceLayer><Scripts />
       </body>
     </html>
   );
