@@ -1,27 +1,53 @@
-/* OUTSTAND runtime performance layer. Keep expensive effects opt-in. */
+/* OUTSTAND runtime performance layer. Expensive effects are opt-in. */
 html,
 body {
   background-attachment: scroll !important;
   transition: none !important;
+  overscroll-behavior-x: none;
 }
 
+/* Contain independent sections so dynamic children do not invalidate the whole page. */
 .perf-contain {
   contain: layout paint style;
 }
 
+/* Best for long dashboard feeds: offscreen content can be skipped while remaining
+   in the DOM/accessibility tree. A stable intrinsic size prevents scroll jumps. */
 .perf-content-auto {
   content-visibility: auto;
+  contain: layout paint style;
   contain-intrinsic-size: auto 500px;
 }
 
+/* Use only on elements that are actually animated. Permanent will-change on a large
+   tree wastes GPU memory and can make performance worse. */
 .perf-layer {
   backface-visibility: hidden;
-  transform: translateZ(0);
+  transform: translate3d(0,0,0);
 }
 
 .perf-scroll {
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+
+/* Shared interaction contract: only compositor-friendly properties are animated. */
+.perf-interactive {
+  transform: translate3d(0,0,0);
+  transition: transform .24s cubic-bezier(.22,1,.36,1), opacity .18s linear;
+  will-change: transform;
+}
+.perf-interactive:hover { transform: translate3d(0,-2px,0); }
+.perf-interactive:active { transform: translate3d(0,0,0) scale(.98); }
+
+/* Reduce visual complexity on constrained devices without changing information architecture. */
+@media (max-width: 767px), (prefers-reduced-data: reduce) {
+  .perf-heavy-blur { filter: none !important; }
+  .perf-heavy-glass {
+    backdrop-filter: blur(10px) saturate(150%) !important;
+    -webkit-backdrop-filter: blur(10px) saturate(150%) !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -32,5 +58,10 @@ body {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+  }
+
+  .perf-interactive:hover,
+  .perf-interactive:active {
+    transform: none;
   }
 }
