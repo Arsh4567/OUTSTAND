@@ -26,9 +26,35 @@ jobs:
           bun-version: latest
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      # Run every independent check even when an earlier one fails. This turns the
+      # gate into a useful diagnostic surface instead of hiding lint/build failures
+      # behind an unrelated typecheck blocker. The final step still fails the job.
       - name: Typecheck
+        id: typecheck
+        continue-on-error: true
         run: bunx tsc --noEmit
       - name: Lint
+        id: lint
+        continue-on-error: true
         run: bun run lint
       - name: Production build
+        id: build
+        continue-on-error: true
         run: bun run build
+
+      - name: Quality gate summary
+        if: always()
+        env:
+          TYPECHECK: ${{ steps.typecheck.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+        run: |
+          echo "Typecheck: ${TYPECHECK}"
+          echo "Lint:      ${LINT}"
+          echo "Build:     ${BUILD}"
+
+          if [ "${TYPECHECK}" != "success" ] || [ "${LINT}" != "success" ] || [ "${BUILD}" != "success" ]; then
+            echo "Quality Gate failed. See each check above for the independent root cause(s)."
+            exit 1
+          fi
