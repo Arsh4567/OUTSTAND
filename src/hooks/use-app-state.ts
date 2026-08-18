@@ -48,6 +48,7 @@ export function useAppState() {
           body: JSON.stringify({ habits, sessions, outstand }),
         });
         if (response.ok) hasSyncedOnce.current = true;
+        else console.warn("Outstand cloud sync failed:", response.status);
       } catch (error) {
         console.warn("Outstand cloud sync unavailable:", error);
       }
