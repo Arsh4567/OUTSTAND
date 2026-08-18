@@ -1,14 +1,11 @@
 // src/hooks/use-app-state.ts
 import { useEffect, useMemo, useRef } from "react";
 import { useLocalStorage } from "@/hooks/use-local-storage";
-import { supabase } from "@/integrations/supabase/client";
 import {
   calculateLocalXp,
   computeStreak,
   levelFromXP,
   todayISO,
-  XP_PER_FOCUS,
-  XP_PER_HABIT,
   type FocusSession,
   type Habit,
   type OutstandCompletion,
@@ -39,6 +36,7 @@ export function useAppState() {
     if (syncTimer.current) clearTimeout(syncTimer.current);
     syncTimer.current = setTimeout(async () => {
       try {
+        const { supabase } = await import("@/integrations/supabase/client");
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
         const response = await fetch("/api/sync-productivity-state", {
@@ -157,7 +155,5 @@ export function useAppState() {
     deleteHabit,
     recordSession,
     recordOutstand,
-    XP_PER_FOCUS,
-    XP_PER_HABIT,
   };
 }
