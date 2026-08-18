@@ -105,7 +105,7 @@ export function OutstandCanvas({
       ref={hostRef}
       className="pointer-events-none absolute inset-0"
       aria-hidden="true"
-      style={{ contain: "strict" }}
+      style={{ contain: "layout paint" }}
     >
       <Canvas
         dpr={profile.dpr}
