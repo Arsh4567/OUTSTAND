@@ -33,12 +33,12 @@ button, a, [role="button"] {
   -webkit-backdrop-filter: blur(24px) saturate(180%);
 }
 
-/* Only transform/opacity are animated. Border and shadow changes snap instead of
-   forcing a repaint on every frame, keeping interaction work compositor-friendly. */
+/* Animate only compositor-friendly properties. Permanent will-change is avoided
+   because this class is shared by many nodes and unnecessary GPU promotion can
+   increase memory pressure and degrade scrolling on lower-end devices. */
 .outstand-interactive {
   transform: translate3d(0,0,0);
   transition: transform .24s var(--outstand-spring), opacity .18s linear;
-  will-change: transform;
 }
 
 .outstand-interactive:hover { transform: translate3d(0,-2px,0); }
@@ -81,7 +81,7 @@ button, a, [role="button"] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .outstand-interactive { transition: none; will-change: auto; }
+  .outstand-interactive { transition: none; }
   .outstand-interactive:hover,
   .outstand-interactive:active { transform: none; }
   .outstand-cursor-spotlight { display: none; }
