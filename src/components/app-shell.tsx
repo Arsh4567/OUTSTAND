@@ -20,6 +20,14 @@ const navItems = [
   { to: "/league", label: "League", icon: Trophy },
 ];
 
+const pageSpring = {
+  type: "spring" as const,
+  stiffness: 380,
+  damping: 30,
+  mass: 0.8,
+  restDelta: 0.001,
+};
+
 export function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isAuthRoute = pathname.startsWith("/auth");
@@ -94,7 +102,7 @@ function ShellWithChrome() {
   const signOut = async () => { await supabase.auth.signOut(); toast.success("Signed out successfully"); navigate({ to: "/auth", replace: true }); };
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-transparent text-slate-50 transition-colors duration-300">
+    <div className="relative min-h-screen overflow-x-hidden bg-transparent text-slate-50">
       <AnimatePresence>{showSupernova && <SupernovaEffect level={level} onClose={() => setShowSupernova(false)} />}</AnimatePresence>
 
       <div className="fixed inset-0 z-[-1] pointer-events-none overflow-hidden">
@@ -107,11 +115,11 @@ function ShellWithChrome() {
         <div className="min-w-0 flex-1 xl:pl-[264px]">
           <header className="sticky top-0 z-40 hidden h-[76px] items-center justify-between border-b border-white/[0.06] bg-[#05070d]/75 px-8 backdrop-blur-2xl xl:flex">
             <div className="flex items-center gap-3"><span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_16px_rgba(52,211,153,.65)]" /><span className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">OUTSTAND · Personal growth system</span></div>
-            <div className="flex items-center gap-3"><button type="button" onClick={() => setIsTimerSettingsOpen(true)} className="rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2 text-xs font-bold text-slate-300 transition hover:border-cyan-300/20 hover:text-white">Quick focus</button><button type="button" onClick={() => navigate({ to: "/profile" })} className="grid h-10 w-10 place-items-center rounded-xl border border-white/[0.08] bg-white/[0.035] text-slate-300 transition hover:border-cyan-300/20 hover:text-cyan-200"><UserRound className="h-4 w-4" /></button></div>
+            <div className="flex items-center gap-3"><button type="button" onClick={() => setIsTimerSettingsOpen(true)} className="outstand-interactive rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2 text-xs font-bold text-slate-300 hover:border-cyan-300/20 hover:text-white">Quick focus</button><button type="button" onClick={() => navigate({ to: "/profile" })} className="outstand-interactive grid h-10 w-10 place-items-center rounded-xl border border-white/[0.08] bg-white/[0.035] text-slate-300 hover:border-cyan-300/20 hover:text-cyan-200"><UserRound className="h-4 w-4" /></button></div>
           </header>
 
           <AnimatePresence mode="wait">
-            <motion.main key={pathname} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.3, ease: "easeOut" }} className="relative z-10 mx-auto w-full max-w-[1560px] px-4 py-5 sm:px-6 lg:px-8 xl:px-10 xl:py-8 2xl:px-12">
+            <motion.main key={pathname} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={pageSpring} className="relative z-10 mx-auto w-full max-w-[1560px] px-4 py-5 sm:px-6 lg:px-8 xl:px-10 xl:py-8 2xl:px-12" style={{ willChange: "transform, opacity" }}>
               <Outlet />
             </motion.main>
           </AnimatePresence>
@@ -127,7 +135,7 @@ function ShellWithChrome() {
 function DesktopSidebar({ pathname, level, xp, onSettings }: { pathname: string; level: number; xp: number; onSettings: () => void }) {
   return <aside className="fixed inset-y-0 left-0 z-50 hidden w-[264px] border-r border-white/[0.06] bg-[#070a12]/90 px-4 py-5 backdrop-blur-2xl xl:block">
     <div className="flex h-full flex-col">
-      <Link to="/dashboard" className="flex items-center gap-3 rounded-2xl px-3 py-3 transition hover:bg-white/[0.035]">
+      <Link to="/dashboard" className="outstand-interactive flex items-center gap-3 rounded-2xl px-3 py-3 hover:bg-white/[0.035]">
         <div className="grid h-10 w-10 place-items-center rounded-xl border border-cyan-300/15 bg-cyan-300/[0.07] text-cyan-200 shadow-[0_0_30px_rgba(34,211,238,.08)]"><Sparkles className="h-5 w-5" /></div>
         <div><p className="text-lg font-black tracking-[-0.04em] text-white">OUTSTAND</p><p className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-600">Become undeniable</p></div>
       </Link>
@@ -135,14 +143,14 @@ function DesktopSidebar({ pathname, level, xp, onSettings }: { pathname: string;
       <nav className="mt-2 space-y-1">
         {navItems.map(({ to, label, icon: Icon, featured }) => {
           const active = pathname === to || (to !== "/dashboard" && pathname.startsWith(`${to}/`));
-          return <Link key={to} to={to} className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold transition ${active ? "border border-cyan-300/10 bg-cyan-300/[0.07] text-white shadow-[inset_0_0_24px_rgba(34,211,238,.025)]" : "text-slate-500 hover:bg-white/[0.035] hover:text-slate-200"} ${featured ? "mt-2" : ""}`}>
+          return <Link key={to} to={to} className={`outstand-interactive group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold ${active ? "border border-cyan-300/10 bg-cyan-300/[0.07] text-white shadow-[inset_0_0_24px_rgba(34,211,238,.025)]" : "text-slate-500 hover:bg-white/[0.035] hover:text-slate-200"} ${featured ? "mt-2" : ""}`}>
             <span className={`grid h-8 w-8 place-items-center rounded-lg border ${active ? "border-cyan-300/15 bg-cyan-300/[0.07] text-cyan-200" : "border-white/[0.05] bg-white/[0.02] text-slate-600 group-hover:text-slate-300"}`}><Icon className="h-4 w-4" /></span><span className="flex-1">{label}</span>{featured && <span className="rounded-full border border-violet-300/15 bg-violet-300/[0.06] px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-violet-200">Core</span>}
           </Link>;
         })}
       </nav>
       <div className="mt-auto space-y-3">
-        <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4"><div className="flex items-center justify-between"><span className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-600">Your level</span><span className="text-xs font-black text-cyan-200">{level}</span></div><p className="mt-2 text-sm font-bold text-white">{xp.toLocaleString()} XP</p><div className="mt-3 h-1 overflow-hidden rounded-full bg-white/5"><div className="h-full w-1/2 rounded-full bg-gradient-to-r from-cyan-400 to-violet-400" /></div></div>
-        <button type="button" onClick={onSettings} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-500 transition hover:bg-white/[0.035] hover:text-white"><span className="grid h-8 w-8 place-items-center rounded-lg border border-white/[0.05] bg-white/[0.02]"><Settings className="h-4 w-4" /></span>Settings</button>
+        <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4"><div className="flex items-center justify-between"><span className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-600">Your level</span><span className="text-xs font-black text-cyan-200 tabular-nums">{level}</span></div><p className="mt-2 text-sm font-bold text-white tabular-nums">{xp.toLocaleString()} XP</p><div className="mt-3 h-1 overflow-hidden rounded-full bg-white/5"><div className="h-full w-1/2 rounded-full bg-gradient-to-r from-cyan-400 to-violet-400" /></div></div>
+        <button type="button" onClick={onSettings} className="outstand-interactive flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-500 hover:bg-white/[0.035] hover:text-white"><span className="grid h-8 w-8 place-items-center rounded-lg border border-white/[0.05] bg-white/[0.02]"><Settings className="h-4 w-4" /></span>Settings</button>
       </div>
     </div>
   </aside>;
@@ -151,8 +159,8 @@ function DesktopSidebar({ pathname, level, xp, onSettings }: { pathname: string;
 function SupernovaEffect({ level, onClose }: { level: number; onClose: () => void }) {
   const particles = Array.from({ length: 45 }).map((_, i) => { const angle = Math.random() * Math.PI * 2; const distance = Math.random() * 400 + 100; return { id: i, x: Math.cos(angle) * distance, y: Math.sin(angle) * distance, size: Math.random() * 10 + 4, color: Math.random() > 0.5 ? "#fbbf24" : "#60a5fa" }; });
   useEffect(() => { if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]); const timer = setTimeout(onClose, 4000); return () => clearTimeout(timer); }, [onClose]);
-  return <motion.div className="fixed inset-0 z-[100] flex flex-col items-center justify-center pointer-events-none overflow-hidden" initial={{ backgroundColor: "rgba(255, 255, 255, 1)" }} animate={{ backgroundColor: "rgba(3, 7, 18, 0.85)" }} exit={{ opacity: 0 }} transition={{ duration: 0.8, ease: "easeOut" }}>
-    {particles.map((p) => <motion.div key={p.id} className="absolute top-1/2 left-1/2 rounded-full" style={{ backgroundColor: p.color, width: p.size, height: p.size, boxShadow: `0 0 20px ${p.color}` }} initial={{ x: 0, y: 0, scale: 0, opacity: 1 }} animate={{ x: p.x, y: p.y, scale: Math.random() * 1.5 + 0.5, opacity: 0 }} transition={{ duration: 1.5 + Math.random(), ease: "easeOut" }} />)}
-    <motion.div className="relative z-10 flex flex-col items-center text-center" initial={{ scale: 0.5, opacity: 0, y: 50 }} animate={{ scale: 1, opacity: 1, y: 0 }} transition={{ delay: 0.2, type: "spring", bounce: 0.6 }}><motion.div className="mb-2 font-black uppercase tracking-widest text-yellow-400 drop-shadow-[0_0_30px_rgba(250,204,21,0.6)]" style={{ fontSize: "clamp(3rem, 10vw, 6rem)" }} animate={{ scale: [1, 1.05, 1] }} transition={{ repeat: Infinity, duration: 2 }}>Level Up</motion.div><div className="rounded-full border border-white/20 bg-white/10 px-6 py-2 text-lg font-medium tracking-wide text-white shadow-2xl backdrop-blur-md sm:text-2xl">You reached Level <span className="font-bold text-blue-400">{level}</span></div></motion.div>
+  return <motion.div className="fixed inset-0 z-[100] flex flex-col items-center justify-center pointer-events-none overflow-hidden bg-slate-950/90" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}>
+    {particles.map((p) => <motion.div key={p.id} className="absolute top-1/2 left-1/2 rounded-full" style={{ backgroundColor: p.color, width: p.size, height: p.size, boxShadow: `0 0 20px ${p.color}` }} initial={{ x: 0, y: 0, scale: 0, opacity: 1 }} animate={{ x: p.x, y: p.y, scale: 1, opacity: 0 }} transition={{ duration: 1.5, ease: "easeOut" }} />)}
+    <motion.div className="relative z-10 flex flex-col items-center text-center" initial={{ scale: 0.5, opacity: 0, y: 50 }} animate={{ scale: 1, opacity: 1, y: 0 }} transition={{ delay: 0.2, type: "spring", bounce: 0.6 }}><motion.div className="mb-2 font-black uppercase tracking-widest text-yellow-400 drop-shadow-[0_0_30px_rgba(250,204,21,0.6)]" style={{ fontSize: "clamp(3rem, 10vw, 6rem)" }} animate={{ scale: [1, 1.05, 1] }} transition={{ repeat: Infinity, duration: 2 }}>Level Up</motion.div><div className="rounded-full border border-white/20 bg-white/10 px-6 py-2 text-lg font-medium tracking-wide text-white shadow-2xl backdrop-blur-md sm:text-2xl">You reached Level <span className="font-bold text-blue-400 tabular-nums">{level}</span></div></motion.div>
   </motion.div>;
 }
