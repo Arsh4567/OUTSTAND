@@ -105,7 +105,7 @@ export function OutstandMotionCore({ className = "", accent = "#67e8f9", size = 
       ref={hostRef}
       className={`pointer-events-none relative ${sizes[size]} ${className}`}
       aria-hidden="true"
-      style={{ contain: "strict" }}
+      style={{ contain: "layout paint" }}
     >
       <div className="absolute inset-0 rounded-full bg-cyan-400/[0.07] blur-2xl" />
       <Canvas
