@@ -9,6 +9,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import SidebarLayout from "@/components/layout/SidebarLayout";
 import { QuickActions } from "@/components/global/QuickActions";
+import { CursorSpotlight } from "@/components/global/CursorSpotlight";
 
 function NotFoundComponent() {
   return (
@@ -19,7 +20,7 @@ function NotFoundComponent() {
         <h1 className="text-6xl font-black tracking-tighter text-white">404</h1>
         <h2 className="mt-3 text-lg font-bold tracking-tight text-slate-200">Signal Lost in Deep Space</h2>
         <p className="mt-2 text-xs leading-relaxed text-slate-400">The protocol or sector you are trying to access does not exist or has been relocated.</p>
-        <Link to="/" className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(79,70,229,0.4)] transition hover:bg-indigo-500"><Home className="h-4 w-4" /> Return to Dashboard</Link>
+        <Link to="/" className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(79,70,229,0.4)] transition-transform duration-240 ease-[cubic-bezier(.22,1,.36,1)] hover:-translate-y-0.5 active:scale-[0.98]"><Home className="h-4 w-4" /> Return to Dashboard</Link>
       </div>
     </div>
   );
@@ -37,8 +38,8 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <h1 className="text-xl font-bold tracking-tight text-white">System Exception Encountered</h1>
         <p className="mt-2 text-xs leading-relaxed text-slate-400">An unexpected runtime anomaly occurred. Your persistent data is safe.</p>
         <div className="mt-6 flex flex-col gap-2.5">
-          <Button onClick={() => { router.invalidate(); reset(); }} className="w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-slate-800"><RefreshCw className="h-4 w-4 text-indigo-400" /> Reboot Subsystem</Button>
-          <a href="/" className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(79,70,229,0.4)] transition hover:bg-indigo-500"><Home className="h-4 w-4" /> Force Hard Reset to Home</a>
+          <Button onClick={() => { router.invalidate(); reset(); }} className="w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-xs font-bold uppercase tracking-wider text-white"><RefreshCw className="h-4 w-4 text-indigo-400" /> Reboot Subsystem</Button>
+          <a href="/" className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(79,70,229,0.4)] transition-transform duration-240 ease-[cubic-bezier(.22,1,.36,1)] hover:-translate-y-0.5 active:scale-[0.98]"><Home className="h-4 w-4" /> Force Hard Reset to Home</a>
         </div>
       </div>
     </div>
@@ -94,7 +95,9 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en" className="dark bg-[#050508] text-slate-100 antialiased">
       <head><HeadContent /></head>
       <body className="min-h-screen bg-[#050508] text-slate-100 selection:bg-indigo-500/30">
-        {children}<Scripts />
+        <CursorSpotlight />
+        {children}
+        <Scripts />
       </body>
     </html>
   );
