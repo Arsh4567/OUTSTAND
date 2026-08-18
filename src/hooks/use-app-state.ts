@@ -30,15 +30,20 @@ export function useAppState() {
     : [];
 
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncAbortController = useRef<AbortController | null>(null);
   const hasSyncedOnce = useRef(false);
 
   useEffect(() => {
     if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncAbortController.current?.abort();
+
     syncTimer.current = setTimeout(async () => {
+      const controller = new AbortController();
+      syncAbortController.current = controller;
       try {
         const { supabase } = await import("@/integrations/supabase/client");
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
+        if (!session || controller.signal.aborted) return;
         const response = await fetch("/api/sync-productivity-state", {
           method: "POST",
           headers: {
@@ -46,16 +51,21 @@ export function useAppState() {
             Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({ habits, sessions, outstand }),
+          signal: controller.signal,
         });
         if (response.ok) hasSyncedOnce.current = true;
         else console.warn("Outstand cloud sync failed:", response.status);
       } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
         console.warn("Outstand cloud sync unavailable:", error);
+      } finally {
+        if (syncAbortController.current === controller) syncAbortController.current = null;
       }
-    }, hasSyncedOnce.current ? 1200 : 250);
+    }, hasSyncedOnce.current ? 1500 : 500);
 
     return () => {
       if (syncTimer.current) clearTimeout(syncTimer.current);
+      syncAbortController.current?.abort();
     };
   }, [habits, sessions, outstand]);
 
@@ -63,9 +73,11 @@ export function useAppState() {
   const levelState = useMemo(() => levelFromXP(xp), [xp]);
 
   const recordOutstand = (title: string, xpReward: number) => {
+    const safeTitle = title.trim();
+    if (!safeTitle) return;
     const safeXp = Number.isFinite(xpReward) ? Math.max(0, Math.round(xpReward)) : 0;
     setOutstand((prev) => [
-      { id: safeUuid(), title: title.trim(), xp: safeXp, completedAt: new Date().toISOString() },
+      { id: safeUuid(), title: safeTitle, xp: safeXp, completedAt: new Date().toISOString() },
       ...(Array.isArray(prev) ? prev : []),
     ].slice(0, 200));
   };
@@ -123,12 +135,13 @@ export function useAppState() {
   };
 
   const recordSession = (durationMin: number, completed: boolean) => {
-    const safeDuration = Math.max(0, Math.round(durationMin));
+    const numericDuration = Number(durationMin);
+    const safeDuration = Number.isFinite(numericDuration) ? Math.min(1440, Math.max(0, Math.round(numericDuration))) : 0;
     const session: FocusSession = {
       id: safeUuid(),
       startedAt: new Date().toISOString(),
       durationMin: safeDuration,
-      completed,
+      completed: Boolean(completed),
     };
     setSessions((prev) => [session, ...(Array.isArray(prev) ? prev : [])].slice(0, 500));
   };
