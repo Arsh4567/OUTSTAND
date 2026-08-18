@@ -122,6 +122,7 @@ function Core({ reducedMotion }: { reducedMotion: boolean }) {
   const outerMaterial = useRef<THREE.MeshBasicMaterial>(null);
   const color = useMemo(() => new THREE.Color(), []);
   const softColor = useMemo(() => new THREE.Color(), []);
+  const white = useMemo(() => new THREE.Color("#ffffff"), []);
 
   useFrame((state, delta) => {
     if (!group.current || reducedMotion) return;
@@ -133,7 +134,7 @@ function Core({ reducedMotion }: { reducedMotion: boolean }) {
     animatedColor(color, time);
     animatedColor(softColor, time + 1.1);
 
-    coreMaterial.current?.color.copy(color).lerp(new THREE.Color("#ffffff"), 0.48);
+    coreMaterial.current?.color.copy(color).lerp(white, 0.48);
     wireMaterial.current?.color.copy(color);
     innerMaterial.current?.color.copy(color);
     outerMaterial.current?.color.copy(softColor);
