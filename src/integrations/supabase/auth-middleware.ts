@@ -3,6 +3,10 @@ import { createMiddleware } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from './types'
+import {
+  SUPABASE_RUNTIME_URL,
+  SUPABASE_RUNTIME_PUBLISHABLE_KEY,
+} from './runtime-config'
 
 function isNewSupabaseApiKey(value: string): boolean {
   return value.startsWith('sb_publishable_') || value.startsWith('sb_secret_');
@@ -30,22 +34,19 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 
 export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server(
   async ({ next }) => {
-    // Vercel deployments can expose the same public Supabase configuration
-    // under VITE_* names. Accept both conventions on the server.
-    const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    // Prefer Vercel environment variables, then fall back to the project's
+    // public configuration for preview deployments missing server env vars.
+    const SUPABASE_URL =
+      process.env.SUPABASE_URL ||
+      process.env.VITE_SUPABASE_URL ||
+      SUPABASE_RUNTIME_URL;
     const SUPABASE_PUBLISHABLE_KEY =
-      process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      process.env.SUPABASE_PUBLISHABLE_KEY ||
+      process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+      SUPABASE_RUNTIME_PUBLISHABLE_KEY;
 
     if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-      const missing = [
-        ...(!SUPABASE_URL ? ['SUPABASE_URL (or VITE_SUPABASE_URL)'] : []),
-        ...(!SUPABASE_PUBLISHABLE_KEY
-          ? ['SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_PUBLISHABLE_KEY)']
-          : []),
-      ];
-      const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Configure the Supabase URL and publishable key in the deployment environment.`;
-      console.error(`[Supabase] ${message}`);
-      throw new Error(message);
+      throw new Error('Supabase server configuration is unavailable.');
     }
 
     const request = getRequest();
