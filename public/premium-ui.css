@@ -1,33 +1,58 @@
-/* Outstand product-wide visual layer. Kept separate so route files stay focused. */
+/* OUTSTAND premium interaction layer. Visual polish is isolated here so route code stays lean. */
 :root {
-  --outstand-shadow-soft: 0 18px 60px rgba(0,0,0,.18);
-  --outstand-shadow-card: 0 24px 80px rgba(0,0,0,.22);
-  --outstand-border: rgba(255,255,255,.09);
+  --outstand-shadow-soft: 0 18px 60px rgba(0,0,0,.18), 0 2px 8px rgba(0,0,0,.08);
+  --outstand-shadow-card: 0 24px 80px rgba(0,0,0,.22), 0 8px 24px rgba(0,0,0,.12);
+  --outstand-rim: inset 0 1px 1px rgba(255,255,255,.12);
+  --outstand-spring: cubic-bezier(.22,1,.36,1);
 }
 
-html { text-rendering: optimizeLegibility; }
-button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
+html {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+button, a, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
 
 .outstand-surface {
-  border: 1px solid var(--outstand-border);
+  border: 1px solid var(--outstand-border, rgba(255,255,255,.09));
   background: linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018));
-  box-shadow: var(--outstand-shadow-soft);
-  backdrop-filter: blur(18px);
+  box-shadow: var(--outstand-shadow-soft), var(--outstand-rim);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
 }
 
 .outstand-surface-strong {
   border: 1px solid rgba(255,255,255,.11);
   background: linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025));
-  box-shadow: var(--outstand-shadow-card);
-  backdrop-filter: blur(24px);
+  box-shadow: var(--outstand-shadow-card), var(--outstand-rim);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
 }
 
+/* Only transform/opacity are animated. Border and shadow changes snap instead of
+   forcing a repaint on every frame, keeping interaction work compositor-friendly. */
 .outstand-interactive {
-  transition: transform .22s cubic-bezier(.16,1,.3,1), border-color .22s ease, box-shadow .22s ease, background-color .22s ease;
+  transform: translate3d(0,0,0);
+  transition: transform .24s var(--outstand-spring), opacity .18s linear;
   will-change: transform;
 }
-.outstand-interactive:hover { transform: translateY(-2px); border-color: rgba(103,232,249,.2); box-shadow: 0 18px 60px rgba(0,0,0,.24), 0 0 30px rgba(34,211,238,.06); }
-.outstand-interactive:active { transform: translateY(0) scale(.99); }
+
+.outstand-interactive:hover { transform: translate3d(0,-2px,0); }
+.outstand-interactive:active { transform: translate3d(0,0,0) scale(.98); }
+
+/* One shared cursor light replaces per-card mousemove handlers. */
+.outstand-cursor-spotlight {
+  background: radial-gradient(circle at center, rgba(103,232,249,.10) 0, rgba(99,102,241,.055) 24%, rgba(0,0,0,0) 68%);
+  filter: blur(1px);
+  mix-blend-mode: screen;
+  contain: strict;
+  will-change: transform, opacity;
+  transition: opacity .18s linear;
+}
 
 .outstand-page-bg {
   background:
@@ -36,16 +61,39 @@ button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
     #050816;
 }
 
+/* Static dithering prevents large OLED gradients from visibly banding without a
+   continuously animated noise texture. */
+.outstand-noise::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .025;
+  background-image: radial-gradient(rgba(255,255,255,.8) .55px, transparent .55px);
+  background-size: 5px 5px;
+  contain: paint;
+}
+
+.outstand-content-auto {
+  content-visibility: auto;
+  contain: layout paint style;
+  contain-intrinsic-size: auto 520px;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    scroll-behavior: auto !important;
-    animation-duration: .01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: .01ms !important;
-  }
-  .outstand-interactive:hover { transform: none; }
+  .outstand-interactive { transition: none; will-change: auto; }
+  .outstand-interactive:hover,
+  .outstand-interactive:active { transform: none; }
+  .outstand-cursor-spotlight { display: none; }
+}
+
+@media (pointer: coarse) {
+  .outstand-cursor-spotlight { display: none; }
 }
 
 @media (max-width: 640px) {
-  .outstand-surface, .outstand-surface-strong { backdrop-filter: blur(12px); }
+  .outstand-surface, .outstand-surface-strong {
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+  }
 }
