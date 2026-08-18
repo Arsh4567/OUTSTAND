@@ -9,15 +9,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { requestNotificationPermission } from "@/lib/notifications";
 import { AppSettingsSheet } from "@/components/app-settings-sheet";
 import { TimerSettingsSheet } from "@/components/timer-settings-sheet";
-import { LayoutDashboard, Swords, Brain, Timer, BookOpen, Trophy, UserRound, Settings, Sparkles } from "lucide-react";
+import { LayoutDashboard, Swords, Brain, Timer, UserRound, Settings, Sparkles } from "lucide-react";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/outstand", label: "Outstand", icon: Swords, featured: true },
   { to: "/intelligence", label: "Intelligence", icon: Brain },
   { to: "/focus", label: "Deep Focus", icon: Timer },
-  { to: "/study", label: "Study", icon: BookOpen },
-  { to: "/league", label: "League", icon: Trophy },
 ];
 
 export function AppShell() {
@@ -177,13 +175,4 @@ function MobileBottomNav({ pathname, onSettings, onQuickFocus }: { pathname: str
     </div>
     <button type="button" onClick={onQuickFocus} className="sr-only">Quick focus</button>
   </nav>;
-}
-
-function SupernovaEffect({ level, onClose }: { level: number; onClose: () => void }) {
-  const particles = Array.from({ length: 45 }).map((_, i) => { const angle = Math.random() * Math.PI * 2; const distance = Math.random() * 400 + 100; return { id: i, x: Math.cos(angle) * distance, y: Math.sin(angle) * distance, size: Math.random() * 10 + 4, color: Math.random() > 0.5 ? "#fbbf24" : "#60a5fa" }; });
-  useEffect(() => { if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]); const timer = setTimeout(onClose, 4000); return () => clearTimeout(timer); }, [onClose]);
-  return <motion.div className="fixed inset-0 z-[100] flex flex-col items-center justify-center pointer-events-none overflow-hidden" initial={{ backgroundColor: "rgba(255, 255, 255, 1)" }} animate={{ backgroundColor: "rgba(3, 7, 18, 0.85)" }} exit={{ opacity: 0 }} transition={{ duration: 0.8, ease: "easeOut" }}>
-    {particles.map((p) => <motion.div key={p.id} className="absolute top-1/2 left-1/2 rounded-full" style={{ backgroundColor: p.color, width: p.size, height: p.size, boxShadow: `0 0 20px ${p.color}` }} initial={{ x: 0, y: 0, scale: 0, opacity: 1 }} animate={{ x: p.x, y: p.y, scale: Math.random() * 1.5 + 0.5, opacity: 0 }} transition={{ duration: 1.5 + Math.random(), ease: "easeOut" }} />)}
-    <motion.div className="relative z-10 flex flex-col items-center text-center" initial={{ scale: 0.5, opacity: 0, y: 50 }} animate={{ scale: 1, opacity: 1, y: 0 }} transition={{ delay: 0.2, type: "spring", bounce: 0.6 }}><motion.div className="mb-2 font-black uppercase tracking-widest text-yellow-400 drop-shadow-[0_0_30px_rgba(250,204,21,0.6)]" style={{ fontSize: "clamp(3rem, 10vw, 6rem)" }} animate={{ scale: [1, 1.05, 1] }} transition={{ repeat: Infinity, duration: 2 }}>Level Up</motion.div><div className="rounded-full border border-white/20 bg-white/10 px-6 py-2 text-lg font-medium tracking-wide text-white shadow-2xl backdrop-blur-md sm:text-2xl">You reached Level <span className="font-bold text-blue-400">{level}</span></div></motion.div>
-  </motion.div>;
 }
