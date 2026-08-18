@@ -6,9 +6,7 @@ body {
   overscroll-behavior-x: none;
 }
 
-.perf-contain {
-  contain: layout paint style;
-}
+.perf-contain { contain: layout paint style; }
 
 .perf-content-auto {
   content-visibility: auto;
@@ -35,15 +33,15 @@ body {
 .perf-interactive:hover { transform: translate3d(0,-2px,0); }
 .perf-interactive:active { transform: translate3d(0,0,0) scale(.98); }
 
-/* Existing design utilities keep their appearance but stop animating
-   paint-heavy box-shadow/border properties. */
+/* Existing utilities stop animating paint-heavy box-shadow/border properties.
+   We intentionally do not set will-change globally: too many promoted layers can
+   consume GPU memory and make scrolling worse on mobile. */
 .glass-card,
 .btn-primary,
 .btn-outstand,
 .outstand-interactive {
   transition-property: transform, opacity !important;
   transition-timing-function: cubic-bezier(.22,1,.36,1) !important;
-  will-change: transform;
 }
 
 .glass-card:hover,
@@ -58,17 +56,17 @@ body {
   transform: translate3d(0,0,0) scale(.98) !important;
 }
 
-/* The legacy utility continuously animated box-shadow. Keep the class available
-   while making its idle state static; users can still opt into transform motion. */
 .animate-neon-breathe {
   animation: none !important;
   box-shadow: var(--shadow-glow, 0 0 30px rgba(99,102,241,.18));
 }
 
+/* One shared cursor layer. No per-card pointer listeners, no layout reads and no
+   animated shadow; the React listener only updates a transform once per frame. */
 .outstand-cursor-spotlight {
   background: radial-gradient(circle at center, rgba(103,232,249,.10) 0, rgba(99,102,241,.055) 24%, transparent 68%);
-  filter: blur(1px);
-  mix-blend-mode: screen;
+  filter: none;
+  mix-blend-mode: normal;
   contain: strict;
   will-change: transform, opacity;
 }
@@ -78,6 +76,15 @@ body {
   .perf-heavy-glass {
     backdrop-filter: blur(10px) saturate(150%) !important;
     -webkit-backdrop-filter: blur(10px) saturate(150%) !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .perf-heavy-glass,
+  .outstand-surface,
+  .outstand-surface-strong {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 }
 
