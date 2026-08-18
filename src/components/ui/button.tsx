@@ -8,7 +8,7 @@ const buttonVariants = cva(
   // PERFORMANCE: animate only transform/opacity. Box-shadow, border and layout
   // are intentionally not transitioned because they trigger extra paint work.
   // The cubic-bezier approximates a damped spring while staying compositor-friendly.
-  "group relative inline-flex items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-xl text-sm font-bold tracking-wide transition-[transform,opacity] duration-240 ease-[cubic-bezier(.22,1,.36,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:transition-transform [&_svg]:duration-200 [&_svg]:ease-[cubic-bezier(.22,1,.36,1)] hover:[&_svg]:scale-105",
+  "group relative inline-flex items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-xl text-sm font-bold tracking-wide transition-[transform,opacity] duration-[240ms] ease-[cubic-bezier(.22,1,.36,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:transition-transform [&_svg]:duration-200 [&_svg]:ease-[cubic-bezier(.22,1,.36,1)] hover:[&_svg]:scale-105",
   {
     variants: {
       variant: {
