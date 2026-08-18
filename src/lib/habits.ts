@@ -2,9 +2,9 @@ export type Habit = {
   id: string;
   name: string;
   emoji: string;
-  color: string; // token name: primary | accent | success | warning
-  createdAt: string; // ISO
-  history: string[]; // ISO date strings (YYYY-MM-DD) of completions
+  color: string;
+  createdAt: string;
+  history: string[];
 };
 
 export type FocusSession = {
@@ -17,6 +17,7 @@ export type FocusSession = {
 export type OutstandCompletion = {
   id: string;
   title: string;
+  xp: number;
   completedAt: string;
 };
 
@@ -29,11 +30,9 @@ export const todayISO = () => {
 };
 
 export const lastNDays = (n: number) => {
-  // Defensive guard: Ensure n is a valid positive number
-  const safeN = (typeof n === 'number' && n > 0 && Number.isFinite(n)) ? n : 7;
-  
+  const safeN = Number.isInteger(n) && n > 0 && n <= 366 ? n : 7;
   const arr: string[] = [];
-  for (let i = safeN - 1; i >= 0; i--) {
+  for (let i = safeN - 1; i >= 0; i -= 1) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const y = d.getFullYear();
@@ -44,78 +43,60 @@ export const lastNDays = (n: number) => {
   return arr;
 };
 
-// CRASH-PROOFED
 export function computeStreak(history?: string[]): number {
-  // Defensive guard: If history is missing, null, or not an array, streak is 0
-  if (!history || !Array.isArray(history) || history.length === 0) {
-    return 0;
+  if (!Array.isArray(history) || history.length === 0) return 0;
+
+  const set = new Set(history);
+  const today = todayISO();
+  const yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterday = `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth() + 1).padStart(2, "0")}-${String(yesterdayDate.getDate()).padStart(2, "0")}`;
+  let cursor = set.has(today) ? new Date() : set.has(yesterday) ? yesterdayDate : null;
+
+  if (!cursor) return 0;
+
+  let streak = 0;
+  while (cursor && streak <= history.length) {
+    const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
+    if (!set.has(key)) break;
+    streak += 1;
+    cursor = new Date(cursor);
+    cursor.setDate(cursor.getDate() - 1);
   }
-  
-  try {
-    const set = new Set(history);
-    let streak = 0;
-    const d = new Date();
-    
-    // Safety break loop limit (prevents infinite loop if dates glitch)
-    let safetyCounter = 0; 
-    
-    while (safetyCounter < 10000) {
-      safetyCounter++;
-      
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      const key = `${y}-${m}-${day}`;
-      
-      if (set.has(key)) {
-        streak += 1;
-        d.setDate(d.getDate() - 1);
-      } else {
-        // allow today to be missing without breaking streak
-        if (streak === 0 && key === todayISO()) {
-          d.setDate(d.getDate() - 1);
-          continue;
-        }
-        break;
-      }
-    }
-    return streak;
-  } catch (error) {
-    console.error("Error computing streak:", error);
-    return 0; // Fallback so app doesn't crash
-  }
+  return streak;
 }
 
 export const XP_PER_HABIT = 10;
 export const XP_PER_FOCUS = 25;
 export const XP_PER_OUTSTAND = 20;
 
-// CRASH-PROOFED
-export const levelFromXP = (xp?: number) => {
-  // Defensive guard: Catch NaN, undefined, negative numbers, or non-numbers
-  if (xp === undefined || xp === null || typeof xp !== "number" || isNaN(xp) || xp < 0) {
-    return { level: 1, into: 0, need: 100 };
-  }
-  
-  // Defensive guard: Prevent "Maximum Call Stack / Infinite Loop" tab freezes
-  if (!Number.isFinite(xp)) {
-    return { level: 99, into: 0, need: 100 }; 
-  }
+export function calculateLocalXp(
+  habits: Habit[],
+  sessions: FocusSession[],
+  outstand: OutstandCompletion[],
+): number {
+  const habitCompletions = habits.reduce((sum, habit) => sum + (Array.isArray(habit.history) ? habit.history.length : 0), 0);
+  const completedFocusSessions = sessions.reduce((sum, session) => sum + (session.completed ? 1 : 0), 0);
+  const outstandXp = outstand.reduce((sum, completion) => sum + (Number.isFinite(completion.xp) ? Math.max(0, completion.xp) : 0), 0);
+  return habitCompletions * XP_PER_HABIT + completedFocusSessions * XP_PER_FOCUS + outstandXp;
+}
 
+export function levelFromXP(xp = 0) {
+  const safeXp = Number.isFinite(xp) && xp >= 0 ? xp : 0;
   let level = 1;
-  let remain = xp;
+  let remaining = safeXp;
   let need = 100;
-  
-  // Safety break loop limit (prevents infinite loop)
-  let safetyCounter = 0;
 
-  while (remain >= need && safetyCounter < 10000) {
-    safetyCounter++;
-    remain -= need;
+  while (remaining >= need) {
+    remaining -= need;
     level += 1;
     need = 100 + (level - 1) * 50;
   }
-  
-  return { level, into: Math.max(0, remain), need };
-};
-  
+
+  return {
+    level,
+    into: remaining,
+    need,
+    progressPct: need > 0 ? Math.min(100, (remaining / need) * 100) : 0,
+  };
+}
