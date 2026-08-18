@@ -98,7 +98,7 @@ async function authenticate(request: Request): Promise<AuthResult> {
 
   const { url, key } = supabaseConfig();
   if (!url || !key) {
-    return { error: json({ error: "Supabase server configuration is missing.", code: "SUPABASE_CONFIG_MISSING" }, 500) };
+    return { error: json({ error: "AI service is temporarily unavailable.", code: "SERVICE_UNAVAILABLE" }, 503) };
   }
 
   const client = createClient(url, key, {
@@ -123,16 +123,16 @@ function isQuotaError(error: unknown) {
 export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
-      GET: async () => {
-        const { url, key } = supabaseConfig();
-        const apiKey = geminiApiKey();
+      GET: async ({ request }) => {
+        const auth = await authenticate(request);
+        if ("error" in auth) return auth.error;
+
+        const configured = Boolean(geminiApiKey());
         return json({
-          ok: Boolean(url && key && apiKey),
+          ok: configured,
           service: "outstand-ai",
-          supabaseConfigured: Boolean(url && key),
-          geminiConfigured: Boolean(apiKey),
-          model: MODEL,
-        });
+          status: configured ? "ready" : "unavailable",
+        }, configured ? 200 : 503);
       },
 
       POST: async ({ request }) => {
@@ -179,11 +179,8 @@ export const Route = createFileRoute("/api/chat")({
             },
             abortSignal: request.signal,
             onError: (error) => {
-              if (isQuotaError(error)) {
-                console.warn("[AI] Gemini quota/rate limit reached. No retry will be attempted.");
-              } else {
-                console.error("Outstand AI stream error:", error);
-              }
+              if (isQuotaError(error)) console.warn("[AI] Gemini quota/rate limit reached.");
+              else console.error("Outstand AI stream error:", error);
             },
           });
 
@@ -244,7 +241,8 @@ export const Route = createFileRoute("/api/chat")({
             },
             onError: (error) => {
               if (isQuotaError(error)) return "AI is temporarily rate-limited. Please try again after the quota window resets.";
-              return error instanceof Error ? error.message : String(error);
+              console.error("AI provider error:", error);
+              return "AI could not complete that request. Please try again.";
             },
             consumeSseStream: consumeStream,
             headers: {
@@ -268,12 +266,13 @@ export const Route = createFileRoute("/api/chat")({
         try {
           const auth = await authenticate(request);
           if ("error" in auth) return auth.error;
-          const { data: conversation, error } = await auth.client.from("chat_conversations").select("id").eq("user_id", auth.userId).order("updated_at", { ascending: false }).limit(1).maybeSingle();
-          if (error) return json({ error: "Could not access your AI conversation.", code: error.code }, 500);
-          if (conversation?.id) {
-            const removed = await auth.client.from("chat_messages").delete().eq("conversation_id", conversation.id).eq("user_id", auth.userId);
-            if (removed.error) return json({ error: "Could not clear AI memory.", code: removed.error.code }, 500);
-          }
+
+          const removed = await auth.client
+            .from("chat_messages")
+            .delete()
+            .eq("user_id", auth.userId);
+
+          if (removed.error) return json({ error: "Could not clear AI memory.", code: "MEMORY_CLEAR_FAILED" }, 500);
           return new Response(null, { status: 204 });
         } catch (error) {
           console.error("Failed to clear AI memory:", error);
