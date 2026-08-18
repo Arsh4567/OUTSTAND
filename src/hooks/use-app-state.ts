@@ -3,7 +3,9 @@ import { useEffect, useMemo, useRef } from "react";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  calculateLocalXp,
   computeStreak,
+  levelFromXP,
   todayISO,
   XP_PER_FOCUS,
   XP_PER_HABIT,
@@ -26,11 +28,10 @@ export function useAppState() {
 
   const habits = Array.isArray(rawHabits) ? rawHabits : [];
   const sessions = Array.isArray(rawSessions) ? rawSessions : [];
-  const outstand = Array.isArray(rawOutstand) ? rawOutstand : [];
+  const outstand = Array.isArray(rawOutstand)
+    ? rawOutstand.map((item) => ({ ...item, xp: Number.isFinite(item?.xp) ? Math.max(0, item.xp) : 0 }))
+    : [];
 
-  // Keep the existing local-first experience, but continuously mirror the state
-  // to the authenticated user's cloud snapshot. The server uses this snapshot
-  // when the browser is closed and it is time to send a reminder.
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasSyncedOnce = useRef(false);
 
@@ -50,8 +51,6 @@ export function useAppState() {
         });
         if (response.ok) hasSyncedOnce.current = true;
       } catch (error) {
-        // Cloud sync is intentionally non-blocking. Local state remains the source
-        // of truth for the UI if the network is unavailable.
         console.warn("Outstand cloud sync unavailable:", error);
       }
     }, hasSyncedOnce.current ? 1200 : 250);
@@ -61,19 +60,13 @@ export function useAppState() {
     };
   }, [habits, sessions, outstand]);
 
-  const xp = useMemo(() => {
-    const habitCompletions = habits.reduce((sum, habit) => sum + (Array.isArray(habit?.history) ? habit.history.length : 0), 0);
-    const completedFocusSessions = sessions.filter((session) => Boolean(session?.completed)).length;
-    const outstandXp = outstand.reduce((sum, completion) => sum + (typeof completion?.xp === "number" ? completion.xp : 0), 0);
-    return habitCompletions * XP_PER_HABIT + completedFocusSessions * XP_PER_FOCUS + outstandXp;
-  }, [habits, sessions, outstand]);
-
-  const level = Math.floor(xp / 500) + 1;
-  const progressToNextLevel = (xp % 500) / 5;
+  const xp = useMemo(() => calculateLocalXp(habits, sessions, outstand), [habits, sessions, outstand]);
+  const levelState = useMemo(() => levelFromXP(xp), [xp]);
 
   const recordOutstand = (title: string, xpReward: number) => {
+    const safeXp = Number.isFinite(xpReward) ? Math.max(0, Math.round(xpReward)) : 0;
     setOutstand((prev) => [
-      { id: safeUuid(), title, xp: xpReward, completedAt: new Date().toISOString() },
+      { id: safeUuid(), title: title.trim(), xp: safeXp, completedAt: new Date().toISOString() },
       ...(Array.isArray(prev) ? prev : []),
     ].slice(0, 200));
   };
@@ -91,11 +84,13 @@ export function useAppState() {
   };
 
   const addHabit = (data: { name: string; emoji: string; color: string }) => {
+    const name = data.name.trim();
+    if (!name) return;
     const habit: Habit = {
       id: safeUuid(),
-      name: data.name.trim(),
-      emoji: data.emoji,
-      color: data.color,
+      name,
+      emoji: data.emoji || "✨",
+      color: data.color || "primary",
       createdAt: new Date().toISOString(),
       history: [],
     };
@@ -103,20 +98,24 @@ export function useAppState() {
   };
 
   const setInitialHabits = (chosenHabits: Array<{ name: string; emoji: string; color: string }>) => {
-    const formattedHabits: Habit[] = chosenHabits.map((item) => ({
-      id: safeUuid(),
-      name: item.name.trim(),
-      emoji: item.emoji,
-      color: item.color,
-      createdAt: new Date().toISOString(),
-      history: [],
-    }));
+    const formattedHabits: Habit[] = chosenHabits
+      .map((item) => ({
+        id: safeUuid(),
+        name: item.name.trim(),
+        emoji: item.emoji || "✨",
+        color: item.color || "primary",
+        createdAt: new Date().toISOString(),
+        history: [],
+      }))
+      .filter((item) => item.name.length > 0);
     setHabits(formattedHabits);
   };
 
   const updateHabit = (id: string, data: Partial<Pick<Habit, "name" | "emoji" | "color">>) => {
     setHabits((prev) => (Array.isArray(prev) ? prev : []).map((habit) => (
-      habit.id === id ? { ...habit, ...data, name: typeof data.name === "string" ? data.name.trim() : habit.name } : habit
+      habit.id === id
+        ? { ...habit, ...data, name: typeof data.name === "string" ? data.name.trim() : habit.name }
+        : habit
     )));
   };
 
@@ -147,10 +146,10 @@ export function useAppState() {
     sessions,
     outstand,
     xp,
-    level,
-    progressToNextLevel,
-    bestStreak,
+    level: levelState.level,
+    progressToNextLevel: levelState.progressPct,
     streaks,
+    bestStreak,
     toggleToday,
     addHabit,
     setInitialHabits,
@@ -158,5 +157,7 @@ export function useAppState() {
     deleteHabit,
     recordSession,
     recordOutstand,
+    XP_PER_FOCUS,
+    XP_PER_HABIT,
   };
 }
