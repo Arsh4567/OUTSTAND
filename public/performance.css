@@ -6,21 +6,16 @@ body {
   overscroll-behavior-x: none;
 }
 
-/* Contain independent sections so dynamic children do not invalidate the whole page. */
 .perf-contain {
   contain: layout paint style;
 }
 
-/* Best for long dashboard feeds: offscreen content can be skipped while remaining
-   in the DOM/accessibility tree. A stable intrinsic size prevents scroll jumps. */
 .perf-content-auto {
   content-visibility: auto;
   contain: layout paint style;
   contain-intrinsic-size: auto 500px;
 }
 
-/* Use only on elements that are actually animated. Permanent will-change on a large
-   tree wastes GPU memory and can make performance worse. */
 .perf-layer {
   backface-visibility: hidden;
   transform: translate3d(0,0,0);
@@ -32,7 +27,6 @@ body {
   scrollbar-gutter: stable;
 }
 
-/* Shared interaction contract: only compositor-friendly properties are animated. */
 .perf-interactive {
   transform: translate3d(0,0,0);
   transition: transform .24s cubic-bezier(.22,1,.36,1), opacity .18s linear;
@@ -41,7 +35,44 @@ body {
 .perf-interactive:hover { transform: translate3d(0,-2px,0); }
 .perf-interactive:active { transform: translate3d(0,0,0) scale(.98); }
 
-/* Reduce visual complexity on constrained devices without changing information architecture. */
+/* Existing design utilities keep their appearance but stop animating
+   paint-heavy box-shadow/border properties. */
+.glass-card,
+.btn-primary,
+.btn-outstand,
+.outstand-interactive {
+  transition-property: transform, opacity !important;
+  transition-timing-function: cubic-bezier(.22,1,.36,1) !important;
+  will-change: transform;
+}
+
+.glass-card:hover,
+.btn-primary:hover,
+.btn-outstand:hover {
+  transform: translate3d(0,-2px,0) !important;
+}
+
+.glass-card:active,
+.btn-primary:active,
+.btn-outstand:active {
+  transform: translate3d(0,0,0) scale(.98) !important;
+}
+
+/* The legacy utility continuously animated box-shadow. Keep the class available
+   while making its idle state static; users can still opt into transform motion. */
+.animate-neon-breathe {
+  animation: none !important;
+  box-shadow: var(--shadow-glow, 0 0 30px rgba(99,102,241,.18));
+}
+
+.outstand-cursor-spotlight {
+  background: radial-gradient(circle at center, rgba(103,232,249,.10) 0, rgba(99,102,241,.055) 24%, transparent 68%);
+  filter: blur(1px);
+  mix-blend-mode: screen;
+  contain: strict;
+  will-change: transform, opacity;
+}
+
 @media (max-width: 767px), (prefers-reduced-data: reduce) {
   .perf-heavy-blur { filter: none !important; }
   .perf-heavy-glass {
@@ -61,7 +92,17 @@ body {
   }
 
   .perf-interactive:hover,
-  .perf-interactive:active {
-    transform: none;
+  .perf-interactive:active,
+  .glass-card:hover,
+  .btn-primary:hover,
+  .btn-outstand:hover,
+  .glass-card:active,
+  .btn-primary:active,
+  .btn-outstand:active {
+    transform: none !important;
   }
+}
+
+@media (pointer: coarse) {
+  .outstand-cursor-spotlight { display: none; }
 }
