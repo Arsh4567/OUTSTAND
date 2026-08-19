@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BadgeCheck, Check, Clock3, Copy, Link2, UserPlus, UserRoundMinus, Users, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { useProfileState } from "@/hooks/use-profile-state";
+import { supabase } from "@/integrations/supabase/client";
 
 const panel = "rounded-[2rem] border border-white/[0.08] bg-white/[0.035] shadow-[0_30px_100px_-55px_rgba(34,211,238,.28)] backdrop-blur-2xl";
 
@@ -11,11 +12,43 @@ function formattedUid(id?: string | null) {
   return `#${String(parseInt(hex, 16) % 100000).padStart(5, "0")}`;
 }
 
+function relativeTime(value: string) {
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
+  if (seconds < 60) return "Just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 export function ProfileSocialUpgrade() {
   const state = useProfileState();
   const [friendMode, setFriendMode] = useState<"add" | "requested" | "remove">("add");
+  const [friendCount, setFriendCount] = useState(0);
+  const [activities, setActivities] = useState<Array<{ id: string; description: string; created_at: string }>>([]);
   const [copied, setCopied] = useState(false);
   const uid = useMemo(() => formattedUid(state.user?.id), [state.user?.id]);
+
+  useEffect(() => {
+    let active = true;
+    const loadSocialData = async () => {
+      const targetId = state.user?.id;
+      if (!targetId) return;
+      const [countResult, stateResult, activityResult] = await Promise.all([
+        supabase.rpc("get_friend_count", { target_user: targetId }),
+        supabase.rpc("get_friend_state", { target_user: targetId }),
+        supabase.from("activity_log").select("id,description,created_at").eq("user_id", targetId).order("created_at", { ascending: false }).limit(3),
+      ]);
+      if (!active) return;
+      if (!countResult.error) setFriendCount(Number(countResult.data || 0));
+      if (!stateResult.error) setFriendMode(stateResult.data === "friends" ? "remove" : stateResult.data === "requested" ? "requested" : "add");
+      if (!activityResult.error) setActivities(activityResult.data || []);
+    };
+    void loadSocialData();
+    return () => { active = false; };
+  }, [state.user?.id]);
 
   const shareProfile = async () => {
     try {
@@ -28,8 +61,24 @@ export function ProfileSocialUpgrade() {
     }
   };
 
-  const friendAction = () => {
-    setFriendMode((current) => current === "add" ? "requested" : current === "requested" ? "remove" : "add");
+  const friendAction = async () => {
+    const targetId = state.user?.id;
+    if (!targetId || friendMode === "requested") return;
+    const result = friendMode === "remove"
+      ? await supabase.rpc("remove_friend", { target_user: targetId })
+      : await supabase.rpc("send_friend_request", { target_user: targetId });
+    if (result.error) {
+      toast.error(result.error.message || "Could not update friendship.");
+      return;
+    }
+    if (friendMode === "remove") {
+      setFriendMode("add");
+      setFriendCount((count) => Math.max(0, count - 1));
+      toast.success("Friend removed");
+    } else {
+      setFriendMode("requested");
+      toast.success("Friend request sent");
+    }
   };
 
   const friendLabel = friendMode === "add" ? "Add Friend" : friendMode === "requested" ? "Requested" : "Remove Friend";
@@ -61,8 +110,8 @@ export function ProfileSocialUpgrade() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-2 rounded-xl border border-white/[0.08] bg-black/15 px-3 py-2 text-xs font-bold text-slate-400"><Users className="h-4 w-4 text-cyan-300" />Friends: 124</span>
-            <button type="button" onClick={friendAction} className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-black transition ${friendClass}`}>
+            <span className="inline-flex items-center gap-2 rounded-xl border border-white/[0.08] bg-black/15 px-3 py-2 text-xs font-bold text-slate-400"><Users className="h-4 w-4 text-cyan-300" />Friends: {friendCount}</span>
+            <button type="button" onClick={friendAction} disabled={friendMode === "requested"} className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-black transition disabled:cursor-default ${friendClass}`}>
               {friendMode === "remove" ? <UserRoundMinus className="h-4 w-4" /> : friendMode === "requested" ? <Check className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
               {friendLabel}
             </button>
@@ -79,19 +128,19 @@ export function ProfileSocialUpgrade() {
           <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[.22em] text-slate-500"><Clock3 className="h-4 w-4 text-cyan-300" />Recent Activity</div>
           <div className="relative mt-6 space-y-5 pl-7">
             <div className="absolute bottom-2 left-[6px] top-2 w-px bg-gradient-to-b from-cyan-300/40 via-violet-300/20 to-transparent" />
-            {["Earned Top Contributor Badge", "Completed a 7-day focus streak", "Reached a new profile milestone"].map((item, index) => (
-              <div key={item} className="relative">
+            {activities.length ? activities.map((item) => (
+              <div key={item.id} className="relative">
                 <span className="absolute -left-7 top-1.5 grid h-3 w-3 place-items-center rounded-full border-2 border-slate-950 bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,.55)]" />
-                <p className="text-sm font-bold text-white">{item}</p>
-                <p className="mt-1 text-xs text-slate-600">{index === 0 ? "2 hours ago" : index === 1 ? "Yesterday" : "3 days ago"}</p>
+                <p className="text-sm font-bold text-white">{item.description}</p>
+                <p className="mt-1 text-xs text-slate-600">{relativeTime(item.created_at)}</p>
               </div>
-            ))}
+            )) : <p className="text-sm text-slate-600">No recent activity yet.</p>}
           </div>
         </div>
 
         <div className="rounded-2xl border border-cyan-300/10 bg-gradient-to-br from-cyan-300/[0.06] to-violet-400/[0.03] p-5">
           <p className="text-[9px] font-black uppercase tracking-[.2em] text-cyan-200/70">Profile signal</p>
-          <p className="mt-3 text-sm leading-6 text-slate-300">A shareable identity layer for OUTSTAND — built around progress, social proof, and momentum.</p>
+          <p className="mt-3 text-sm leading-6 text-slate-300">{state.getRankTitle(state.level)} · {state.xp.toLocaleString()} XP · {state.bestStreak} day best streak.</p>
           <button type="button" onClick={state.handleCopyId} className="mt-5 inline-flex items-center gap-2 text-xs font-bold text-slate-500 transition hover:text-white">
             {state.copiedId ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <Copy className="h-3.5 w-3.5 text-cyan-300" />}
             {state.copiedId ? "UID copied" : "Copy UID"}
