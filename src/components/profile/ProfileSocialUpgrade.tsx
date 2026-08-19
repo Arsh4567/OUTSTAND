@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BadgeCheck, Check, Clock3, Copy, Link2, UserPlus, UserRoundMinus, Users, Zap } from "lucide-react";
+import { Check, Clock3, Copy, Link2, Users, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { useProfileState } from "@/hooks/use-profile-state";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,13 +19,11 @@ function relativeTime(value: string) {
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return `${Math.floor(hours / 24)}d ago`;
 }
 
 export function ProfileSocialUpgrade() {
   const state = useProfileState();
-  const [friendMode, setFriendMode] = useState<"add" | "requested" | "remove">("add");
   const [friendCount, setFriendCount] = useState(0);
   const [activities, setActivities] = useState<Array<{ id: string; description: string; created_at: string }>>([]);
   const [copied, setCopied] = useState(false);
@@ -36,14 +34,12 @@ export function ProfileSocialUpgrade() {
     const loadSocialData = async () => {
       const targetId = state.user?.id;
       if (!targetId) return;
-      const [countResult, stateResult, activityResult] = await Promise.all([
+      const [countResult, activityResult] = await Promise.all([
         supabase.rpc("get_friend_count", { target_user: targetId }),
-        supabase.rpc("get_friend_state", { target_user: targetId }),
         supabase.from("activity_log").select("id,description,created_at").eq("user_id", targetId).order("created_at", { ascending: false }).limit(3),
       ]);
       if (!active) return;
       if (!countResult.error) setFriendCount(Number(countResult.data || 0));
-      if (!stateResult.error) setFriendMode(stateResult.data === "friends" ? "remove" : stateResult.data === "requested" ? "requested" : "add");
       if (!activityResult.error) setActivities(activityResult.data || []);
     };
     void loadSocialData();
@@ -61,33 +57,6 @@ export function ProfileSocialUpgrade() {
     }
   };
 
-  const friendAction = async () => {
-    const targetId = state.user?.id;
-    if (!targetId || friendMode === "requested") return;
-    const result = friendMode === "remove"
-      ? await supabase.rpc("remove_friend", { target_user: targetId })
-      : await supabase.rpc("send_friend_request", { target_user: targetId });
-    if (result.error) {
-      toast.error(result.error.message || "Could not update friendship.");
-      return;
-    }
-    if (friendMode === "remove") {
-      setFriendMode("add");
-      setFriendCount((count) => Math.max(0, count - 1));
-      toast.success("Friend removed");
-    } else {
-      setFriendMode("requested");
-      toast.success("Friend request sent");
-    }
-  };
-
-  const friendLabel = friendMode === "add" ? "Add Friend" : friendMode === "requested" ? "Requested" : "Remove Friend";
-  const friendClass = friendMode === "remove"
-    ? "border-rose-300/20 bg-rose-400/10 text-rose-200 hover:bg-rose-400/15"
-    : friendMode === "requested"
-      ? "border-amber-300/20 bg-amber-300/10 text-amber-200 hover:bg-amber-300/15"
-      : "border-cyan-300/20 bg-cyan-300 text-slate-950 hover:bg-cyan-200";
-
   return (
     <section className={`${panel} overflow-hidden`}>
       <div className="relative overflow-hidden p-5 sm:p-7">
@@ -99,11 +68,7 @@ export function ProfileSocialUpgrade() {
               <span className="absolute bottom-1 right-1 h-3.5 w-3.5 rounded-full border-[2px] border-slate-950 bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,.8)]" aria-label="Online" />
             </div>
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="truncate text-2xl font-black tracking-tight text-white">{state.name}</h2>
-                <span title="Verified" className="inline-flex items-center gap-1 rounded-full border border-cyan-300/15 bg-cyan-300/10 px-2 py-1 text-[9px] font-black uppercase tracking-[.12em] text-cyan-200"><BadgeCheck className="h-3.5 w-3.5" />Verified</span>
-                <span className="rounded-full border border-violet-300/20 bg-violet-300/10 px-2 py-1 text-[9px] font-black uppercase tracking-[.12em] text-violet-200">PRO</span>
-              </div>
+              <h2 className="truncate text-2xl font-black tracking-tight text-white">{state.name}</h2>
               <p className="mt-1 text-xs font-semibold text-slate-500">UID: {uid}</p>
               {state.profile?.username && <p className="mt-1 text-xs font-semibold text-cyan-200/60">@{state.profile.username}</p>}
             </div>
@@ -111,10 +76,7 @@ export function ProfileSocialUpgrade() {
 
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-2 rounded-xl border border-white/[0.08] bg-black/15 px-3 py-2 text-xs font-bold text-slate-400"><Users className="h-4 w-4 text-cyan-300" />Friends: {friendCount}</span>
-            <button type="button" onClick={friendAction} disabled={friendMode === "requested"} className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-black transition disabled:cursor-default ${friendClass}`}>
-              {friendMode === "remove" ? <UserRoundMinus className="h-4 w-4" /> : friendMode === "requested" ? <Check className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
-              {friendLabel}
-            </button>
+            <span className="inline-flex items-center gap-2 rounded-xl border border-emerald-300/10 bg-emerald-300/[0.04] px-3 py-2 text-xs font-bold text-emerald-200"><span className="h-2 w-2 rounded-full bg-emerald-400" />Online</span>
             <button type="button" onClick={shareProfile} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2.5 text-xs font-black text-white transition hover:border-cyan-300/20 hover:bg-cyan-300/10">
               {copied ? <Check className="h-4 w-4 text-emerald-300" /> : <Link2 className="h-4 w-4 text-cyan-300" />}
               {copied ? "Link Copied!" : "Share Profile"}
