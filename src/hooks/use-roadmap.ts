@@ -2,41 +2,23 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-export type RoadmapQuestion = {
-  id: string; question: string; type: "text" | "number" | "choice" | "multiline"; required?: boolean; options?: string[]; placeholder?: string;
-};
-export type RoadmapTask = {
-  id: string; day_number: number; task_order: number; title: string; instructions: string; estimated_minutes: number | null;
-  task_type: string; methodology_tags: string[]; resources: Array<{ title?: string; url?: string; note?: string }>;
-  spaced_repetition_day: number | null; difficulty: string | null; success_criteria: string | null; is_required: boolean;
-  progress?: "pending" | "in_progress" | "completed" | "skipped";
-};
-export type RoadmapMilestone = {
-  id: string; milestone_order: number; day_start: number; day_end: number; title: string; outcome: string | null;
-  description: string | null; methodology_tags: string[]; tasks: RoadmapTask[];
-};
+export type RoadmapQuestion = { id: string; question: string; type: "text" | "number" | "choice" | "multiline"; required?: boolean; options?: string[]; placeholder?: string };
+export type RoadmapTask = { id: string; day_number: number; task_order: number; title: string; instructions: string; estimated_minutes: number | null; task_type: string; methodology_tags: string[]; resources: Array<{ title?: string; url?: string; note?: string }>; spaced_repetition_day: number | null; difficulty: string | null; success_criteria: string | null; is_required: boolean; progress?: "pending" | "in_progress" | "completed" | "skipped" };
+export type RoadmapMilestone = { id: string; milestone_order: number; day_start: number; day_end: number; title: string; outcome: string | null; description: string | null; methodology_tags: string[]; tasks: RoadmapTask[] };
 
 function normalizeQuestions(value: unknown): RoadmapQuestion[] {
   if (!Array.isArray(value)) return [];
-  return value
-    .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
-    .map((item, index) => ({
-      id: String(item.id || `roadmap_question_${index + 1}`),
-      question: String(item.question || "What additional detail would help us personalize your roadmap?"),
-      type: (["text", "number", "choice", "multiline"].includes(String(item.type)) ? String(item.type) : "text") as RoadmapQuestion["type"],
-      required: item.required !== false,
-      options: Array.isArray(item.options) ? item.options.map(String) : undefined,
-      placeholder: item.placeholder ? String(item.placeholder) : undefined,
-    }));
+  return value.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object")).map((item, index) => ({
+    id: String(item.id || `roadmap_question_${index + 1}`),
+    question: String(item.question || "What additional detail would help us personalize your roadmap?"),
+    type: (["text", "number", "choice", "multiline"].includes(String(item.type)) ? String(item.type) : "text") as RoadmapQuestion["type"],
+    required: item.required !== false,
+    options: Array.isArray(item.options) ? item.options.map(String) : undefined,
+    placeholder: item.placeholder ? String(item.placeholder) : undefined,
+  }));
 }
 
-const fallbackFollowUp: RoadmapQuestion = {
-  id: "roadmap_missing_detail",
-  question: "What is the single most important result you want to achieve by the end of this roadmap?",
-  type: "multiline",
-  required: true,
-  placeholder: "For example: score 90%+ in my next exam, reach 1200 chess rating, or build my first working website.",
-};
+const fallbackFollowUp: RoadmapQuestion = { id: "roadmap_missing_detail", question: "What is the single most important result you want to achieve by the end of this roadmap?", type: "multiline", required: true, placeholder: "For example: score 90%+ in my next exam, reach 1200 chess rating, or build my first working website." };
 
 export function useRoadmap() {
   const [roadmap, setRoadmap] = useState<any | null>(null);
@@ -77,9 +59,8 @@ export function useRoadmap() {
       const hydratedTasks = (taskRows || []).map((task) => ({ ...task, progress: progress.get(task.id) || "pending" })) as RoadmapTask[];
       setTasks(hydratedTasks);
       setMilestones((milestoneRows || []).map((milestone) => ({ ...milestone, tasks: hydratedTasks.filter((task) => task.day_number >= milestone.day_start && task.day_number <= milestone.day_end) })) as RoadmapMilestone[]);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not load roadmap.");
-    } finally { setLoading(false); }
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not load roadmap."); }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => { void load(); }, [load]);
@@ -105,20 +86,19 @@ export function useRoadmap() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not generate roadmap.");
       if (result.needsMoreInfo) {
-        const nextQuestions = normalizeQuestions(result.questions);
-        setQuestions(nextQuestions.length ? nextQuestions : [fallbackFollowUp]);
-        return { ...result, questions: nextQuestions.length ? nextQuestions : [fallbackFollowUp] };
+        // The plan response is allowed to request more information, but its
+        // question payload is model-generated and may be malformed. Re-run the
+        // canonical intake endpoint so the UI always receives answerable fields.
+        const nextQuestions = await askQuestions(category, currentAnswers);
+        const visibleQuestions = nextQuestions.length ? nextQuestions : [fallbackFollowUp];
+        setQuestions(visibleQuestions);
+        return { ...result, questions: visibleQuestions };
       }
       const plan = result.plan;
       if (!plan?.title || !Array.isArray(plan?.milestones) || plan.milestones.length === 0) throw new Error("The AI returned an incomplete roadmap.");
       const durationDays = Math.max(1, Math.min(730, Number(plan.durationDays) || Number(currentAnswers.durationDays) || 30));
       const startDate = new Date(); const targetDate = new Date(startDate); targetDate.setDate(startDate.getDate() + durationDays - 1);
-      const { data: createdRoadmap, error: roadmapError } = await supabase.from("roadmaps").insert({
-        user_id: session.user.id, title: plan.title,
-        goal: String(currentAnswers.goal || currentAnswers.target || plan.summary || plan.title), category,
-        questionnaire: currentAnswers, generation_metadata: { scientific: true, methodology: "evidence-informed", generated_plan: plan },
-        duration_days: durationDays, start_date: startDate.toISOString().slice(0, 10), target_date: targetDate.toISOString().slice(0, 10), status: "active",
-      }).select().single();
+      const { data: createdRoadmap, error: roadmapError } = await supabase.from("roadmaps").insert({ user_id: session.user.id, title: plan.title, goal: String(currentAnswers.goal || currentAnswers.target || plan.summary || plan.title), category, questionnaire: currentAnswers, generation_metadata: { scientific: true, methodology: "evidence-informed", generated_plan: plan }, duration_days: durationDays, start_date: startDate.toISOString().slice(0, 10), target_date: targetDate.toISOString().slice(0, 10), status: "active" }).select().single();
       if (roadmapError || !createdRoadmap) throw roadmapError || new Error("Roadmap could not be saved.");
       try {
         for (let index = 0; index < plan.milestones.length; index += 1) {
@@ -135,21 +115,13 @@ export function useRoadmap() {
             if (taskError) throw taskError;
           }
         }
-      } catch (error) {
-        await supabase.from("roadmaps").delete().eq("id", createdRoadmap.id).eq("user_id", session.user.id);
-        throw error;
-      }
+      } catch (error) { await supabase.from("roadmaps").delete().eq("id", createdRoadmap.id).eq("user_id", session.user.id); throw error; }
       setAnswers(currentAnswers);
       await load(createdRoadmap.id);
-      // The API generates the plan only; this hook owns persistence. Return the
-      // actual Supabase id so the route can reliably distinguish success from
-      // an AI-only response.
       return { ...result, roadmapId: createdRoadmap.id };
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not save the generated roadmap.");
-      throw error;
-    } finally { setGenerating(false); }
-  }, [load]);
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not save the generated roadmap."); throw error; }
+    finally { setGenerating(false); }
+  }, [askQuestions, load]);
 
   const toggleTask = useCallback(async (task: RoadmapTask) => {
     if (!roadmap) return;
