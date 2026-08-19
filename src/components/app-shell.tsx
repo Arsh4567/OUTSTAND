@@ -134,7 +134,7 @@ function ShellWithChrome() {
       </div>
 
       <MobileBottomNav pathname={pathname} onSettings={() => setIsSettingsOpen(true)} onQuickFocus={() => setIsTimerSettingsOpen(true)} />
-      <AppSettingsSheet isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} theme={theme} onThemeChange={setTheme} haptics={haptics} onHapticsChange={setHaptics} isNotificationsGranted={isNotificationsGranted} onNotificationToggle={handleNotificationToggle} isTestingPush={isTestingPush} onTestPush={onNavigateProfile={() => navigate({ to: "/profile" })} onClearData={handleClearLocalData} onSignOut={signOut} />
+      <AppSettingsSheet isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} theme={theme} onThemeChange={setTheme} haptics={haptics} onHapticsChange={setHaptics} isNotificationsGranted={isNotificationsGranted} onNotificationToggle={handleNotificationToggle} isTestingPush={isTestingPush} onTestPush={handleTestPush} onNavigateProfile={() => navigate({ to: "/profile" })} onClearData={handleClearLocalData} onSignOut={signOut} />
       <TimerSettingsSheet isOpen={isTimerSettingsOpen} onClose={() => setIsTimerSettingsOpen(false)} />
     </div>
   );
