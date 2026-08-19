@@ -13,8 +13,11 @@ type Props = {
 export function RoadmapOnboarding({ questions, answers, onChange, onNext, generating }: Props) {
   const [index, setIndex] = useState(0);
   const current = questions[index];
+  const questionSignature = questions.map((question) => question.id).join("|");
 
-  useEffect(() => setIndex(0), [questions.length]);
+  // The AI may return a new set with the same number of questions. Resetting
+  // only on questions.length left the UI stuck at "4/4" with the new question.
+  useEffect(() => setIndex(0), [questionSignature]);
 
   const value = current ? String(answers[current.id] ?? "") : "";
   const canContinue = !current?.required || value.trim().length > 0;
@@ -25,7 +28,7 @@ export function RoadmapOnboarding({ questions, answers, onChange, onNext, genera
   const setValue = (next: string) => onChange({ ...answers, [current.id]: next });
 
   const next = async () => {
-    if (!canContinue) return;
+    if (!canContinue || generating) return;
     if (index < questions.length - 1) {
       setIndex((value) => value + 1);
       return;
