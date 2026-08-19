@@ -24,7 +24,8 @@ const navItems = [
 export function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isAuthRoute = pathname.startsWith("/auth");
-  if (isAuthRoute) return <Outlet />;
+  const isImmersiveRoute = pathname === "/roadmap";
+  if (isAuthRoute || isImmersiveRoute) return <Outlet />;
   return <ShellWithChrome />;
 }
 
