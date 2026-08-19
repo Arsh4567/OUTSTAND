@@ -1,61 +1,32 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, MessageCircle, UserPlus, Users } from "lucide-react";
+import { ArrowLeft, Check, Clock3, MessageCircle, UserPlus, Users, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/user-profile")({ component: UserProfilePage });
-
-type Profile = { id: string; display_name: string | null; full_name: string | null; username: string | null; avatar_url: string | null; bio?: string | null; total_xp?: number | null; current_level?: number | null };
-const label = (p: Profile) => p.display_name || p.full_name || (p.username ? `@${p.username}` : "OUTSTAND user");
-const initials = (p: Profile) => label(p).slice(0, 1).toUpperCase();
-
-function UserProfilePage() {
-  const navigate = useNavigate();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [relationship, setRelationship] = useState<"friend" | "pending" | "none">("none");
-  const [loading, setLoading] = useState(true);
-  const targetId = Route.useSearch?.() as unknown as { id?: string };
-
-  useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get("id");
-    void (async () => {
-      const { data: auth } = await supabase.auth.getUser();
-      if (!id || !auth.user) { setLoading(false); return; }
-      setUserId(auth.user.id);
-      const { data } = await supabase.from("profiles").select("id,display_name,full_name,username,avatar_url,bio,total_xp,current_level").eq("id", id).maybeSingle();
-      setProfile(data as Profile | null);
-      if (data) {
-        const { data: friendship } = await supabase.from("friendships").select("id").eq("user_id", auth.user.id).eq("friend_id", id).maybeSingle();
-        if (friendship) setRelationship("friend");
-        else { const { data: request } = await supabase.from("friend_requests").select("id").or(`and(sender_id.eq.${auth.user.id},receiver_id.eq.${id}),and(sender_id.eq.${id},receiver_id.eq.${auth.user.id})`).eq("status", "pending").maybeSingle(); if (request) setRelationship("pending"); }
-      }
-      setLoading(false);
-    })();
-  }, []);
-
-  const addFriend = async () => {
-    if (!profile || !userId) return;
-    const { error } = await supabase.rpc("send_friend_request", { target_user: profile.id });
-    if (error) toast.error(error.message?.includes("Already friends") ? "You're already friends." : "Could not send friend request.");
-    else { setRelationship("pending"); toast.success("Friend request sent."); }
-  };
-
-  if (loading) return <main className="mx-auto max-w-3xl p-6 text-slate-500">Loading profile…</main>;
-  if (!profile) return <main className="mx-auto max-w-3xl p-6"><p className="text-white">Profile not found.</p><Link to="/friends" className="mt-4 inline-block text-cyan-300">Back to friends</Link></main>;
-
-  return <main className="mx-auto max-w-3xl space-y-5 px-4 pb-24 pt-6 sm:px-6">
-    <button type="button" onClick={() => navigate({ to: "/friends" })} className="inline-flex items-center gap-2 text-xs font-black text-slate-500 hover:text-white"><ArrowLeft className="h-4 w-4" /> Back to friends</button>
-    <section className="overflow-hidden rounded-[2.5rem] border border-white/10 bg-[radial-gradient(circle_at_20%_0%,rgba(34,211,238,.14),transparent_35%),rgba(255,255,255,.035)] p-7 sm:p-10">
-      <div className="flex flex-col items-center text-center sm:flex-row sm:text-left">
-        <div className="grid h-28 w-28 shrink-0 place-items-center overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950 text-4xl font-black text-cyan-200">{profile.avatar_url ? <img src={profile.avatar_url} alt={`${label(profile)} avatar`} className="h-full w-full object-cover" /> : initials(profile)}</div>
-        <div className="mt-5 sm:ml-6 sm:mt-0"><h1 className="text-3xl font-black text-white">{label(profile)}</h1>{profile.username && <p className="mt-1 text-sm text-cyan-200/60">@{profile.username}</p>}<p className="mt-3 text-sm text-slate-500">UID: #{profile.id.slice(-8)}</p><p className="mt-4 max-w-xl text-sm leading-6 text-slate-300">{profile.bio || "No bio yet."}</p></div>
-      </div>
-      <div className="mt-7 flex flex-wrap gap-3">
-        {relationship === "friend" ? <span className="inline-flex items-center gap-2 rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-2.5 text-xs font-black text-emerald-200"><Users className="h-4 w-4" /> Friends</span> : relationship === "pending" ? <span className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs font-black text-slate-500">Request pending</span> : profile.id !== userId ? <button type="button" onClick={() => void addFriend()} className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-2.5 text-xs font-black text-slate-950 hover:bg-cyan-200"><UserPlus className="h-4 w-4" /> Add friend</button> : null}
-        {relationship === "friend" && <Link to="/chat" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2.5 text-xs font-black text-white"><MessageCircle className="h-4 w-4 text-cyan-300" /> Message</Link>}
-      </div>
-    </section>
-  </main>;
+type Profile = { id:string; display_name:string|null; full_name:string|null; username:string|null; avatar_url:string|null; bio?:string|null; total_xp?:number|null; current_level?:number|null; last_seen_at?:string|null };
+type Activity = { id:string; description:string; created_at:string };
+const label=(p:Profile)=>p.display_name||p.full_name||(p.username?`@${p.username}`:"OUTSTAND user"); const initials=(p:Profile)=>label(p).slice(0,1).toUpperCase();
+const relative=(value?:string|null)=>{if(!value)return "Offline";const s=Math.max(0,Math.floor((Date.now()-new Date(value).getTime())/1000));if(s<120)return "Online now";const m=Math.floor(s/60);if(m<60)return `Last seen ${m}m ago`;const h=Math.floor(m/60);if(h<24)return `Last seen ${h}h ago`;const d=Math.floor(h/24);return `Last seen ${d}d ago`};
+const online=(value?:string|null)=>Boolean(value&&Date.now()-new Date(value).getTime()<120000);
+function UserProfilePage(){
+ const navigate=useNavigate(); const [profile,setProfile]=useState<Profile|null>(null); const [userId,setUserId]=useState<string|null>(null); const [relationship,setRelationship]=useState<"friend"|"pending"|"none">("none"); const [friendCount,setFriendCount]=useState(0); const [activity,setActivity]=useState<Activity[]>([]); const [loading,setLoading]=useState(true); const [,tick]=useState(0);
+ useEffect(()=>{const id=new URLSearchParams(window.location.search).get("id");void(async()=>{const{data:auth}=await supabase.auth.getUser();if(!id||!auth.user){setLoading(false);return}setUserId(auth.user.id);const[{data:p},{data:friends},{data:activities}]=await Promise.all([supabase.from("profiles").select("id,display_name,full_name,username,avatar_url,bio,total_xp,current_level,last_seen_at").eq("id",id).maybeSingle(),supabase.from("friendships").select("id").eq("user_id",id),supabase.from("activity_log").select("id,description,created_at").eq("user_id",id).order("created_at",{ascending:false}).limit(5)]);setProfile(p as Profile|null);setFriendCount(friends?.length||0);setActivity(activities||[]);if(p){const{data:friendship}=await supabase.from("friendships").select("id").eq("user_id",auth.user.id).eq("friend_id",id).maybeSingle();if(friendship)setRelationship("friend");else{const{data:req}=await supabase.from("friend_requests").select("id").or(`and(sender_id.eq.${auth.user.id},receiver_id.eq.${id}),and(sender_id.eq.${id},receiver_id.eq.${auth.user.id})`).eq("status","pending").maybeSingle();if(req)setRelationship("pending")}}setLoading(false)})()},[]);
+ useEffect(()=>{const i=window.setInterval(()=>tick(v=>v+1),30000);return()=>window.clearInterval(i)},[]);
+ const addFriend=async()=>{if(!profile||!userId)return;const{error}=await supabase.rpc("send_friend_request",{target_user:profile.id});if(error)toast.error(error.message?.includes("Already friends")?"You're already friends.":"Could not send friend request.");else{setRelationship("pending");toast.success("Friend request sent.")}};
+ if(loading)return <main className="mx-auto max-w-4xl p-6 text-slate-500">Loading profile…</main>; if(!profile)return <main className="mx-auto max-w-4xl p-6"><p className="text-white">Profile not found.</p><Link to="/friends" className="mt-4 inline-block text-cyan-300">Back to friends</Link></main>;
+ const isOn=online(profile.last_seen_at); return <main className="mx-auto max-w-4xl space-y-5 px-4 pb-24 pt-6 sm:px-6">
+  <button type="button" onClick={()=>navigate({to:"/friends"})} className="inline-flex items-center gap-2 text-xs font-black text-slate-500 transition hover:text-white"><ArrowLeft className="h-4 w-4"/> Back to friends</button>
+  <section className="relative overflow-hidden rounded-[2.5rem] border border-white/10 bg-[radial-gradient(circle_at_10%_0%,rgba(34,211,238,.16),transparent_32%),radial-gradient(circle_at_90%_100%,rgba(129,140,248,.12),transparent_38%),rgba(255,255,255,.035)] p-7 shadow-[0_40px_100px_-60px_rgba(34,211,238,.45)] sm:p-10">
+   <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-cyan-300/10 blur-3xl"/><div className="relative flex flex-col items-center text-center sm:flex-row sm:text-left">
+    <div className="relative grid h-32 w-32 shrink-0 place-items-center overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950 text-5xl font-black text-cyan-200 shadow-2xl">{profile.avatar_url?<img src={profile.avatar_url} alt={`${label(profile)} avatar`} className="h-full w-full object-cover"/>:initials(profile)}<span className={`absolute bottom-2 right-2 h-4 w-4 rounded-full border-[3px] border-slate-950 ${isOn?"bg-emerald-400 shadow-[0_0_16px_rgba(52,211,153,.65)]":"bg-slate-600"}`}/></div>
+    <div className="mt-6 min-w-0 sm:ml-7 sm:mt-0"><div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start"><h1 className="text-3xl font-black tracking-tight text-white">{label(profile)}</h1><span className="rounded-lg border border-cyan-300/15 bg-cyan-300/5 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-cyan-200">OUTSTAND</span></div>{profile.username&&<p className="mt-1 text-sm font-semibold text-cyan-200/60">@{profile.username}</p>}<p className={`mt-3 text-xs font-black ${isOn?"text-emerald-300":"text-slate-500"}`}>{relative(profile.last_seen_at)}</p><p className="mt-2 text-xs text-slate-600">UID: #{profile.id.slice(-8)}</p><p className="mt-4 max-w-xl text-sm leading-6 text-slate-300">{profile.bio||"No bio yet."}</p></div>
+   </div>
+   <div className="relative mt-8 grid grid-cols-2 gap-2 sm:grid-cols-3"><Stat icon={<Users/>} label="Friends" value={friendCount}/><Stat icon={<Zap/>} label="Level" value={String(profile.current_level||1)}/><Stat icon={<Check/>} label="XP" value={(profile.total_xp||0).toLocaleString()}/></div>
+   <div className="relative mt-5 flex flex-wrap gap-3">{relationship==="friend"?<span className="inline-flex items-center gap-2 rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-2.5 text-xs font-black text-emerald-200"><Users className="h-4 w-4"/> Friends</span>:relationship==="pending"?<span className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs font-black text-slate-500">Request pending</span>:profile.id!==userId?<button type="button" onClick={()=>void addFriend()} className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-2.5 text-xs font-black text-slate-950 hover:bg-cyan-200"><UserPlus className="h-4 w-4"/> Add friend</button>:null}{relationship==="friend"&&<Link to="/chat" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2.5 text-xs font-black text-white"><MessageCircle className="h-4 w-4 text-cyan-300"/> Message</Link>}</div>
+  </section>
+  <section className="rounded-[2rem] border border-white/[0.08] bg-white/[0.035] p-6 backdrop-blur-2xl sm:p-7"><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[.22em] text-slate-500"><Clock3 className="h-4 w-4 text-cyan-300"/> Recent activity</div>{activity.length?<div className="relative mt-6 space-y-5 pl-7"><div className="absolute bottom-2 left-[6px] top-2 w-px bg-gradient-to-b from-cyan-300/40 to-transparent"/>{activity.map(item=><div key={item.id} className="relative"><span className="absolute -left-7 top-1.5 h-3 w-3 rounded-full border-2 border-slate-950 bg-cyan-300"/><p className="text-sm font-bold text-white">{item.description}</p><p className="mt-1 text-xs text-slate-600">{relative(item.created_at)}</p></div>)}</div>:<p className="mt-5 rounded-2xl border border-dashed border-white/10 p-5 text-sm text-slate-600">No public activity yet.</p>}</section>
+ </main>;
 }
+function Stat({icon,label,value}:{icon:React.ReactNode;label:string;value:string}){return <div className="rounded-2xl border border-white/[0.06] bg-black/15 p-4"><div className="flex items-center gap-2 text-cyan-300">{icon}<span className="text-[9px] font-black uppercase tracking-[.18em] text-slate-600">{label}</span></div><p className="mt-2 text-xl font-black text-white">{value}</p></div>}
