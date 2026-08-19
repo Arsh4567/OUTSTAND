@@ -49,7 +49,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      // Keep browser zoom unrestricted so users with low vision can enlarge the app.
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { name: "theme-color", content: "#050508" },
       { name: "mobile-web-app-capable", content: "yes" },
@@ -104,10 +103,10 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const { pathname } = useLocation();
-  const isNoSidebarRoute = pathname === "/" || pathname.startsWith("/auth") || pathname.startsWith("/onboarding");
+  const isPublicExperience = pathname === "/" || pathname === "/roadmap" || pathname.startsWith("/auth") || pathname.startsWith("/onboarding");
   return (
     <QueryClientProvider client={queryClient}>
-      {isNoSidebarRoute ? <AppShell /> : <SidebarLayout><AppShell /></SidebarLayout>}
+      {isPublicExperience ? <AppShell /> : <SidebarLayout><AppShell /></SidebarLayout>}
       <Toaster />
       <QuickActions />
     </QueryClientProvider>
