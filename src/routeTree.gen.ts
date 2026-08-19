@@ -34,9 +34,8 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({ id: '/callback', path
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({ id: '/_authenticated', getParentRoute: () => rootRouteImport } as any)
 const IndexRoute = IndexRouteImport.update({ id: '/', path: '/', getParentRoute: () => rootRouteImport } as any)
 const RegainRoute = RegainRouteImport.update({ id: '/regain', path: '/regain', getParentRoute: () => rootRouteImport } as any)
-const ApiChatRoute = ApiChatRouteImport.update({ id: '/chat', path: '/chat', getParentRoute: () => ApiRoute } as any)
-const ApiRoadmapRoute = ApiRoadmapRouteImport.update({ id: '/roadmap', path: '/roadmap', getParentRoute: () => ApiRoute } as any)
-const ApiRoute = rootRouteImport.update({ id: '/api', path: '/api', getParentRoute: () => rootRouteImport } as any)
+const ApiChatRoute = ApiChatRouteImport.update({ id: '/api/chat', path: '/api/chat', getParentRoute: () => rootRouteImport } as any)
+const ApiRoadmapRoute = ApiRoadmapRouteImport.update({ id: '/api/roadmap', path: '/api/roadmap', getParentRoute: () => rootRouteImport } as any)
 
 const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({ id: '/profile', path: '/profile', getParentRoute: () => AuthenticatedRouteRoute } as any)
 const AuthenticatedOutstandRoute = AuthenticatedOutstandRouteImport.update({ id: '/outstand', path: '/outstand', getParentRoute: () => AuthenticatedRouteRoute } as any)
@@ -110,8 +109,8 @@ declare module '@tanstack/react-router' {
     '/_authenticated': { id: '/_authenticated'; path: ''; fullPath: '/'; preLoaderRoute: typeof AuthenticatedRouteRouteImport; parentRoute: typeof rootRouteImport }
     '/': { id: '/'; path: '/'; fullPath: '/'; preLoaderRoute: typeof IndexRouteImport; parentRoute: typeof rootRouteImport }
     '/regain': { id: '/regain'; path: '/regain'; fullPath: '/regain'; preLoaderRoute: typeof RegainRouteImport; parentRoute: typeof rootRouteImport }
-    '/api/chat': { id: '/api/chat'; path: '/chat'; fullPath: '/api/chat'; preLoaderRoute: typeof ApiChatRouteImport; parentRoute: typeof ApiRoute }
-    '/api/roadmap': { id: '/api/roadmap'; path: '/roadmap'; fullPath: '/api/roadmap'; preLoaderRoute: typeof ApiRoadmapRouteImport; parentRoute: typeof ApiRoute }
+    '/api/chat': { id: '/api/chat'; path: '/api/chat'; fullPath: '/api/chat'; preLoaderRoute: typeof ApiChatRouteImport; parentRoute: typeof rootRouteImport }
+    '/api/roadmap': { id: '/api/roadmap'; path: '/api/roadmap'; fullPath: '/api/roadmap'; preLoaderRoute: typeof ApiRoadmapRouteImport; parentRoute: typeof rootRouteImport }
     '/_authenticated/profile': { id: '/_authenticated/profile'; path: '/profile'; fullPath: '/profile'; preLoaderRoute: typeof AuthenticatedProfileRouteImport; parentRoute: typeof AuthenticatedRouteRoute }
     '/_authenticated/outstand': { id: '/_authenticated/outstand'; path: '/outstand'; fullPath: '/outstand'; preLoaderRoute: typeof AuthenticatedOutstandRouteImport; parentRoute: typeof AuthenticatedRouteRoute }
     '/_authenticated/focus': { id: '/_authenticated/focus'; path: '/focus'; fullPath: '/focus'; preLoaderRoute: typeof AuthenticatedFocusRouteImport; parentRoute: typeof AuthenticatedRouteRoute }
@@ -158,17 +157,14 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 }
 const AuthenticatedRouteRouteWithChildren = AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
-interface ApiRouteChildren { ApiChatRoute: typeof ApiChatRoute; ApiRoadmapRoute: typeof ApiRoadmapRoute }
-const ApiRouteChildren: ApiRouteChildren = { ApiChatRoute, ApiRoadmapRoute }
-const ApiRouteWithChildren = ApiRoute._addFileChildren(ApiRouteChildren)
-
 interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRouteWithChildren
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   RegainRoute: typeof RegainRoute
-  ApiRoute: typeof ApiRouteWithChildren
+  ApiChatRoute: typeof ApiChatRoute
+  ApiRoadmapRoute: typeof ApiRoadmapRoute
 }
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute,
@@ -176,7 +172,8 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRouteWithChildren,
   SitemapDotxmlRoute,
   RegainRoute,
-  ApiRoute: ApiRouteWithChildren,
+  ApiChatRoute,
+  ApiRoadmapRoute,
 }
 
 export const routeTree = rootRouteImport._addFileChildren(rootRouteChildren)._addFileTypes<FileRouteTypes>()
