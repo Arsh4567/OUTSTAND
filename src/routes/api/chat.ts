@@ -158,7 +158,7 @@ export const Route = createFileRoute("/api/chat")({
           const result = streamText({
             model: google("gemini-2.5-flash"), // Updated to current stable flash tier
             system: buildSystemPrompt(appContext),
-            messages: convertToModelMessages(messages as UIMessage[]),
+            messages: await convertToModelMessages(messages as UIMessage[]),
             onFinish: async ({ text }: { text: string }) => {
               if (text) {
                 try {
