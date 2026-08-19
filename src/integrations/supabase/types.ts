@@ -4,67 +4,67 @@ export type Json =
   | boolean
   | null
   | { [key: string]: Json | undefined }
-  | Json[]
+  | Json[];
 
 export type Database = {
-  __InternalSupabase: { PostgrestVersion: "14.5" }
+  __InternalSupabase: { PostgrestVersion: "14.5" };
   public: {
     Tables: {
-      ai_roadmaps: {
-        Row: { id: string; user_id: string; category: string; title: string; summary: string; duration_days: number; difficulty: string; answers: Json; plan: Json; habits_snapshot: Json; is_active: boolean; created_at: string; updated_at: string }
-        Insert: { id?: string; user_id: string; category: string; title: string; summary: string; duration_days: number; difficulty: string; answers?: Json; plan?: Json; habits_snapshot?: Json; is_active?: boolean; created_at?: string; updated_at?: string }
-        Update: { id?: string; user_id?: string; category?: string; title?: string; summary?: string; duration_days?: number; difficulty?: string; answers?: Json; plan?: Json; habits_snapshot?: Json; is_active?: boolean; created_at?: string; updated_at?: string }
-        Relationships: []
-      }
-      chat_conversations: {
-        Row: { created_at: string; id: string; updated_at: string; user_id: string }
-        Insert: { created_at?: string; id?: string; updated_at?: string; user_id: string }
-        Update: { created_at?: string; id?: string; updated_at?: string; user_id?: string }
-        Relationships: []
-      }
-      chat_messages: {
-        Row: { content: string; conversation_id: string; created_at: string; id: string; role: string; user_id: string }
-        Insert: { content: string; conversation_id: string; created_at?: string; id?: string; role: string; user_id: string }
-        Update: { content?: string; conversation_id?: string; created_at?: string; id?: string; role?: string; user_id?: string }
-        Relationships: []
-      }
-      daily_logs: {
-        Row: { created_at: string; id: string; log_date: string; negatives: Json; positives: Json; score: number; updated_at: string; user_id: string }
-        Insert: { created_at?: string; id?: string; log_date: string; negatives?: Json; positives?: Json; score?: number; updated_at?: string; user_id?: string }
-        Update: { created_at?: string; id?: string; log_date?: string; negatives?: Json; positives?: Json; score?: number; updated_at?: string; user_id?: string }
-        Relationships: []
-      }
-      profiles: {
-        Row: { avatar_url: string | null; created_at: string; display_name: string | null; id: string; updated_at: string }
-        Insert: { avatar_url?: string | null; created_at?: string; display_name?: string | null; id: string; updated_at?: string }
-        Update: { avatar_url?: string | null; created_at?: string; display_name?: string | null; id?: string; updated_at?: string }
-        Relationships: []
-      }
-      user_stats: {
-        Row: { user_id: string; total_xp: number; level: number; streak_days: number; current_level_xp: number; next_level_xp: number }
-        Insert: { user_id: string; total_xp?: number; level?: number; streak_days?: number; current_level_xp?: number; next_level_xp?: number }
-        Update: { user_id?: string; total_xp?: number; level?: number; streak_days?: number; current_level_xp?: number; next_level_xp?: number }
-        Relationships: []
-      }
-    }
-    Views: { [_ in never]: never }
-    Functions: { [_ in never]: never }
-    Enums: { [_ in never]: never }
-    CompositeTypes: { [_ in never]: never }
-  }
-}
+      roadmaps: {
+        Row: { id:string; user_id:string; title:string; goal:string; category:string; questionnaire:Json; generation_metadata:Json; duration_days:number; start_date:string; target_date:string|null; status:string; version:number; created_at:string; updated_at:string };
+        Insert: { id?:string; user_id:string; title:string; goal:string; category?:string; questionnaire?:Json; generation_metadata?:Json; duration_days:number; start_date?:string; target_date?:string|null; status?:string; version?:number; created_at?:string; updated_at?:string };
+        Update: { id?:string; user_id?:string; title?:string; goal?:string; category?:string; questionnaire?:Json; generation_metadata?:Json; duration_days?:number; start_date?:string; target_date?:string|null; status?:string; version?:number; created_at?:string; updated_at?:string };
+        Relationships: [];
+      };
+      roadmap_milestones: {
+        Row:{ id:string; roadmap_id:string; user_id:string; milestone_order:number; day_start:number; day_end:number; title:string; outcome:string|null; description:string|null; methodology_tags:string[]; created_at:string };
+        Insert:{ id?:string; roadmap_id:string; user_id:string; milestone_order:number; day_start:number; day_end:number; title:string; outcome?:string|null; description?:string|null; methodology_tags?:string[]; created_at?:string };
+        Update:{ id?:string; roadmap_id?:string; user_id?:string; milestone_order?:number; day_start?:number; day_end?:number; title?:string; outcome?:string|null; description?:string|null; methodology_tags?:string[]; created_at?:string };
+        Relationships:[{ foreignKeyName:"roadmap_milestones_roadmap_id_fkey"; columns:["roadmap_id"]; isOneToOne:false; referencedRelation:"roadmaps"; referencedColumns:["id"] }];
+      };
+      roadmap_tasks: {
+        Row:{ id:string; roadmap_id:string; milestone_id:string; user_id:string; day_number:number; task_order:number; title:string; instructions:string; estimated_minutes:number|null; task_type:string; methodology_tags:string[]; resources:Json; spaced_repetition_day:number|null; difficulty:string|null; success_criteria:string|null; is_required:boolean; created_at:string };
+        Insert:{ id?:string; roadmap_id:string; milestone_id:string; user_id:string; day_number:number; task_order:number; title:string; instructions:string; estimated_minutes?:number|null; task_type?:string; methodology_tags?:string[]; resources?:Json; spaced_repetition_day?:number|null; difficulty?:string|null; success_criteria?:string|null; is_required?:boolean; created_at?:string };
+        Update:{ id?:string; roadmap_id?:string; milestone_id?:string; user_id?:string; day_number?:number; task_order?:number; title?:string; instructions?:string; estimated_minutes?:number|null; task_type?:string; methodology_tags?:string[]; resources?:Json; spaced_repetition_day?:number|null; difficulty?:string|null; success_criteria?:string|null; is_required?:boolean; created_at?:string };
+        Relationships:[{ foreignKeyName:"roadmap_tasks_milestone_id_fkey"; columns:["milestone_id"]; isOneToOne:false; referencedRelation:"roadmap_milestones"; referencedColumns:["id"] },{ foreignKeyName:"roadmap_tasks_roadmap_id_fkey"; columns:["roadmap_id"]; isOneToOne:false; referencedRelation:"roadmaps"; referencedColumns:["id"] }];
+      };
+      roadmap_task_progress: {
+        Row:{ id:string; task_id:string; roadmap_id:string; user_id:string; status:string; completed_at:string|null; notes:string|null; updated_at:string };
+        Insert:{ id?:string; task_id:string; roadmap_id:string; user_id:string; status?:string; completed_at?:string|null; notes?:string|null; updated_at?:string };
+        Update:{ id?:string; task_id?:string; roadmap_id?:string; user_id?:string; status?:string; completed_at?:string|null; notes?:string|null; updated_at?:string };
+        Relationships:[{ foreignKeyName:"roadmap_task_progress_task_id_fkey"; columns:["task_id"]; isOneToOne:false; referencedRelation:"roadmap_tasks"; referencedColumns:["id"] },{ foreignKeyName:"roadmap_task_progress_roadmap_id_fkey"; columns:["roadmap_id"]; isOneToOne:false; referencedRelation:"roadmaps"; referencedColumns:["id"] }];
+      };
+      roadmap_daily_logs: {
+        Row:{ id:string; roadmap_id:string; user_id:string; log_date:string; planned_tasks:number; completed_tasks:number; completion_percent:number; reflection:string|null; energy_level:number|null; difficulty_rating:number|null; created_at:string; updated_at:string };
+        Insert:{ id?:string; roadmap_id:string; user_id:string; log_date:string; planned_tasks?:number; completed_tasks?:number; completion_percent?:number; reflection?:string|null; energy_level?:number|null; difficulty_rating?:number|null; created_at?:string; updated_at?:string };
+        Update:{ id?:string; roadmap_id?:string; user_id?:string; log_date?:string; planned_tasks?:number; completed_tasks?:number; completion_percent?:number; reflection?:string|null; energy_level?:number|null; difficulty_rating?:number|null; created_at?:string; updated_at?:string };
+        Relationships:[{ foreignKeyName:"roadmap_daily_logs_roadmap_id_fkey"; columns:["roadmap_id"]; isOneToOne:false; referencedRelation:"roadmaps"; referencedColumns:["id"] }];
+      };
+      nightly_reviews: {
+        Row:{ id:string; roadmap_id:string; daily_log_id:string; user_id:string; review_date:string; ai_summary:string|null; ai_feedback:string|null; strengths:Json; blockers:Json; adaptation:Json; generated_at:string };
+        Insert:{ id?:string; roadmap_id:string; daily_log_id:string; user_id:string; review_date:string; ai_summary?:string|null; ai_feedback?:string|null; strengths?:Json; blockers?:Json; adaptation?:Json; generated_at?:string };
+        Update:{ id?:string; roadmap_id?:string; daily_log_id?:string; user_id?:string; review_date?:string; ai_summary?:string|null; ai_feedback?:string|null; strengths?:Json; blockers?:Json; adaptation?:Json; generated_at?:string };
+        Relationships:[{ foreignKeyName:"nightly_reviews_daily_log_id_fkey"; columns:["daily_log_id"]; isOneToOne:false; referencedRelation:"roadmap_daily_logs"; referencedColumns:["id"] },{ foreignKeyName:"nightly_reviews_roadmap_id_fkey"; columns:["roadmap_id"]; isOneToOne:false; referencedRelation:"roadmaps"; referencedColumns:["id"] }];
+      };
+      ai_roadmaps: { Row:{ id:string; user_id:string; category:string; title:string; summary:string; duration_days:number; difficulty:string; answers:Json; plan:Json; habits_snapshot:Json; is_active:boolean; created_at:string; updated_at:string }; Insert:{ id?:string; user_id:string; category:string; title:string; summary:string; duration_days:number; difficulty:string; answers?:Json; plan?:Json; habits_snapshot?:Json; is_active?:boolean; created_at?:string; updated_at?:string }; Update:{ id?:string; user_id?:string; category?:string; title?:string; summary?:string; duration_days?:number; difficulty?:string; answers?:Json; plan?:Json; habits_snapshot?:Json; is_active?:boolean; created_at?:string; updated_at?:string }; Relationships:[] };
+      chat_conversations:{Row:{created_at:string;id:string;updated_at:string;user_id:string};Insert:{created_at?:string;id?:string;updated_at?:string;user_id:string};Update:{created_at?:string;id?:string;updated_at?:string;user_id?:string};Relationships:[]};
+      chat_messages:{Row:{content:string;conversation_id:string;created_at:string;id:string;role:string;user_id:string};Insert:{content:string;conversation_id:string;created_at?:string;id?:string;role:string;user_id:string};Update:{content?:string;conversation_id?:string;created_at?:string;id?:string;role?:string;user_id?:string};Relationships:[]};
+      daily_logs:{Row:{created_at:string;id:string;log_date:string;negatives:Json;positives:Json;score:number;updated_at:string;user_id:string};Insert:{created_at?:string;id?:string;log_date:string;negatives?:Json;positives?:Json;score?:number;updated_at?:string;user_id?:string};Update:{created_at?:string;id?:string;log_date?:string;negatives?:Json;positives?:Json;score?:number;updated_at?:string;user_id?:string};Relationships:[]};
+      profiles:{Row:{avatar_url:string|null;created_at:string;display_name:string|null;id:string;updated_at:string};Insert:{avatar_url?:string|null;created_at?:string;display_name?:string|null;id:string;updated_at?:string};Update:{avatar_url?:string|null;created_at?:string;display_name?:string|null;id?:string;updated_at?:string};Relationships:[]};
+      user_stats:{Row:{user_id:string;total_xp:number;level:number;streak_days:number;current_level_xp:number;next_level_xp:number};Insert:{user_id:string;total_xp?:number;level?:number;streak_days?:number;current_level_xp?:number;next_level_xp?:number};Update:{user_id?:string;total_xp?:number;level?:number;streak_days?:number;current_level_xp?:number;next_level_xp?:number};Relationships:[]};
+    };
+    Views:{[_ in never]:never};
+    Functions:{[_ in never]:never};
+    Enums:{[_ in never]:never};
+    CompositeTypes:{[_ in never]:never};
+  };
+};
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
-
-export type Tables<DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] & DefaultSchema["Views"]) | { schema: keyof DatabaseWithoutInternals }, TableName extends DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals } ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] & DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"]) : never = never> = DefaultSchemaTableNameOrOptions extends { schema: keyof DatabaseWithoutInternals }
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] & DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends { Row: infer R } ? R : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] & DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends { Row: infer R } ? R : never
-    : never
-
-export type TablesInsert<T extends keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals }, N extends T extends { schema: keyof DatabaseWithoutInternals } ? keyof DatabaseWithoutInternals[T["schema"]]["Tables"] : never = never> = T extends { schema: keyof DatabaseWithoutInternals } ? DatabaseWithoutInternals[T["schema"]]["Tables"][N] extends { Insert: infer I } ? I : never : T extends keyof DefaultSchema["Tables"] ? DefaultSchema["Tables"][T] extends { Insert: infer I } ? I : never : never
-export type TablesUpdate<T extends keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals }, N extends T extends { schema: keyof DatabaseWithoutInternals } ? keyof DatabaseWithoutInternals[T["schema"]]["Tables"] : never = never> = T extends { schema: keyof DatabaseWithoutInternals } ? DatabaseWithoutInternals[T["schema"]]["Tables"][N] extends { Update: infer U } ? U : never : T extends keyof DefaultSchema["Tables"] ? DefaultSchema["Tables"][T] extends { Update: infer U } ? U : never : never
-export type Enums<T extends keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals }, N extends T extends { schema: keyof DatabaseWithoutInternals } ? keyof DatabaseWithoutInternals[T["schema"]]["Enums"] : never = never> = T extends { schema: keyof DatabaseWithoutInternals } ? DatabaseWithoutInternals[T["schema"]]["Enums"][N] : T extends keyof DefaultSchema["Enums"] ? DefaultSchema["Enums"][T] : never
-export type CompositeTypes<T extends keyof DefaultSchema["CompositeTypes"] | { schema: keyof DatabaseWithoutInternals }, N extends T extends { schema: keyof DatabaseWithoutInternals } ? keyof DatabaseWithoutInternals[T["schema"]]["CompositeTypes"] : never = never> = T extends { schema: keyof DatabaseWithoutInternals } ? DatabaseWithoutInternals[T["schema"]]["CompositeTypes"][N] : T extends keyof DefaultSchema["CompositeTypes"] ? DefaultSchema["CompositeTypes"][T] : never
-export const Constants = { public: { Enums: {} } } as const
+type DatabaseWithoutInternals = Omit<Database,"__InternalSupabase">;
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database,"public">];
+export type Tables<T extends keyof (DefaultSchema["Tables"] & DefaultSchema["Views"]), N extends T = T> = (DefaultSchema["Tables"] & DefaultSchema["Views"])[N] extends { Row: infer R } ? R : never;
+export type TablesInsert<T extends keyof DefaultSchema["Tables"], N extends T = T> = DefaultSchema["Tables"][N] extends { Insert: infer I } ? I : never;
+export type TablesUpdate<T extends keyof DefaultSchema["Tables"], N extends T = T> = DefaultSchema["Tables"][N] extends { Update: infer U } ? U : never;
+export type Enums<T extends keyof DefaultSchema["Enums"]> = DefaultSchema["Enums"][T];
+export type CompositeTypes<T extends keyof DefaultSchema["CompositeTypes"]> = DefaultSchema["CompositeTypes"][T];
+export const Constants = { public: { Enums: {} } } as const;
