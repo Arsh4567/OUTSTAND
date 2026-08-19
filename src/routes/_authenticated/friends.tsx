@@ -47,12 +47,9 @@ function FriendsPage() {
       const q = query.trim();
       if (!q || !userId) { setResults([]); return; }
       const clean = q.replace(/^@/, "");
-
-      // UUIDs are searched by exact profile ID; names/usernames remain fuzzy-searchable.
       const request = uuidPattern.test(clean)
         ? supabase.from("profiles").select("id,display_name,full_name,username,avatar_url,total_xp,current_level").eq("id", clean).neq("id", userId).limit(8)
         : supabase.from("profiles").select("id,display_name,full_name,username,avatar_url,total_xp,current_level").or(`username.ilike.%${clean}%,display_name.ilike.%${clean}%,full_name.ilike.%${clean}%`).neq("id", userId).limit(8);
-
       const { data } = await request;
       setResults(data || []);
     }, 250);
@@ -62,11 +59,16 @@ function FriendsPage() {
   const pendingFor = useMemo(() => new Map(requests.map(r => [r.sender_id === userId ? r.receiver_id : r.sender_id, r])), [requests, userId]);
 
   const sendRequest = async (target: Profile) => {
-    if (!userId) return;
+    if (!userId || busy) return;
     setBusy(target.id);
-    const { error } = await supabase.from("friend_requests").insert({ sender_id: userId, receiver_id: target.id });
-    if (error) toast.error(error.code === "23505" ? "A request already exists." : "Could not send request.");
-    else { toast.success(`Request sent to ${label(target)}`); await load(userId); }
+    const { error } = await supabase.rpc("send_friend_request", { target_user: target.id });
+    if (error) {
+      const message = error.message?.includes("Already friends") ? "You're already friends." : error.message?.includes("Invalid friend target") ? "You can't add this user." : "Could not send friend request.";
+      toast.error(message);
+    } else {
+      toast.success(`Friend request sent to ${label(target)}`);
+      await load(userId);
+    }
     setBusy(null);
   };
 
@@ -90,7 +92,7 @@ function FriendsPage() {
     <section className="rounded-[2rem] border border-white/[0.08] bg-white/[0.035] p-5 shadow-[0_24px_80px_rgba(0,0,0,.22)] backdrop-blur-2xl sm:p-7">
       <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[.24em] text-slate-500"><Search className="h-4 w-4" /> Find people</div>
       <div className="relative mt-4"><Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600" /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search by name, username, or ID…" aria-label="Search friends by name, username, or ID" className="w-full rounded-2xl border border-white/10 bg-black/20 py-4 pl-11 pr-4 text-sm font-semibold text-white outline-none transition placeholder:text-slate-700 focus:border-cyan-300/40" /></div>
-      {results.length > 0 && <div className="mt-3 grid gap-2">{results.map(p => { const existing = pendingFor.get(p.id); return <Person key={p.id} profile={p} action={existing ? <span className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs font-bold text-slate-500"><Clock3 className="h-3.5 w-3.5" />{existing.sender_id === userId ? "Pending" : "Incoming"}</span> : <button disabled={busy === p.id} onClick={() => void sendRequest(p)} className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950 disabled:opacity-50"><UserPlus className="h-3.5 w-3.5" />Add friend</button>} />; })}</div>}
+      {results.length > 0 && <div className="mt-3 grid gap-2">{results.map(p => { const existing = pendingFor.get(p.id); return <Person key={p.id} profile={p} action={existing ? <span className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs font-bold text-slate-500"><Clock3 className="h-3.5 w-3.5" />{existing.sender_id === userId ? "Pending" : "Incoming"}</span> : <button type="button" disabled={busy === p.id || Boolean(busy)} onClick={() => void sendRequest(p)} className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950 transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"><UserPlus className="h-3.5 w-3.5" />{busy === p.id ? "Sending…" : "Add friend"}</button>} />; })}</div>}
     </section>
 
     <div className="grid gap-5 lg:grid-cols-2">
