@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { MessageCircle, Search, UserPlus, X } from "lucide-react";
 import { ProfileSocialUpgrade } from "@/components/profile/ProfileSocialUpgrade";
@@ -96,13 +97,12 @@ export function ProfileSocialActions() {
         >
           <UserPlus className="h-4 w-4" /> Add friends
         </button>
-        <button
-          type="button"
-          onClick={() => window.location.assign("/chat")}
+        <Link
+          to="/chat"
           className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2.5 text-xs font-black text-white transition hover:border-cyan-300/20 hover:bg-cyan-300/10"
         >
           <MessageCircle className="h-4 w-4 text-cyan-300" /> Messages
-        </button>
+        </Link>
       </div>
 
       {open && (
