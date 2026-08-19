@@ -65,9 +65,13 @@ async function requestBody(req: VercelRequest) {
 }
 
 function validatePlan(plan: any) {
-  if (!plan || typeof plan !== "object" || typeof plan.title !== "string" || !Number.isInteger(plan.durationDays) || !Array.isArray(plan.milestones)) throw new Error("The AI returned an invalid roadmap structure.");
+  if (!plan || typeof plan !== "object" || typeof plan.title !== "string" || !Number.isInteger(plan.durationDays) || !Array.isArray(plan.milestones) || plan.milestones.length === 0) throw new Error("The AI returned an invalid roadmap structure.");
   for (const milestone of plan.milestones) {
     if (!Number.isInteger(milestone.day) || typeof milestone.title !== "string" || !Array.isArray(milestone.actions)) throw new Error("The AI returned an invalid milestone.");
+    for (const action of milestone.actions) {
+      if (typeof action === "string") continue;
+      if (!action || typeof action.title !== "string") throw new Error("The AI returned an invalid roadmap task.");
+    }
   }
   return plan;
 }
@@ -93,25 +97,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const result: any = await ask(`Build a genuinely personalized ${category} roadmap from this interview. Return exactly {"plan":{"title":"string","summary":"string","durationDays":number,"difficulty":"string","assumptions":["string"],"milestones":[{"day":number,"title":"string","outcome":"string","actions":[{"title":"string","instructions":"string","estimatedMinutes":number,"taskType":"practice|review|assessment|reflection","methodologyTags":["active_recall"],"resources":[{"title":"string","url":"string","note":"string"}],"spacedRepetitionDay":number|null,"successCriteria":"string"}]}],"adaptationRule":"string"}}. Every task must be goal-specific, measurable and fit the stated time. Use appropriate evidence-informed methodologies and meaningful spaced-repetition timing when relevant. If essential information is missing return {"needsMoreInfo":true,"questions":[...]}.\n\nCategory: ${category}\nInterview:\n${JSON.stringify(answers)}`);
       if (result?.needsMoreInfo) return json(res, 200, result);
       validatePlan(result?.plan);
-      const plan = result.plan;
-      const durationDays = Math.max(1, Math.min(730, plan.durationDays));
-      const startDate = new Date();
-      const targetDate = new Date(startDate); targetDate.setDate(startDate.getDate() + durationDays - 1);
-      const { data: roadmap, error: roadmapError } = await auth.client.from("roadmaps").insert({ title: plan.title, goal: String(answers.goal || plan.summary || plan.title), category, questionnaire: answers, generation_metadata: { methodology: "evidence-informed", generated_at: new Date().toISOString() }, duration_days: durationDays, start_date: startDate.toISOString().slice(0, 10), target_date: targetDate.toISOString().slice(0, 10), status: "active" }).select().single();
-      if (roadmapError || !roadmap) throw roadmapError || new Error("Could not save roadmap.");
-      for (let index = 0; index < plan.milestones.length; index += 1) {
-        const source = plan.milestones[index];
-        const nextDay = Number(plan.milestones[index + 1]?.day || durationDays + 1);
-        const dayStart = Math.max(1, Number(source.day));
-        const { data: milestone, error: milestoneError } = await auth.client.from("roadmap_milestones").insert({ roadmap_id: roadmap.id, user_id: auth.userId, milestone_order: index + 1, day_start: dayStart, day_end: Math.max(dayStart, nextDay - 1), title: source.title, outcome: source.outcome || null, description: source.description || null, methodology_tags: ["chunking", "deliberate_practice"] }).select().single();
-        if (milestoneError || !milestone) throw milestoneError || new Error("Could not save milestone.");
-        for (let taskIndex = 0; taskIndex < source.actions.length; taskIndex += 1) {
-          const task = source.actions[taskIndex];
-          const { error: taskError } = await auth.client.from("roadmap_tasks").insert({ roadmap_id: roadmap.id, milestone_id: milestone.id, user_id: auth.userId, day_number: dayStart, task_order: taskIndex + 1, title: String(task.title), instructions: String(task.instructions), estimated_minutes: Number(task.estimatedMinutes) || 25, task_type: String(task.taskType || "practice"), methodology_tags: Array.isArray(task.methodologyTags) ? task.methodologyTags : ["deliberate_practice"], resources: Array.isArray(task.resources) ? task.resources : [], spaced_repetition_day: task.spacedRepetitionDay == null ? null : Number(task.spacedRepetitionDay), success_criteria: String(task.successCriteria || "Complete the task and record errors or blockers."), is_required: true });
-          if (taskError) throw taskError;
-        }
-      }
-      return json(res, 200, { plan, roadmapId: roadmap.id });
+      return json(res, 200, { plan: result.plan });
     }
 
     const roadmapId = typeof context.roadmapId === "string" ? context.roadmapId : "";
@@ -122,14 +108,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { data: progress } = await auth.client.from("roadmap_task_progress").select("task_id,status,completed_at,notes").eq("roadmap_id", roadmapId).eq("user_id", auth.userId);
     const { data: logs } = await auth.client.from("roadmap_daily_logs").select("log_date,planned_tasks,completed_tasks,completion_percent,reflection,energy_level,difficulty_rating").eq("roadmap_id", roadmapId).eq("user_id", auth.userId).order("log_date", { ascending: false }).limit(14);
     const result: any = await ask(`Analyze tonight's evidence for this roadmap. Never alter completed tasks. Return exactly {"analysis":{"summary":"string","strengths":["string"],"blockers":["string"],"recommendation":"string"},"adapted":boolean,"futureAdjustments":[{"taskId":"string","action":"keep|reduce|split|reschedule|increase","reason":"string"}]}. Only suggest realistic future changes based on completion, reflection, energy and difficulty.\n\nRoadmap:\n${JSON.stringify(roadmap)}\nTasks:\n${JSON.stringify(tasks || [])}\nProgress:\n${JSON.stringify(progress || [])}\nDaily logs:\n${JSON.stringify(logs || [])}\nTonight context:\n${JSON.stringify(context)}`);
-    if (result?.adapted && Array.isArray(result.futureAdjustments)) {
-      for (const adjustment of result.futureAdjustments) {
-        if (!tasks?.some((task) => task.id === adjustment.taskId)) continue;
-        if (["reschedule", "reduce", "increase", "split"].includes(adjustment.action)) {
-          await auth.client.from("roadmap_tasks").update({ instructions: `${tasks.find((task) => task.id === adjustment.taskId)?.instructions || ""}\n\nAI adaptation: ${String(adjustment.reason || "").slice(0, 300)}` }).eq("id", adjustment.taskId).eq("user_id", auth.userId);
-        }
-      }
-    }
     return json(res, 200, result);
   } catch (error: any) {
     console.error("OUTSTAND roadmap request failed", error);
