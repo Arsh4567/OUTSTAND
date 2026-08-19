@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Check, Clock3, Search, UserPlus, Users, X, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/friends")({ component: FriendsPage });
@@ -13,6 +12,7 @@ type Friend = { user_id: string; friend_id: string; created_at: string; profile?
 
 const initials = (p?: Profile) => (p?.display_name || p?.full_name || p?.username || "U").slice(0, 1).toUpperCase();
 const label = (p?: Profile) => p?.display_name || p?.full_name || (p?.username ? `@${p.username}` : "Outstand user");
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function FriendsPage() {
   const [userId, setUserId] = useState<string>();
@@ -47,7 +47,13 @@ function FriendsPage() {
       const q = query.trim();
       if (!q || !userId) { setResults([]); return; }
       const clean = q.replace(/^@/, "");
-      const { data } = await supabase.from("profiles").select("id,display_name,full_name,username,avatar_url,total_xp,current_level").or(`username.ilike.%${clean}%,display_name.ilike.%${clean}%,full_name.ilike.%${clean}%`).neq("id", userId).limit(8);
+
+      // UUIDs are searched by exact profile ID; names/usernames remain fuzzy-searchable.
+      const request = uuidPattern.test(clean)
+        ? supabase.from("profiles").select("id,display_name,full_name,username,avatar_url,total_xp,current_level").eq("id", clean).neq("id", userId).limit(8)
+        : supabase.from("profiles").select("id,display_name,full_name,username,avatar_url,total_xp,current_level").or(`username.ilike.%${clean}%,display_name.ilike.%${clean}%,full_name.ilike.%${clean}%`).neq("id", userId).limit(8);
+
+      const { data } = await request;
       setResults(data || []);
     }, 250);
     return () => window.clearTimeout(t);
@@ -83,7 +89,7 @@ function FriendsPage() {
 
     <section className="rounded-[2rem] border border-white/[0.08] bg-white/[0.035] p-5 shadow-[0_24px_80px_rgba(0,0,0,.22)] backdrop-blur-2xl sm:p-7">
       <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[.24em] text-slate-500"><Search className="h-4 w-4" /> Find people</div>
-      <div className="relative mt-4"><Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600" /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search by username or name…" className="w-full rounded-2xl border border-white/10 bg-black/20 py-4 pl-11 pr-4 text-sm font-semibold text-white outline-none transition placeholder:text-slate-700 focus:border-cyan-300/40" /></div>
+      <div className="relative mt-4"><Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600" /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search by name, username, or ID…" aria-label="Search friends by name, username, or ID" className="w-full rounded-2xl border border-white/10 bg-black/20 py-4 pl-11 pr-4 text-sm font-semibold text-white outline-none transition placeholder:text-slate-700 focus:border-cyan-300/40" /></div>
       {results.length > 0 && <div className="mt-3 grid gap-2">{results.map(p => { const existing = pendingFor.get(p.id); return <Person key={p.id} profile={p} action={existing ? <span className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs font-bold text-slate-500"><Clock3 className="h-3.5 w-3.5" />{existing.sender_id === userId ? "Pending" : "Incoming"}</span> : <button disabled={busy === p.id} onClick={() => void sendRequest(p)} className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950 disabled:opacity-50"><UserPlus className="h-3.5 w-3.5" />Add friend</button>} />; })}</div>}
     </section>
 
