@@ -141,7 +141,10 @@ export function useRoadmap() {
       }
       setAnswers(currentAnswers);
       await load(createdRoadmap.id);
-      return result;
+      // The API generates the plan only; this hook owns persistence. Return the
+      // actual Supabase id so the route can reliably distinguish success from
+      // an AI-only response.
+      return { ...result, roadmapId: createdRoadmap.id };
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save the generated roadmap.");
       throw error;
