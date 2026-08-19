@@ -14,6 +14,10 @@ const initials = (p?: Profile) => (p?.display_name || p?.full_name || p?.usernam
 const label = (p?: Profile) => p?.display_name || p?.full_name || (p?.username ? `@${p.username}` : "Outstand user");
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+// PostgREST `.or()` filters use a compact expression syntax. Escape wildcard and
+// separator characters so arbitrary search text cannot alter the filter expression.
+const escapeSearchFilter = (value: string) => value.replace(/[\\%,._()]/g, "\\$&").replace(/\*/g, "\\*");
+
 function FriendsPage() {
   const [userId, setUserId] = useState<string>();
   const [query, setQuery] = useState("");
@@ -49,7 +53,7 @@ function FriendsPage() {
       const clean = q.replace(/^@/, "");
       const request = uuidPattern.test(clean)
         ? supabase.from("profiles").select("id,display_name,full_name,username,avatar_url,total_xp,current_level").eq("id", clean).neq("id", userId).limit(8)
-        : supabase.from("profiles").select("id,display_name,full_name,username,avatar_url,total_xp,current_level").or(`username.ilike.%${clean}%,display_name.ilike.%${clean}%,full_name.ilike.%${clean}%`).neq("id", userId).limit(8);
+        : supabase.from("profiles").select("id,display_name,full_name,username,avatar_url,total_xp,current_level").or(`username.ilike.%${escapeSearchFilter(clean)}%,display_name.ilike.%${escapeSearchFilter(clean)}%,full_name.ilike.%${escapeSearchFilter(clean)}%`).neq("id", userId).limit(8);
       const { data } = await request;
       setResults(data || []);
     }, 250);
