@@ -1,5 +1,5 @@
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Activity, Flame, LogOut, Timer, Zap, Brain, User, Settings, Share, History, SlidersHorizontal } from "lucide-react";
+import { Activity, Flame, LogOut, Timer, Zap, Brain, Map, User, Settings, Share, History, SlidersHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAppState } from "@/hooks/use-app-state";
 import { useAuth, displayNameOf } from "@/hooks/use-auth";
@@ -29,6 +29,7 @@ const NAV = [
   { to: "/dopamine", label: "Dopamine", icon: Brain },
   { to: "/focus", label: "Focus", icon: Timer },
   { to: "/outstand", label: "Outstand", icon: Zap },
+  { to: "/roadmap", label: "Roadmap", icon: Map },
 ] as const;
 
 export function AppShell() {
