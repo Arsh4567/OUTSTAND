@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
-import { streamText, type UIMessage } from "ai";
+import { streamText, convertToModelMessages, type UIMessage } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 
@@ -158,11 +158,8 @@ export const Route = createFileRoute("/api/chat")({
           const result = streamText({
             model: google("gemini-2.5-flash"), // Updated to current stable flash tier
             system: buildSystemPrompt(appContext),
-            messages: messages as UIMessage[],
-          });
-
-          return result.toDataStreamResponse({
-            onFinish: async ({ text }) => {
+            messages: convertToModelMessages(messages as UIMessage[]),
+            onFinish: async ({ text }: { text: string }) => {
               if (text) {
                 try {
                   await supabase.from("chat_messages").insert({
@@ -177,6 +174,8 @@ export const Route = createFileRoute("/api/chat")({
               }
             },
           });
+
+          return result.toUIMessageStreamResponse();
         } catch (error: any) {
           console.error("Critical Chat API POST Error:", error);
           return new Response(JSON.stringify({ error: error?.message || "An unexpected server error occurred." }), { 
