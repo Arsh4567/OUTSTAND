@@ -9,10 +9,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { requestNotificationPermission } from "@/lib/notifications";
 import { AppSettingsSheet } from "@/components/app-settings-sheet";
 import { TimerSettingsSheet } from "@/components/timer-settings-sheet";
-import { LayoutDashboard, Swords, Brain, Timer, BookOpen, Trophy, UserRound, Settings, Sparkles } from "lucide-react";
+import { LayoutDashboard, Swords, Brain, Timer, BookOpen, Trophy, UserRound, Settings, Sparkles, Map } from "lucide-react";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/roadmap", label: "Roadmap", icon: Map },
   { to: "/outstand", label: "Outstand", icon: Swords, featured: true },
   { to: "/intelligence", label: "Intelligence", icon: Brain },
   { to: "/focus", label: "Deep Focus", icon: Timer },
@@ -23,7 +24,8 @@ const navItems = [
 export function AppShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isAuthRoute = pathname.startsWith("/auth");
-  if (isAuthRoute) return <Outlet />;
+  const isImmersiveRoute = pathname === "/roadmap";
+  if (isAuthRoute || isImmersiveRoute) return <Outlet />;
   return <ShellWithChrome />;
 }
 
