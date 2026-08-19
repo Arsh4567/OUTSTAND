@@ -32,6 +32,12 @@ function chooseHabit(habits: any[], today: string) {
   return habits.find((habit) => !Array.isArray(habit?.history) || !habit.history.includes(today));
 }
 
+function dayNumber(startDate: string, date: string) {
+  const start = new Date(`${startDate}T00:00:00Z`).getTime();
+  const current = new Date(`${date}T00:00:00Z`).getTime();
+  return Math.floor((current - start) / 86400000) + 1;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const cronSecret = process.env.CRON_SECRET;
@@ -54,8 +60,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (quietHours(now, pref.quiet_start, pref.quiet_end, pref.quiet_hours_enabled, tz)) continue;
     if (clock.minute > 10) continue;
 
-    const { data: state } = await admin.from('user_productivity_state').select('habits,sessions,outstand').eq('user_id', pref.user_id).maybeSingle();
     const date = localDate(now, tz);
+    const { data: state } = await admin.from('user_productivity_state').select('habits,sessions,outstand').eq('user_id', pref.user_id).maybeSingle();
     const since = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
     const { count } = await admin.from('notification_events').select('id', { count: 'exact', head: true }).eq('user_id', pref.user_id).gte('created_at', since);
     if ((count ?? 0) >= Math.max(1, Number(pref.max_daily) || 3)) continue;
@@ -65,7 +71,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let body = '';
     let path = '/dashboard';
 
+    // Roadmap notifications use the new normalized roadmap/task data first.
+    // This keeps notifications accurate even when the legacy daily_quests mirror is stale.
     if (pref.goals_enabled && (clock.hour === 8 || clock.hour === 19)) {
+      const { data: roadmap } = await admin.from('roadmaps').select('id,title,start_date,duration_days').eq('user_id', pref.user_id).eq('status', 'active').lte('start_date', date).order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (roadmap) {
+        const day = dayNumber(roadmap.start_date, date);
+        if (day >= 1 && day <= roadmap.duration_days) {
+          const { data: tasks } = await admin.from('roadmap_tasks').select('id,title,estimated_minutes').eq('roadmap_id', roadmap.id).eq('user_id', pref.user_id).eq('day_number', day).order('task_order').limit(1);
+          const task = tasks?.[0];
+          if (task) {
+            const { data: progress } = await admin.from('roadmap_task_progress').select('status').eq('roadmap_id', roadmap.id).eq('task_id', task.id).eq('user_id', pref.user_id).maybeSingle();
+            const completed = progress?.status === 'completed';
+            if (clock.hour === 8 && !completed) {
+              category = 'goal';
+              title = `Today's focus: ${task.title}`;
+              body = `${task.estimated_minutes ? `${task.estimated_minutes} min · ` : ''}Your roadmap task is ready. Open OUTSTAND to begin.`;
+              path = '/roadmap';
+            } else if (clock.hour === 19) {
+              category = 'goal';
+              title = 'Time for your 2-minute nightly reflection & analysis.';
+              body = completed ? `Nice work on ${task.title}. Log today's reflection and get tomorrow's adjustment.` : `Review ${task.title}, record what happened, and let OUTSTAND adjust your plan.`;
+              path = '/roadmap?review=tonight';
+            }
+          }
+        }
+      }
+    }
+
+    // Preserve the existing daily-quest notification fallback for users who still
+    // have only the legacy AI roadmap system populated.
+    if (!category && pref.goals_enabled && (clock.hour === 8 || clock.hour === 19)) {
       const { data: missions } = await admin.from('daily_quests').select('id, completed, quests(title, category)').eq('user_id', pref.user_id).eq('assigned_date', date).eq('completed', false).order('id').limit(1);
       const row = missions?.[0] as any;
       const task = Array.isArray(row?.quests) ? row.quests[0] : row?.quests;
@@ -73,6 +109,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         category = 'goal';
         title = clock.hour === 8 ? 'Your OUTSTAND plan is ready 🎯' : 'Your roadmap is waiting for you';
         body = `Next up: ${task.title}. Open OUTSTAND and take the smallest useful step now.`;
+        path = '/roadmap';
       }
     }
 
@@ -101,7 +138,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!category) continue;
 
-    const dedupeKey = `${category}:${date}:${clock.hour}`;
+    const dedupeKey = `${category}:roadmap:${date}:${clock.hour}`;
     const { data: existing } = await admin.from('notification_delivery_log').select('id').eq('user_id', pref.user_id).eq('dedupe_key', dedupeKey).maybeSingle();
     if (existing) continue;
 
