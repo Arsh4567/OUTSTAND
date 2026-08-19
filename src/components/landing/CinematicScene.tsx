@@ -8,172 +8,237 @@ import {
   useReducedMotion,
 } from "@/lib/performance";
 
-type FieldData = {
-  particles: Float32Array;
-  connections: Float32Array;
-};
+type PathPoint = [number, number, number];
 
-function createField(): FieldData {
-  const count = 120;
-  const particles = new Float32Array(count * 3);
-  const connectionCount = 32;
-  const connections = new Float32Array(connectionCount * 6);
+const AMBER = new THREE.Color("#fbbf24");
+const GOLD = new THREE.Color("#fde68a");
+const VIOLET = new THREE.Color("#8b5cf6");
+const SKY = new THREE.Color("#a5b4fc");
 
-  for (let i = 0; i < count; i += 1) {
-    const radius = 2.8 + Math.random() * 4.5;
-    const theta = Math.random() * Math.PI * 2;
-    const y = (Math.random() - 0.5) * 5.8;
-    particles[i * 3] = Math.cos(theta) * radius;
-    particles[i * 3 + 1] = y;
-    particles[i * 3 + 2] = Math.sin(theta) * radius - 1.2;
+function createMountainGeometry(points: number, radius: number, yScale: number) {
+  const positions = new Float32Array(points * points * 3);
+  const step = (radius * 2) / (points - 1);
+
+  for (let z = 0; z < points; z += 1) {
+    for (let x = 0; x < points; x += 1) {
+      const px = -radius + x * step;
+      const pz = -radius + z * step;
+      const ridge = Math.max(0, 1 - Math.abs(px) / radius);
+      const noise =
+        Math.sin(px * 0.95 + pz * 0.65) * 0.32 +
+        Math.cos(px * 0.42 - pz * 1.1) * 0.22 +
+        Math.sin((px + pz) * 0.28) * 0.18;
+      const height = (0.25 + ridge * 0.75 + noise) * yScale;
+      const i = (z * points + x) * 3;
+      positions[i] = px;
+      positions[i + 1] = Math.max(0, height);
+      positions[i + 2] = pz;
+    }
   }
 
-  for (let i = 0; i < connectionCount; i += 1) {
-    const a = Math.floor(Math.random() * count);
-    const b = Math.floor(Math.random() * count);
-    connections.set(particles.slice(a * 3, a * 3 + 3), i * 6);
-    connections.set(particles.slice(b * 3, b * 3 + 3), i * 6 + 3);
-  }
-
-  return { particles, connections };
+  return { positions, points, radius };
 }
 
-const PALETTE = [
-  new THREE.Color("#67e8f9"),
-  new THREE.Color("#60a5fa"),
-  new THREE.Color("#818cf8"),
-  new THREE.Color("#a78bfa"),
-];
+function RoadmapPath() {
+  const points = useMemo<PathPoint[]>(
+    () => [
+      [-4.2, 0.1, 2.4],
+      [-3.35, 0.16, 1.55],
+      [-2.4, 0.18, 1.0],
+      [-1.25, 0.22, 0.55],
+      [-0.25, 0.25, -0.2],
+      [0.9, 0.34, -0.8],
+      [1.9, 0.45, -1.35],
+      [2.9, 0.62, -1.65],
+      [3.8, 0.9, -2.0],
+    ],
+    [],
+  );
+  const positions = useMemo(() => new Float32Array(points.flat()), [points]);
+  const particles = useMemo(
+    () =>
+      new Float32Array(
+        Array.from({ length: 42 }, (_, index) => {
+          const t = index / 41;
+          const point = points[Math.floor(t * (points.length - 1))];
+          const jitter = (Math.random() - 0.5) * 0.18;
+          return [point[0] + jitter, point[1] + 0.05 + Math.random() * 0.18, point[2] + jitter];
+        }).flat(),
+      ),
+    [points],
+  );
+  const glow = useRef<THREE.LineBasicMaterial>(null);
+  const pointMaterial = useRef<THREE.PointsMaterial>(null);
 
-function animatedColor(target: THREE.Color, time: number, offset = 0) {
-  const wave = (Math.sin(time * 0.28 + offset) + 1) / 2;
-  const scaled = wave * (PALETTE.length - 1);
-  const index = Math.floor(scaled);
-  const next = Math.min(index + 1, PALETTE.length - 1);
-  target.copy(PALETTE[index]).lerp(PALETTE[next], scaled - index);
-  return target;
-}
-
-function IntelligenceField({ reducedMotion }: { reducedMotion: boolean }) {
-  const group = useRef<THREE.Group>(null);
-  const pointsMaterial = useRef<THREE.PointsMaterial>(null);
-  const lineMaterial = useRef<THREE.LineBasicMaterial>(null);
-  const data = useMemo(createField, []);
-  const color = useMemo(() => new THREE.Color(), []);
-
-  useFrame((state) => {
-    if (!group.current || reducedMotion) return;
-
-    const targetY = state.pointer.x * 0.08;
-    const targetX = -state.pointer.y * 0.045;
-    group.current.rotation.y = THREE.MathUtils.lerp(group.current.rotation.y, targetY, 0.035);
-    group.current.rotation.x = THREE.MathUtils.lerp(group.current.rotation.x, targetX, 0.035);
-
-    animatedColor(color, state.clock.elapsedTime, 1.8);
-    if (pointsMaterial.current) {
-      pointsMaterial.current.color.copy(color);
-      pointsMaterial.current.opacity = 0.38 + Math.sin(state.clock.elapsedTime * 0.7) * 0.06;
-    }
-    if (lineMaterial.current) {
-      lineMaterial.current.color.copy(color).multiplyScalar(0.72);
-      lineMaterial.current.opacity = 0.055 + Math.sin(state.clock.elapsedTime * 0.55) * 0.018;
-    }
+  useFrame(({ clock }) => {
+    const pulse = 0.72 + Math.sin(clock.elapsedTime * 2.1) * 0.16;
+    if (glow.current) glow.current.opacity = pulse;
+    if (pointMaterial.current) pointMaterial.current.opacity = Math.min(1, pulse + 0.08);
   });
 
   return (
-    <group ref={group}>
+    <group>
+      <line>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+        </bufferGeometry>
+        <lineBasicMaterial
+          ref={glow}
+          color="#fbbf24"
+          transparent
+          opacity={0.85}
+          linewidth={2}
+          blending={THREE.AdditiveBlending}
+        />
+      </line>
       <points>
         <bufferGeometry>
-          <bufferAttribute attach="attributes-position" args={[data.particles, 3]} />
+          <bufferAttribute attach="attributes-position" args={[particles, 3]} />
         </bufferGeometry>
         <pointsMaterial
-          ref={pointsMaterial}
-          color="#67e8f9"
-          size={0.035}
+          ref={pointMaterial}
+          color="#fde68a"
+          size={0.085}
           sizeAttenuation
           transparent
-          opacity={0.4}
+          opacity={0.9}
           depthWrite={false}
           blending={THREE.AdditiveBlending}
         />
       </points>
-      <lineSegments>
-        <bufferGeometry>
-          <bufferAttribute attach="attributes-position" args={[data.connections, 3]} />
-        </bufferGeometry>
-        <lineBasicMaterial
-          ref={lineMaterial}
-          color="#67e8f9"
-          transparent
-          opacity={0.06}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </lineSegments>
     </group>
   );
 }
 
-function Core({ reducedMotion }: { reducedMotion: boolean }) {
-  const group = useRef<THREE.Group>(null);
-  const coreMaterial = useRef<THREE.MeshBasicMaterial>(null);
-  const wireMaterial = useRef<THREE.MeshBasicMaterial>(null);
-  const innerMaterial = useRef<THREE.MeshBasicMaterial>(null);
-  const outerMaterial = useRef<THREE.MeshBasicMaterial>(null);
-  const color = useMemo(() => new THREE.Color(), []);
-  const softColor = useMemo(() => new THREE.Color(), []);
-  const white = useMemo(() => new THREE.Color("#ffffff"), []);
+function MountainRange() {
+  const near = useMemo(() => createMountainGeometry(34, 5.7, 2.5), []);
+  const far = useMemo(() => createMountainGeometry(28, 7.2, 1.8), []);
 
-  useFrame((state, delta) => {
-    if (!group.current || reducedMotion) return;
+  return (
+    <group position={[0, -1.1, -1.1]}>
+      <mesh geometry={new THREE.BufferGeometry()} position={[0, 0, -0.7]}>
+        <planeGeometry args={[13, 5]} />
+        <meshBasicMaterial color="#090d1a" transparent opacity={0.7} />
+      </mesh>
+      <mesh position={[0, 0, -0.8]}>
+        <planeGeometry args={[12.8, 6.2]} />
+        <meshBasicMaterial color="#111827" transparent opacity={0.18} />
+      </mesh>
+      <mesh position={[0, 0, -2.2]}>
+        <planeGeometry args={[15, 7]} />
+        <meshBasicMaterial color="#111827" transparent opacity={0.1} />
+      </mesh>
+      <mesh position={[0, -0.1, -1.6]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[13, 10]} />
+        <meshBasicMaterial color="#0a1020" roughness={1} metalness={0} />
+      </mesh>
+      <mesh position={[0, -0.2, -0.25]}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[near.positions, 3]} />
+        </bufferGeometry>
+        <meshBasicMaterial color="#1f2937" wireframe transparent opacity={0.1} />
+      </mesh>
+      <mesh position={[0, -0.35, -2.5]}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[far.positions, 3]} />
+        </bufferGeometry>
+        <meshBasicMaterial color="#334155" wireframe transparent opacity={0.05} />
+      </mesh>
+    </group>
+  );
+}
 
-    const time = state.clock.elapsedTime;
-    group.current.rotation.y += delta * 0.1;
-    group.current.rotation.x = Math.sin(time * 0.22) * 0.045;
+function OverlookAndPerson() {
+  const body = useMemo(() => new THREE.Group(), []);
+  const figure = useRef<THREE.Group>(null);
 
-    animatedColor(color, time);
-    animatedColor(softColor, time + 1.1);
-
-    coreMaterial.current?.color.copy(color).lerp(white, 0.48);
-    wireMaterial.current?.color.copy(color);
-    innerMaterial.current?.color.copy(color);
-    outerMaterial.current?.color.copy(softColor);
-
-    const pulse = 0.78 + Math.sin(time * 1.25) * 0.14;
-    if (coreMaterial.current) coreMaterial.current.opacity = 0.64 * pulse;
-    if (wireMaterial.current) wireMaterial.current.opacity = 0.2 + pulse * 0.08;
-    if (innerMaterial.current) innerMaterial.current.opacity = 0.32 + pulse * 0.1;
-    if (outerMaterial.current) outerMaterial.current.opacity = 0.16 + pulse * 0.06;
+  useFrame(({ clock }) => {
+    if (!figure.current) return;
+    figure.current.position.y = Math.sin(clock.elapsedTime * 0.5) * 0.012;
   });
 
   return (
-    <group ref={group}>
-      <mesh>
-        <icosahedronGeometry args={[1.05, 1]} />
-        <meshBasicMaterial ref={wireMaterial} color="#67e8f9" wireframe transparent opacity={0.26} />
+    <group>
+      <group ref={figure} position={[0.05, -0.02, 2.1]} rotation={[0, Math.PI, 0]}>
+        <mesh position={[0, 0.68, 0]}>
+          <capsuleGeometry args={[0.19, 0.52, 8, 12]} />
+          <meshStandardMaterial color="#111827" roughness={0.82} />
+        </mesh>
+        <mesh position={[0, 1.2, 0]}>
+          <sphereGeometry args={[0.18, 16, 16]} />
+          <meshStandardMaterial color="#0b1020" roughness={0.72} />
+        </mesh>
+        <mesh position={[-0.12, 0.7, 0]} rotation={[0, 0, -0.18]}>
+          <capsuleGeometry args={[0.05, 0.42, 6, 10]} />
+          <meshStandardMaterial color="#0f172a" roughness={0.86} />
+        </mesh>
+        <mesh position={[0.12, 0.7, 0]} rotation={[0, 0, 0.18]}>
+          <capsuleGeometry args={[0.05, 0.42, 6, 10]} />
+          <meshStandardMaterial color="#0f172a" roughness={0.86} />
+        </mesh>
+        <mesh position={[-0.09, 0.26, 0]}>
+          <capsuleGeometry args={[0.06, 0.55, 6, 10]} />
+          <meshStandardMaterial color="#111827" roughness={0.88} />
+        </mesh>
+        <mesh position={[0.09, 0.26, 0]}>
+          <capsuleGeometry args={[0.06, 0.55, 6, 10]} />
+          <meshStandardMaterial color="#111827" roughness={0.88} />
+        </mesh>
+      </group>
+
+      <mesh position={[0, -0.32, 1.95]} rotation={[0, 0, 0]}>
+        <boxGeometry args={[8.6, 0.18, 2.6]} />
+        <meshPhysicalMaterial color="#64748b" transmission={0.82} roughness={0.08} metalness={0.15} transparent opacity={0.78} />
       </mesh>
-      <mesh scale={0.68}>
-        <sphereGeometry args={[1, 20, 20]} />
-        <meshBasicMaterial ref={coreMaterial} color="#eaffff" transparent opacity={0.68} />
-      </mesh>
-      <mesh rotation={[Math.PI / 2.4, 0.15, 0]}>
-        <torusGeometry args={[1.45, 0.014, 6, 64]} />
-        <meshBasicMaterial ref={innerMaterial} color="#67e8f9" transparent opacity={0.42} />
-      </mesh>
-      <mesh rotation={[0.6, 0.8, 0.2]}>
-        <torusGeometry args={[1.78, 0.009, 6, 64]} />
-        <meshBasicMaterial ref={outerMaterial} color="#818cf8" transparent opacity={0.24} />
+      <mesh position={[0, 0.08, 0.72]}>
+        <boxGeometry args={[8.6, 0.08, 0.08]} />
+        <meshBasicMaterial color="#94a3b8" transparent opacity={0.3} />
       </mesh>
     </group>
   );
 }
 
-function Scene({ reducedMotion }: { reducedMotion: boolean }) {
+function DawnLighting() {
   return (
     <>
-      <IntelligenceField reducedMotion={reducedMotion} />
-      <Core reducedMotion={reducedMotion} />
+      <ambientLight intensity={0.45} color="#7c86a8" />
+      <directionalLight position={[-4, 5, -4]} intensity={3.6} color="#f59e0b" />
+      <directionalLight position={[5, 3, 2]} intensity={1.35} color="#8b5cf6" />
+      <pointLight position={[0, 0.8, 1.5]} intensity={3.2} distance={6} color="#fbbf24" />
     </>
+  );
+}
+
+function AtmosphericFog() {
+  return <fog attach="fog" args={["#0b1020", 5, 15]} />;
+}
+
+function Scene({ reducedMotion }: { reducedMotion: boolean }) {
+  const scene = useRef<THREE.Group>(null);
+
+  useFrame((state) => {
+    if (!scene.current || reducedMotion) return;
+    const t = state.clock.elapsedTime / 15;
+    const eased = Math.min(1, t);
+    const smooth = eased * eased * (3 - 2 * eased);
+    scene.current.position.x = smooth * 0.55;
+    scene.current.position.y = -smooth * 0.35;
+    scene.current.rotation.x = THREE.MathUtils.degToRad(smooth * 3.5);
+    scene.current.rotation.y = THREE.MathUtils.degToRad(-smooth * 8.5);
+    state.camera.position.x = THREE.MathUtils.lerp(state.camera.position.x, smooth * 1.55, 0.018);
+    state.camera.position.y = THREE.MathUtils.lerp(state.camera.position.y, 1.2 + smooth * 1.0, 0.018);
+    state.camera.position.z = THREE.MathUtils.lerp(state.camera.position.z, 7.6 + smooth * 3.0, 0.018);
+    state.camera.lookAt(0.2 + smooth * 0.35, 0.5 + smooth * 0.5, -0.3 - smooth * 1.4);
+  });
+
+  return (
+    <group ref={scene}>
+      <AtmosphericFog />
+      <DawnLighting />
+      <MountainRange />
+      <RoadmapPath />
+      <OverlookAndPerson />
+    </group>
   );
 }
 
@@ -188,29 +253,24 @@ export function CinematicScene() {
   return (
     <div
       ref={hostRef}
-      className="pointer-events-none absolute inset-0 -z-10 overflow-hidden perf-contain"
+      className="pointer-events-none absolute inset-0 -z-10 overflow-hidden bg-[#05070d] perf-contain"
       aria-hidden="true"
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(34,211,238,0.09),transparent_27%),radial-gradient(circle_at_18%_30%,rgba(79,70,229,0.07),transparent_30%),radial-gradient(circle_at_84%_64%,rgba(6,182,212,0.06),transparent_30%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_20%,rgba(245,158,11,0.2),transparent_25%),linear-gradient(180deg,#1a1730_0%,#111827_38%,#05070d_82%)]" />
       <Canvas
         dpr={profile.dpr}
         frameloop={shouldAnimate ? "always" : "never"}
-        camera={{ position: [0, 0, 6.2], fov: 44 }}
-        gl={{
-          antialias: false,
-          alpha: true,
-          powerPreference: "high-performance",
-          depth: true,
-          stencil: false,
-          preserveDrawingBuffer: false,
-        }}
-        performance={{ min: 0.65, max: 1, debounce: 120 }}
+        camera={{ position: [0, 0.9, 7.6], fov: 42 }}
+        gl={{ antialias: false, alpha: true, powerPreference: "high-performance", depth: true, stencil: false, preserveDrawingBuffer: false }}
+        performance={{ min: 0.6, max: 1, debounce: 120 }}
       >
         <Scene reducedMotion={!shouldAnimate} />
       </Canvas>
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_25%,rgba(2,4,11,0.12)_72%,rgba(2,4,11,0.3)_100%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(2,4,11,0.02),rgba(2,4,11,0.06)_50%,rgba(2,4,11,0.22)_100%)]" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-[#02040b]/55 to-transparent" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_18%,rgba(2,4,11,0.12)_58%,rgba(2,4,11,0.72)_100%)]" />
+      <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-[#05070d]/55 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-[#02040b] via-[#02040b]/72 to-transparent" />
+      <div className="absolute left-1/2 top-1/3 h-32 w-2/3 -translate-x-1/2 rounded-full bg-amber-300/10 blur-[85px]" />
+      <div className="absolute left-1/2 top-1/2 h-2/3 w-1/2 -translate-x-1/2 rounded-full bg-violet-500/[0.07] blur-[110px]" />
     </div>
   );
 }
