@@ -25,13 +25,31 @@ export function useRoadmap() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (preferredRoadmapId?: string) => {
     setLoading(true);
     try {
-      const { data: roadmapData, error } = await supabase.from("roadmaps").select("*").in("status", ["active", "paused"]).order("created_at", { ascending: false }).limit(1).maybeSingle();
-      if (error) throw error;
-      if (!roadmapData) { setRoadmap(null); setMilestones([]); setTasks([]); return; }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Please sign in to view your roadmap.");
+
+      // Do not use maybeSingle() here: users can have multiple active roadmaps.
+      // We intentionally select the newest one, or a just-created roadmap when supplied.
+      let roadmapData: any | null = null;
+      if (preferredRoadmapId) {
+        const { data, error } = await supabase.from("roadmaps").select("*").eq("id", preferredRoadmapId).eq("user_id", session.user.id).maybeSingle();
+        if (error) throw error;
+        roadmapData = data;
+      }
+      if (!roadmapData) {
+        const { data, error } = await supabase.from("roadmaps").select("*").eq("user_id", session.user.id).in("status", ["active", "paused"]).order("created_at", { ascending: false }).limit(1);
+        if (error) throw error;
+        roadmapData = data?.[0] ?? null;
+      }
+
+      if (!roadmapData) {
+        setRoadmap(null); setMilestones([]); setTasks([]); return;
+      }
       setRoadmap(roadmapData);
+
       const [{ data: milestoneRows, error: milestoneError }, { data: taskRows, error: taskError }, { data: progressRows, error: progressError }] = await Promise.all([
         supabase.from("roadmap_milestones").select("*").eq("roadmap_id", roadmapData.id).order("milestone_order"),
         supabase.from("roadmap_tasks").select("*").eq("roadmap_id", roadmapData.id).order("day_number").order("task_order"),
@@ -40,6 +58,7 @@ export function useRoadmap() {
       if (milestoneError) throw milestoneError;
       if (taskError) throw taskError;
       if (progressError) throw progressError;
+
       const progress = new Map((progressRows || []).map((item) => [item.task_id, item.status]));
       const hydratedTasks = (taskRows || []).map((task) => ({ ...task, progress: progress.get(task.id) || "pending" })) as RoadmapTask[];
       setTasks(hydratedTasks);
@@ -76,16 +95,10 @@ export function useRoadmap() {
       const startDate = new Date(); const targetDate = new Date(startDate); targetDate.setDate(startDate.getDate() + durationDays - 1);
 
       const { data: createdRoadmap, error: roadmapError } = await supabase.from("roadmaps").insert({
-        user_id: session.user.id,
-        title: plan.title,
-        goal: String(currentAnswers.goal || currentAnswers.target || plan.summary || plan.title),
-        category,
-        questionnaire: currentAnswers,
-        generation_metadata: { scientific: true, methodology: "evidence-informed", generated_plan: plan },
-        duration_days: durationDays,
-        start_date: startDate.toISOString().slice(0, 10),
-        target_date: targetDate.toISOString().slice(0, 10),
-        status: "active",
+        user_id: session.user.id, title: plan.title,
+        goal: String(currentAnswers.goal || currentAnswers.target || plan.summary || plan.title), category,
+        questionnaire: currentAnswers, generation_metadata: { scientific: true, methodology: "evidence-informed", generated_plan: plan },
+        duration_days: durationDays, start_date: startDate.toISOString().slice(0, 10), target_date: targetDate.toISOString().slice(0, 10), status: "active",
       }).select().single();
       if (roadmapError || !createdRoadmap) throw roadmapError || new Error("Roadmap could not be saved.");
 
@@ -121,7 +134,12 @@ export function useRoadmap() {
         await supabase.from("roadmaps").delete().eq("id", createdRoadmap.id).eq("user_id", session.user.id);
         throw error;
       }
-      setAnswers(currentAnswers); await load(); return result;
+
+      setAnswers(currentAnswers);
+      // Hydrate the exact roadmap that was just created. This avoids stale-query
+      // races and also works when older active roadmaps exist.
+      await load(createdRoadmap.id);
+      return result;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save the generated roadmap.");
       throw error;
