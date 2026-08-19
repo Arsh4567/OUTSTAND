@@ -16,6 +16,28 @@ export type RoadmapMilestone = {
   description: string | null; methodology_tags: string[]; tasks: RoadmapTask[];
 };
 
+function normalizeQuestions(value: unknown): RoadmapQuestion[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
+    .map((item, index) => ({
+      id: String(item.id || `roadmap_question_${index + 1}`),
+      question: String(item.question || "What additional detail would help us personalize your roadmap?"),
+      type: (["text", "number", "choice", "multiline"].includes(String(item.type)) ? String(item.type) : "text") as RoadmapQuestion["type"],
+      required: item.required !== false,
+      options: Array.isArray(item.options) ? item.options.map(String) : undefined,
+      placeholder: item.placeholder ? String(item.placeholder) : undefined,
+    }));
+}
+
+const fallbackFollowUp: RoadmapQuestion = {
+  id: "roadmap_missing_detail",
+  question: "What is the single most important result you want to achieve by the end of this roadmap?",
+  type: "multiline",
+  required: true,
+  placeholder: "For example: score 90%+ in my next exam, reach 1200 chess rating, or build my first working website.",
+};
+
 export function useRoadmap() {
   const [roadmap, setRoadmap] = useState<any | null>(null);
   const [milestones, setMilestones] = useState<RoadmapMilestone[]>([]);
@@ -30,9 +52,6 @@ export function useRoadmap() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Please sign in to view your roadmap.");
-
-      // Do not use maybeSingle() here: users can have multiple active roadmaps.
-      // We intentionally select the newest one, or a just-created roadmap when supplied.
       let roadmapData: any | null = null;
       if (preferredRoadmapId) {
         const { data, error } = await supabase.from("roadmaps").select("*").eq("id", preferredRoadmapId).eq("user_id", session.user.id).maybeSingle();
@@ -44,12 +63,8 @@ export function useRoadmap() {
         if (error) throw error;
         roadmapData = data?.[0] ?? null;
       }
-
-      if (!roadmapData) {
-        setRoadmap(null); setMilestones([]); setTasks([]); return;
-      }
+      if (!roadmapData) { setRoadmap(null); setMilestones([]); setTasks([]); return; }
       setRoadmap(roadmapData);
-
       const [{ data: milestoneRows, error: milestoneError }, { data: taskRows, error: taskError }, { data: progressRows, error: progressError }] = await Promise.all([
         supabase.from("roadmap_milestones").select("*").eq("roadmap_id", roadmapData.id).order("milestone_order"),
         supabase.from("roadmap_tasks").select("*").eq("roadmap_id", roadmapData.id).order("day_number").order("task_order"),
@@ -58,7 +73,6 @@ export function useRoadmap() {
       if (milestoneError) throw milestoneError;
       if (taskError) throw taskError;
       if (progressError) throw progressError;
-
       const progress = new Map((progressRows || []).map((item) => [item.task_id, item.status]));
       const hydratedTasks = (taskRows || []).map((task) => ({ ...task, progress: progress.get(task.id) || "pending" })) as RoadmapTask[];
       setTasks(hydratedTasks);
@@ -76,8 +90,10 @@ export function useRoadmap() {
     const response = await fetch("/api/roadmap", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ mode: "questions", category, answers: currentAnswers }) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Could not generate intake questions.");
-    setQuestions(Array.isArray(result.questions) ? result.questions : []);
-    return result.questions || [];
+    const nextQuestions = normalizeQuestions(result.questions);
+    if (!nextQuestions.length) throw new Error("The roadmap intake did not return any questions. Please try again.");
+    setQuestions(nextQuestions);
+    return nextQuestions;
   }, [answers]);
 
   const generate = useCallback(async (category: string, currentAnswers: Record<string, unknown>) => {
@@ -88,12 +104,15 @@ export function useRoadmap() {
       const response = await fetch("/api/roadmap", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ mode: "plan", category, answers: currentAnswers }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not generate roadmap.");
-      if (result.needsMoreInfo) { setQuestions(Array.isArray(result.questions) ? result.questions : []); return result; }
+      if (result.needsMoreInfo) {
+        const nextQuestions = normalizeQuestions(result.questions);
+        setQuestions(nextQuestions.length ? nextQuestions : [fallbackFollowUp]);
+        return { ...result, questions: nextQuestions.length ? nextQuestions : [fallbackFollowUp] };
+      }
       const plan = result.plan;
       if (!plan?.title || !Array.isArray(plan?.milestones) || plan.milestones.length === 0) throw new Error("The AI returned an incomplete roadmap.");
       const durationDays = Math.max(1, Math.min(730, Number(plan.durationDays) || Number(currentAnswers.durationDays) || 30));
       const startDate = new Date(); const targetDate = new Date(startDate); targetDate.setDate(startDate.getDate() + durationDays - 1);
-
       const { data: createdRoadmap, error: roadmapError } = await supabase.from("roadmaps").insert({
         user_id: session.user.id, title: plan.title,
         goal: String(currentAnswers.goal || currentAnswers.target || plan.summary || plan.title), category,
@@ -101,32 +120,18 @@ export function useRoadmap() {
         duration_days: durationDays, start_date: startDate.toISOString().slice(0, 10), target_date: targetDate.toISOString().slice(0, 10), status: "active",
       }).select().single();
       if (roadmapError || !createdRoadmap) throw roadmapError || new Error("Roadmap could not be saved.");
-
       try {
         for (let index = 0; index < plan.milestones.length; index += 1) {
           const milestone = plan.milestones[index];
           const dayStart = Math.max(1, Number(milestone.day) || 1);
           const nextDay = Number(plan.milestones[index + 1]?.day || durationDays + 1);
-          const { data: milestoneRow, error: milestoneError } = await supabase.from("roadmap_milestones").insert({
-            roadmap_id: createdRoadmap.id, user_id: session.user.id, milestone_order: index + 1,
-            day_start: dayStart, day_end: Math.max(dayStart, nextDay - 1), title: String(milestone.title),
-            outcome: milestone.outcome || null, description: milestone.description || null,
-            methodology_tags: Array.isArray(milestone.methodologyTags) ? milestone.methodologyTags : ["chunking", "deliberate_practice"],
-          }).select().single();
+          const { data: milestoneRow, error: milestoneError } = await supabase.from("roadmap_milestones").insert({ roadmap_id: createdRoadmap.id, user_id: session.user.id, milestone_order: index + 1, day_start: dayStart, day_end: Math.max(dayStart, nextDay - 1), title: String(milestone.title), outcome: milestone.outcome || null, description: milestone.description || null, methodology_tags: Array.isArray(milestone.methodologyTags) ? milestone.methodologyTags : ["chunking", "deliberate_practice"] }).select().single();
           if (milestoneError || !milestoneRow) throw milestoneError || new Error("Milestone could not be saved.");
-
           const actions = Array.isArray(milestone.actions) ? milestone.actions : [];
           for (let actionIndex = 0; actionIndex < actions.length; actionIndex += 1) {
             const source = actions[actionIndex];
             const task = typeof source === "string" ? { title: source, instructions: source } : source;
-            const { error: taskError } = await supabase.from("roadmap_tasks").insert({
-              roadmap_id: createdRoadmap.id, milestone_id: milestoneRow.id, user_id: session.user.id,
-              day_number: dayStart, task_order: actionIndex + 1, title: String(task.title),
-              instructions: String(task.instructions || task.title), estimated_minutes: Number(task.estimatedMinutes) || 25,
-              task_type: String(task.taskType || "practice"), methodology_tags: Array.isArray(task.methodologyTags) ? task.methodologyTags : ["active_recall", "deliberate_practice", "chunking"],
-              resources: Array.isArray(task.resources) ? task.resources : [], spaced_repetition_day: task.spacedRepetitionDay == null ? null : Number(task.spacedRepetitionDay),
-              difficulty: task.difficulty ? String(task.difficulty) : null, success_criteria: String(task.successCriteria || "Complete the task and record errors or blockers."), is_required: true,
-            });
+            const { error: taskError } = await supabase.from("roadmap_tasks").insert({ roadmap_id: createdRoadmap.id, milestone_id: milestoneRow.id, user_id: session.user.id, day_number: dayStart, task_order: actionIndex + 1, title: String(task.title), instructions: String(task.instructions || task.title), estimated_minutes: Number(task.estimatedMinutes) || 25, task_type: String(task.taskType || "practice"), methodology_tags: Array.isArray(task.methodologyTags) ? task.methodologyTags : ["active_recall", "deliberate_practice", "chunking"], resources: Array.isArray(task.resources) ? task.resources : [], spaced_repetition_day: task.spacedRepetitionDay == null ? null : Number(task.spacedRepetitionDay), difficulty: task.difficulty ? String(task.difficulty) : null, success_criteria: String(task.successCriteria || "Complete the task and record errors or blockers."), is_required: true });
             if (taskError) throw taskError;
           }
         }
@@ -134,10 +139,7 @@ export function useRoadmap() {
         await supabase.from("roadmaps").delete().eq("id", createdRoadmap.id).eq("user_id", session.user.id);
         throw error;
       }
-
       setAnswers(currentAnswers);
-      // Hydrate the exact roadmap that was just created. This avoids stale-query
-      // races and also works when older active roadmaps exist.
       await load(createdRoadmap.id);
       return result;
     } catch (error) {
