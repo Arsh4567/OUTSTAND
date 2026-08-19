@@ -71,8 +71,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let body = '';
     let path = '/dashboard';
 
-    // Roadmap notifications use the new normalized roadmap/task data first.
-    // This keeps notifications accurate even when the legacy daily_quests mirror is stale.
     if (pref.goals_enabled && (clock.hour === 8 || clock.hour === 19)) {
       const { data: roadmap } = await admin.from('roadmaps').select('id,title,start_date,duration_days').eq('user_id', pref.user_id).eq('status', 'active').lte('start_date', date).order('created_at', { ascending: false }).limit(1).maybeSingle();
       if (roadmap) {
@@ -99,8 +97,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // Preserve the existing daily-quest notification fallback for users who still
-    // have only the legacy AI roadmap system populated.
     if (!category && pref.goals_enabled && (clock.hour === 8 || clock.hour === 19)) {
       const { data: missions } = await admin.from('daily_quests').select('id, completed, quests(title, category)').eq('user_id', pref.user_id).eq('assigned_date', date).eq('completed', false).order('id').limit(1);
       const row = missions?.[0] as any;
@@ -138,7 +134,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!category) continue;
 
-    const dedupeKey = `${category}:roadmap:${date}:${clock.hour}`;
+    const dedupeKey = `${category}:${date}:${clock.hour}`;
     const { data: existing } = await admin.from('notification_delivery_log').select('id').eq('user_id', pref.user_id).eq('dedupe_key', dedupeKey).maybeSingle();
     if (existing) continue;
 
