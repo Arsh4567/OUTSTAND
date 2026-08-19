@@ -55,26 +55,24 @@ export function useRoadmap() {
       const { data: roadmapData, error } = await supabase.from("roadmaps").select("*").in("status", ["active", "paused"]).order("created_at", { ascending: false }).limit(1).maybeSingle();
       if (error) throw error;
       if (!roadmapData) {
-        setRoadmap(null);
-        setMilestones([]);
-        setTasks([]);
-        return;
+        setRoadmap(null); setMilestones([]); setTasks([]); return;
       }
       setRoadmap(roadmapData);
-      const [{ data: milestoneRows }, { data: taskRows }, { data: progressRows }] = await Promise.all([
+      const [{ data: milestoneRows, error: milestoneError }, { data: taskRows, error: taskError }, { data: progressRows, error: progressError }] = await Promise.all([
         supabase.from("roadmap_milestones").select("*").eq("roadmap_id", roadmapData.id).order("milestone_order"),
         supabase.from("roadmap_tasks").select("*").eq("roadmap_id", roadmapData.id).order("day_number").order("task_order"),
         supabase.from("roadmap_task_progress").select("task_id,status").eq("roadmap_id", roadmapData.id),
       ]);
+      if (milestoneError) throw milestoneError;
+      if (taskError) throw taskError;
+      if (progressError) throw progressError;
       const progress = new Map((progressRows || []).map((item) => [item.task_id, item.status]));
       const hydratedTasks = (taskRows || []).map((task) => ({ ...task, progress: progress.get(task.id) || "pending" })) as RoadmapTask[];
       setTasks(hydratedTasks);
       setMilestones((milestoneRows || []).map((milestone) => ({ ...milestone, tasks: hydratedTasks.filter((task) => task.day_number >= milestone.day_start && task.day_number <= milestone.day_end) })) as RoadmapMilestone[]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not load roadmap.");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { void load(); }, [load]);
@@ -82,14 +80,10 @@ export function useRoadmap() {
   const askQuestions = useCallback(async (category: string, currentAnswers: Record<string, unknown> = answers) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error("Please sign in to build a roadmap.");
-    const response = await fetch("/api/roadmap", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ mode: "questions", category, answers: currentAnswers }),
-    });
+    const response = await fetch("/api/roadmap", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ mode: "questions", category, answers: currentAnswers }) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Could not generate intake questions.");
-    setQuestions(result.questions || []);
+    setQuestions(Array.isArray(result.questions) ? result.questions : []);
     return result.questions || [];
   }, [answers]);
 
@@ -98,23 +92,19 @@ export function useRoadmap() {
     if (!session) throw new Error("Please sign in to build a roadmap.");
     setGenerating(true);
     try {
-      const response = await fetch("/api/roadmap", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ mode: "plan", category, answers: currentAnswers }),
-      });
+      const response = await fetch("/api/roadmap", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ mode: "plan", category, answers: currentAnswers }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not generate roadmap.");
       if (result.needsMoreInfo) {
-        setQuestions(result.questions || []);
+        setQuestions(Array.isArray(result.questions) ? result.questions : []);
         return result;
       }
       const plan = result.plan;
-      if (!plan?.title || !Array.isArray(plan?.milestones)) throw new Error("The AI returned an incomplete roadmap.");
-      const durationDays = Number(plan.durationDays || currentAnswers.durationDays || 30);
+      if (!plan?.title || !Array.isArray(plan?.milestones) || plan.milestones.length === 0) throw new Error("The AI returned an incomplete roadmap.");
+      const durationDays = Math.max(1, Math.min(730, Number(plan.durationDays) || Number(currentAnswers.durationDays) || 30));
       const startDate = new Date();
-      const targetDate = new Date(startDate);
-      targetDate.setDate(startDate.getDate() + durationDays - 1);
+      const targetDate = new Date(startDate); targetDate.setDate(startDate.getDate() + durationDays - 1);
+
       const { data: createdRoadmap, error: roadmapError } = await supabase.from("roadmaps").insert({
         title: plan.title,
         goal: String(currentAnswers.goal || plan.summary || plan.title),
@@ -130,36 +120,29 @@ export function useRoadmap() {
 
       for (let index = 0; index < plan.milestones.length; index += 1) {
         const milestone = plan.milestones[index];
-        const dayStart = Number(milestone.day || 1);
-        const dayEnd = Number(plan.milestones[index + 1]?.day ? Number(plan.milestones[index + 1].day) - 1 : durationDays);
+        const dayStart = Math.max(1, Number(milestone.day) || 1);
+        const nextDay = Number(plan.milestones[index + 1]?.day || durationDays + 1);
         const { data: milestoneRow, error: milestoneError } = await supabase.from("roadmap_milestones").insert({
-          roadmap_id: createdRoadmap.id,
-          user_id: session.user.id,
-          milestone_order: index + 1,
-          day_start: dayStart,
-          day_end: Math.max(dayStart, dayEnd),
-          title: milestone.title,
-          outcome: milestone.outcome || null,
-          description: Array.isArray(milestone.actions) ? milestone.actions.join(" · ") : null,
-          methodology_tags: ["chunking", "deliberate_practice"],
+          roadmap_id: createdRoadmap.id, user_id: session.user.id, milestone_order: index + 1,
+          day_start: dayStart, day_end: Math.max(dayStart, nextDay - 1), title: String(milestone.title),
+          outcome: milestone.outcome || null, description: milestone.description || null,
+          methodology_tags: Array.isArray(milestone.methodologyTags) ? milestone.methodologyTags : ["chunking", "deliberate_practice"],
         }).select().single();
         if (milestoneError || !milestoneRow) throw milestoneError || new Error("Milestone could not be saved.");
+
         const actions = Array.isArray(milestone.actions) ? milestone.actions : [];
         for (let actionIndex = 0; actionIndex < actions.length; actionIndex += 1) {
-          const title = String(actions[actionIndex]);
+          const source = actions[actionIndex];
+          const task = typeof source === "string" ? { title: source, instructions: source } : source;
           const { error: taskError } = await supabase.from("roadmap_tasks").insert({
-            roadmap_id: createdRoadmap.id,
-            milestone_id: milestoneRow.id,
-            user_id: session.user.id,
-            day_number: dayStart,
-            task_order: actionIndex + 1,
-            title,
-            instructions: title,
-            estimated_minutes: 25,
-            task_type: "practice",
-            methodology_tags: ["active_recall", "deliberate_practice", "chunking"],
-            resources: [],
-            success_criteria: "Complete the task as written and record any mistakes or blockers.",
+            roadmap_id: createdRoadmap.id, milestone_id: milestoneRow.id, user_id: session.user.id,
+            day_number: dayStart, task_order: actionIndex + 1, title: String(task.title),
+            instructions: String(task.instructions || task.title), estimated_minutes: Number(task.estimatedMinutes) || 25,
+            task_type: String(task.taskType || "practice"), methodology_tags: Array.isArray(task.methodologyTags) ? task.methodologyTags : ["active_recall", "deliberate_practice", "chunking"],
+            resources: Array.isArray(task.resources) ? task.resources : [],
+            spaced_repetition_day: task.spacedRepetitionDay == null ? null : Number(task.spacedRepetitionDay),
+            difficulty: task.difficulty ? String(task.difficulty) : null,
+            success_criteria: String(task.successCriteria || "Complete the task and record errors or blockers."),
             is_required: true,
           });
           if (taskError) throw taskError;
@@ -168,9 +151,11 @@ export function useRoadmap() {
       setAnswers(currentAnswers);
       await load();
       return result;
-    } finally {
-      setGenerating(false);
-    }
+    } catch (error) {
+      // Avoid leaving a half-created roadmap visible when a milestone/task insert fails.
+      toast.error(error instanceof Error ? error.message : "Could not save the generated roadmap.");
+      throw error;
+    } finally { setGenerating(false); }
   }, [load]);
 
   const toggleTask = useCallback(async (task: RoadmapTask) => {
@@ -195,7 +180,7 @@ export function useRoadmap() {
       const response = await fetch("/api/roadmap", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ mode: "adapt", context: { roadmapId: roadmap.id, reflection, energy, difficulty, completion: percent } }) });
       if (response.ok) {
         const result = await response.json();
-        await supabase.from("nightly_reviews").upsert({ roadmap_id: roadmap.id, daily_log_id: dailyLog.id, user_id: roadmap.user_id, review_date: today, ai_summary: result.reason || null, ai_feedback: result.plan?.summary || null, adaptation: result, strengths: [], blockers: [] }, { onConflict: "roadmap_id,review_date" });
+        await supabase.from("nightly_reviews").upsert({ roadmap_id: roadmap.id, daily_log_id: dailyLog.id, user_id: roadmap.user_id, review_date: today, ai_summary: result.analysis?.summary || result.reason || null, ai_feedback: result.analysis?.recommendation || null, adaptation: result, strengths: result.analysis?.strengths || [], blockers: result.analysis?.blockers || [] }, { onConflict: "roadmap_id,review_date" });
         return result;
       }
     }
