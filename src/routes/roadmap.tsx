@@ -31,7 +31,7 @@ function RoadmapPage() {
       if (result?.needsMoreInfo) { setShowOnboarding(true); return; }
       if (!result?.roadmapId) throw new Error("Roadmap was generated but no saved roadmap ID was returned.");
       if (result?.structuredContent) {
-        const { error } = await supabase.from("roadmaps").update({ structured_content: result.structuredContent }).eq("id", result.roadmapId);
+        const { error } = await (supabase.from("roadmaps") as any).update({ structured_content: result.structuredContent }).eq("id", result.roadmapId);
         if (error) throw error;
       }
       setShowOnboarding(false); toast.success("Your interactive learning roadmap is ready.");
