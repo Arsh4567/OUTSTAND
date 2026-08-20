@@ -23,7 +23,20 @@ export function useAppState() {
   const refreshCloudStreak = useCallback(async (recordToday = false) => { try { const { data: { user } } = await supabase.auth.getUser(); if (!user) { setCurrentStreak(0); setCloudBestStreak(0); return; } if (recordToday) { const { data, error } = await supabase.rpc("record_daily_streak", { p_user_id: user.id }); if (!error && data?.[0]) { setCurrentStreak(Number(data[0].current_streak) || 0); setCloudBestStreak(Number(data[0].best_streak) || 0); return; } } const { data } = await supabase.from("profiles").select("current_streak,best_streak,last_streak_date").eq("id", user.id).maybeSingle(); setCurrentStreak(Number(data?.current_streak) || 0); setCloudBestStreak(Number(data?.best_streak) || 0); } catch { setCurrentStreak(0); setCloudBestStreak(0); } }, []);
   useEffect(() => { void refreshXp(); void refreshCloudStreak(false); }, [refreshXp, refreshCloudStreak]);
 
-  useEffect(() => { let active = true; const channel = supabase.channel("live-xp").on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles" }, payload => { if (!active) return; void supabase.auth.getUser().then(({ data: { user } }) => { if (user?.id === payload.new.id) setXp(Math.max(0, Number(payload.new.total_xp) || 0)); }); }).subscribe(); return () => { active = false; void supabase.removeChannel(channel); }; }, []);
+  // Avoid an auth lookup for every profile UPDATE. The realtime path only needs the
+  // current user's id, so caching it keeps frequent XP events O(1) and network-free.
+  useEffect(() => {
+    let active = true;
+    let userId: string | null = null;
+    void supabase.auth.getUser().then(({ data: { user } }) => { if (active) userId = user?.id ?? null; });
+    const subscription = supabase.auth.onAuthStateChange((_event, session) => { userId = session?.user?.id ?? null; });
+    const channel = supabase.channel("live-xp").on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles" }, payload => {
+      if (!active || !userId || userId !== payload.new.id) return;
+      setXp(Math.max(0, Number(payload.new.total_xp) || 0));
+    }).subscribe();
+    return () => { active = false; subscription.data.subscription.unsubscribe(); void supabase.removeChannel(channel); };
+  }, []);
+
   useEffect(() => { if (syncTimer.current) clearTimeout(syncTimer.current); syncAbortRef.current?.abort(); const controller = new AbortController(); syncAbortRef.current = controller; const sync = async () => { try { const { data: { session } } = await supabase.auth.getSession(); if (!session || controller.signal.aborted) return; for (let attempt = 0; attempt < MAX_SYNC_RETRIES; attempt += 1) { try { const response = await fetch("/api/sync-productivity-state", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ habits, sessions, outstand }), signal: controller.signal }); if (response.ok) { hasSyncedOnce.current = true; return; } if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) return; } catch (error) { if (isAbortError(error)) return; if (attempt === MAX_SYNC_RETRIES - 1) return; } await new Promise<void>(resolve => setTimeout(resolve, 500 * 2 ** attempt)); if (controller.signal.aborted) return; } } catch (error) { if (!controller.signal.aborted && !isAbortError(error)) console.warn("Outstand cloud sync unavailable:", error); } }; syncTimer.current = setTimeout(sync, hasSyncedOnce.current ? 1200 : 250); return () => { if (syncTimer.current) clearTimeout(syncTimer.current); controller.abort(); if (syncAbortRef.current === controller) syncAbortRef.current = null; }; }, [habits, sessions, outstand]);
   useEffect(() => { let active = true; const subscription = supabase.auth.onAuthStateChange((event, session) => { if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && session?.access_token && active) { void refreshXp(); void refreshCloudStreak(false); } }); return () => { active = false; subscription.data.subscription.unsubscribe(); }; }, [refreshXp, refreshCloudStreak]);
 
