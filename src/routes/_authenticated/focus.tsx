@@ -3,127 +3,29 @@ import { useEffect, useRef, useState } from "react";
 import { Pause, Play, RotateCcw, Timer, CheckCircle2 } from "lucide-react";
 import { useAppState } from "@/hooks/use-app-state";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/focus")({
-  head: () => ({
-    meta: [
-      { title: "Focus — Outstand" },
-      { name: "description", content: "A simple distraction-free focus timer." },
-    ],
-  }),
+  head: () => ({ meta: [{ title: "Focus — Outstand" }, { name: "description", content: "A simple distraction-free focus timer." }] }),
   component: FocusPage,
 });
-
-const FOCUS_MINUTES = 25;
-const BREAK_MINUTES = 5;
-
-function FocusPage() {
-  const { sessions, recordSession } = useAppState();
-  const [minutes, setMinutes] = useState(FOCUS_MINUTES);
-  const [seconds, setSeconds] = useState(0);
-  const [running, setRunning] = useState(false);
-  const [task, setTask] = useState("");
-  const [mode, setMode] = useState<"focus" | "break">("focus");
-  const intervalRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!running) return;
-    intervalRef.current = window.setInterval(() => {
-      setSeconds((current) => {
-        if (current > 0) return current - 1;
-        setMinutes((currentMinutes) => {
-          if (currentMinutes > 0) return currentMinutes - 1;
-          setRunning(false);
-          if (mode === "focus") {
-            recordSession(FOCUS_MINUTES, true);
-            toast.success("Focus session complete", { description: "Take a short break." });
-            setMode("break");
-            setMinutes(BREAK_MINUTES);
-          } else {
-            toast.success("Break complete", { description: "Ready for another focus session." });
-            setMode("focus");
-            setMinutes(FOCUS_MINUTES);
-          }
-          return mode === "focus" ? 0 : 0;
-        });
-        return 59;
-      });
-    }, 1000);
-    return () => {
-      if (intervalRef.current) window.clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    };
-  }, [running, mode, recordSession]);
-
-  useEffect(() => () => {
-    if (intervalRef.current) window.clearInterval(intervalRef.current);
-  }, []);
-
-  const reset = () => {
-    setRunning(false);
-    setMinutes(mode === "focus" ? FOCUS_MINUTES : BREAK_MINUTES);
-    setSeconds(0);
-  };
-
-  const toggle = () => setRunning((value) => !value);
-  const completedSessions = sessions.filter((session) => session.completed).length;
-  const focusMinutes = sessions.filter((session) => session.completed).reduce((total, session) => total + session.durationMin, 0);
-  const totalSeconds = (mode === "focus" ? FOCUS_MINUTES * 60 : BREAK_MINUTES * 60);
-  const remainingSeconds = minutes * 60 + seconds;
-  const progress = Math.max(0, Math.min(1, 1 - remainingSeconds / totalSeconds));
-  const circumference = 2 * Math.PI * 108;
-
-  return (
-    <main className="min-h-[calc(100vh-72px)] px-4 py-8 sm:px-6 sm:py-12">
-      <div className="mx-auto max-w-3xl">
-        <header className="mb-8">
-          <div className="flex items-center gap-3 text-cyan-300">
-            <div className="grid h-10 w-10 place-items-center rounded-xl border border-cyan-300/15 bg-cyan-300/10"><Timer className="h-5 w-5" /></div>
-            <span className="text-[10px] font-black uppercase tracking-[.25em] text-slate-500">Focus</span>
-          </div>
-          <h1 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-4xl">One thing. For 25 minutes.</h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">Choose one task, start the timer, and ignore everything else until it ends.</p>
-        </header>
-
-        <section className="overflow-hidden rounded-[2rem] border border-white/[0.08] bg-white/[0.035] shadow-2xl backdrop-blur-xl">
-          <div className="border-b border-white/[0.06] p-5 sm:p-7">
-            <div className="flex gap-2">
-              <button type="button" onClick={() => { if (!running) { setMode("focus"); setMinutes(FOCUS_MINUTES); setSeconds(0); } }} className={`rounded-xl px-4 py-2 text-xs font-black ${mode === "focus" ? "bg-cyan-300 text-slate-950" : "text-slate-500 hover:bg-white/5 hover:text-white"}`}>Focus · 25m</button>
-              <button type="button" onClick={() => { if (!running) { setMode("break"); setMinutes(BREAK_MINUTES); setSeconds(0); } }} className={`rounded-xl px-4 py-2 text-xs font-black ${mode === "break" ? "bg-white text-slate-950" : "text-slate-500 hover:bg-white/5 hover:text-white"}`}>Break · 5m</button>
-            </div>
-            <label className="mt-5 block"><span className="text-[10px] font-black uppercase tracking-[.18em] text-slate-600">What are you working on?</span><input value={task} onChange={(event) => setTask(event.target.value)} disabled={running} maxLength={120} placeholder="e.g. Finish chemistry notes" className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm font-semibold text-white outline-none placeholder:text-slate-700 focus:border-cyan-300/40 disabled:opacity-60" /></label>
-          </div>
-
-          <div className="flex flex-col items-center px-5 py-10 sm:py-14">
-            <div className="relative h-64 w-64 sm:h-72 sm:w-72">
-              <svg viewBox="0 0 240 240" className="h-full w-full -rotate-90" aria-hidden="true">
-                <circle cx="120" cy="120" r="108" fill="none" stroke="currentColor" strokeWidth="6" className="text-white/[0.06]" />
-                <circle cx="120" cy="120" r="108" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" className="text-cyan-300 transition-all duration-1000" strokeDasharray={circumference} strokeDashoffset={circumference * (1 - progress)} />
-              </svg>
-              <div className="absolute inset-0 grid place-items-center text-center">
-                <div><p className="font-mono text-6xl font-black tabular-nums tracking-tight text-white sm:text-7xl">{String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}</p><p className="mt-2 text-[10px] font-black uppercase tracking-[.25em] text-slate-600">{mode === "focus" ? "Focus" : "Break"}</p></div>
-              </div>
-            </div>
-
-            {task && <p className="mt-5 max-w-md truncate text-center text-sm font-bold text-slate-400">{task}</p>}
-            <div className="mt-7 flex items-center gap-3">
-              <Button onClick={toggle} className="h-12 rounded-xl bg-cyan-300 px-7 text-sm font-black text-slate-950 hover:bg-cyan-200">{running ? <><Pause className="mr-2 h-4 w-4" /> Pause</> : <><Play className="mr-2 h-4 w-4" /> Start focus</>}</Button>
-              <Button variant="ghost" onClick={reset} className="h-12 w-12 rounded-xl text-slate-500 hover:bg-white/5 hover:text-white" aria-label="Reset timer"><RotateCcw className="h-4 w-4" /></Button>
-            </div>
-          </div>
-        </section>
-
-        <section className="mt-5 grid gap-3 sm:grid-cols-3">
-          <SimpleStat icon={<CheckCircle2 />} label="Completed" value={completedSessions} />
-          <SimpleStat icon={<Timer />} label="Focus time" value={`${focusMinutes}m`} />
-          <SimpleStat icon={<span className="text-base">✓</span>} label="Next" value={mode === "focus" ? "Take a break" : "Focus again"} />
-        </section>
-      </div>
-    </main>
-  );
+const FOCUS_MINUTES = 25; const BREAK_MINUTES = 5;
+type FocusRow = { id:string; user_id:string; duration_minutes:number; completed_at:string|null; created_at:string };
+function FocusPage(){
+ const { user } = useAppState();
+ const [minutes,setMinutes]=useState(FOCUS_MINUTES); const [seconds,setSeconds]=useState(0); const [running,setRunning]=useState(false); const [task,setTask]=useState(""); const [mode,setMode]=useState<"focus"|"break">("focus"); const [sessions,setSessions]=useState<FocusRow[]>([]); const [loading,setLoading]=useState(true); const intervalRef=useRef<number|null>(null);
+ const loadSessions=async()=>{if(!user){setSessions([]);setLoading(false);return} const {data,error}=await supabase.from("focus_sessions").select("id,user_id,duration_minutes,completed_at,created_at").eq("user_id",user.id).order("created_at",{ascending:false}).limit(100); if(error){toast.error("Could not load focus history.");setSessions([])}else setSessions((data||[]) as FocusRow[]);setLoading(false)};
+ useEffect(()=>{void loadSessions()},[user?.id]);
+ useEffect(()=>{if(!running)return; intervalRef.current=window.setInterval(()=>{setSeconds(current=>{if(current>0)return current-1;setMinutes(currentMinutes=>{if(currentMinutes>0)return currentMinutes-1;setRunning(false);if(mode==="focus"){void completeFocusSession();toast.success("Focus session complete",{description:"Take a short break."});setMode("break");setMinutes(BREAK_MINUTES)}else{toast.success("Break complete",{description:"Ready for another focus session."});setMode("focus");setMinutes(FOCUS_MINUTES)}return 0});return 59})},1000);return()=>{if(intervalRef.current)window.clearInterval(intervalRef.current);intervalRef.current=null}},[running,mode]);
+ useEffect(()=>()=>{if(intervalRef.current)window.clearInterval(intervalRef.current)},[]);
+ const completeFocusSession=async()=>{if(!user)return;const{error}=await supabase.from("focus_sessions").insert({user_id:user.id,duration_minutes:FOCUS_MINUTES,completed_at:new Date().toISOString()});if(error)toast.error("Session finished, but could not save it.");else void loadSessions()};
+ const savePartial=async()=>{if(!user)return;const elapsed=FOCUS_MINUTES*60-(minutes*60+seconds);if(mode!=="focus"||elapsed<60)return;const{error}=await supabase.from("focus_sessions").insert({user_id:user.id,duration_minutes:Math.max(1,Math.round(elapsed/60)),completed_at:null});if(error)toast.error("Could not save partial session.");else void loadSessions()};
+ const reset=()=>{void savePartial();setRunning(false);setMinutes(mode==="focus"?FOCUS_MINUTES:BREAK_MINUTES);setSeconds(0)}; const toggle=()=>setRunning(v=>!v);
+ const completedSessions=sessions.filter(s=>s.completed_at).length; const focusMinutes=sessions.filter(s=>s.completed_at).reduce((t,s)=>t+s.duration_minutes,0); const totalSeconds=mode==="focus"?FOCUS_MINUTES*60:BREAK_MINUTES*60; const remainingSeconds=minutes*60+seconds; const progress=Math.max(0,Math.min(1,1-remainingSeconds/totalSeconds)); const circumference=2*Math.PI*108;
+ return <main className="min-h-[calc(100vh-72px)] px-4 py-8 sm:px-6 sm:py-12"><div className="mx-auto max-w-3xl"><header className="mb-8"><div className="flex items-center gap-3 text-cyan-300"><div className="grid h-10 w-10 place-items-center rounded-xl border border-cyan-300/15 bg-cyan-300/10"><Timer className="h-5 w-5"/></div><span className="text-[10px] font-black uppercase tracking-[.25em] text-slate-500">Focus</span></div><h1 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-4xl">One thing. For 25 minutes.</h1><p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">Choose one task, start the timer, and ignore everything else until it ends.</p></header>
+ <section className="overflow-hidden rounded-[2rem] border border-white/[0.08] bg-white/[0.035] shadow-2xl backdrop-blur-xl"><div className="border-b border-white/[0.06] p-5 sm:p-7"><div className="flex gap-2"><button type="button" disabled={running} onClick={()=>{setMode("focus");setMinutes(FOCUS_MINUTES);setSeconds(0)}} className={`rounded-xl px-4 py-2 text-xs font-black ${mode==="focus"?"bg-cyan-300 text-slate-950":"text-slate-500 hover:bg-white/5 hover:text-white"}`}>Focus · 25m</button><button type="button" disabled={running} onClick={()=>{setMode("break");setMinutes(BREAK_MINUTES);setSeconds(0)}} className={`rounded-xl px-4 py-2 text-xs font-black ${mode==="break"?"bg-white text-slate-950":"text-slate-500 hover:bg-white/5 hover:text-white"}`}>Break · 5m</button></div><label className="mt-5 block"><span className="text-[10px] font-black uppercase tracking-[.18em] text-slate-600">What are you working on?</span><input value={task} onChange={e=>setTask(e.target.value)} disabled={running} maxLength={120} placeholder="e.g. Finish chemistry notes" className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm font-semibold text-white outline-none placeholder:text-slate-700 focus:border-cyan-300/40 disabled:opacity-60"/></label></div>
+ <div className="flex flex-col items-center px-5 py-10 sm:py-14"><div className="relative h-64 w-64 sm:h-72 sm:w-72"><svg viewBox="0 0 240 240" className="h-full w-full -rotate-90" aria-hidden="true"><circle cx="120" cy="120" r="108" fill="none" stroke="currentColor" strokeWidth="6" className="text-white/[0.06]"/><circle cx="120" cy="120" r="108" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" className="text-cyan-300 transition-all duration-1000" strokeDasharray={circumference} strokeDashoffset={circumference*(1-progress)}/></svg><div className="absolute inset-0 grid place-items-center text-center"><div><p className="font-mono text-6xl font-black tabular-nums tracking-tight text-white sm:text-7xl">{String(minutes).padStart(2,"0")}:{String(seconds).padStart(2,"0")}</p><p className="mt-2 text-[10px] font-black uppercase tracking-[.25em] text-slate-600">{mode==="focus"?"Focus":"Break"}</p></div></div></div>{task&&<p className="mt-5 max-w-md truncate text-center text-sm font-bold text-slate-400">{task}</p>}<div className="mt-7 flex items-center gap-3"><Button onClick={toggle} className="h-12 rounded-xl bg-cyan-300 px-7 text-sm font-black text-slate-950 hover:bg-cyan-200">{running?<><Pause className="mr-2 h-4 w-4"/>Pause</>:<><Play className="mr-2 h-4 w-4"/>Start focus</>}</Button><Button variant="ghost" onClick={reset} className="h-12 w-12 rounded-xl text-slate-500 hover:bg-white/5 hover:text-white" aria-label="Reset timer"><RotateCcw className="h-4 w-4"/></Button></div></div></section>
+ <section className="mt-5 grid gap-3 sm:grid-cols-3"><SimpleStat icon={<CheckCircle2/>} label="Completed" value={loading?"—":completedSessions}/><SimpleStat icon={<Timer/>} label="Focus time" value={loading?"—":`${focusMinutes}m`}/><SimpleStat icon={<span className="text-base">✓</span>} label="Next" value={mode==="focus"?"Take a break":"Focus again"}/></section></div></main>;
 }
-
-function SimpleStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
-  return <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4"><div className="flex items-center gap-2 text-cyan-300">{icon}<span className="text-[9px] font-black uppercase tracking-[.18em] text-slate-600">{label}</span></div><p className="mt-2 text-lg font-black text-white">{value}</p></div>;
-}
+function SimpleStat({icon,label,value}:{icon:React.ReactNode;label:string;value:string|number}){return <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4"><div className="flex items-center gap-2 text-cyan-300">{icon}<span className="text-[9px] font-black uppercase tracking-[.18em] text-slate-600">{label}</span></div><p className="mt-2 text-lg font-black text-white">{value}</p></div>}
