@@ -6,6 +6,8 @@ import { RoadmapOnboarding } from "@/components/roadmap/RoadmapOnboarding";
 import { RoadmapVisualizer } from "@/components/roadmap/RoadmapVisualizer";
 import { DailyFocusCard } from "@/components/roadmap/DailyFocusCard";
 import { NightlyReviewModal } from "@/components/roadmap/NightlyReviewModal";
+import { InteractiveLearningRoadmap, type LearningMilestone } from "@/components/roadmap/InteractiveLearningRoadmap";
+import { supabase } from "@/integrations/supabase/client";
 import { useRoadmap } from "@/hooks/use-roadmap";
 
 export const Route = createFileRoute("/roadmap")({ component: RoadmapPage });
@@ -28,7 +30,11 @@ function RoadmapPage() {
       const result = await roadmap.generate(category, roadmap.answers);
       if (result?.needsMoreInfo) { setShowOnboarding(true); return; }
       if (!result?.roadmapId) throw new Error("Roadmap was generated but no saved roadmap ID was returned.");
-      setShowOnboarding(false); toast.success("Your hourly roadmap is ready.");
+      if (result?.structuredContent) {
+        const { error } = await supabase.from("roadmaps").update({ structured_content: result.structuredContent }).eq("id", result.roadmapId);
+        if (error) throw error;
+      }
+      setShowOnboarding(false); toast.success("Your interactive learning roadmap is ready.");
     } catch (error) { toast.error(error instanceof Error ? error.message : "Could not generate roadmap."); }
   };
 
@@ -43,6 +49,11 @@ function RoadmapPage() {
   const totalRequired = useMemo(() => roadmap.tasks.filter((task) => task.is_required).length, [roadmap.tasks]);
   const overallProgress = totalRequired ? Math.round((completedCount / totalRequired) * 100) : 0;
   const nextTask = roadmap.todayTasks.find((task) => task.progress !== "completed");
+  const learningMilestones = useMemo<LearningMilestone[]>(() => {
+    const value = roadmap.roadmap?.structured_content?.milestones;
+    if (!Array.isArray(value)) return [];
+    return value.filter((item: any) => item && typeof item === "object" && typeof item.milestone_title === "string" && Array.isArray(item.quiz)) as LearningMilestone[];
+  }, [roadmap.roadmap]);
 
   if (roadmap.loading) return <main className="min-h-screen bg-slate-950 px-4 py-16 text-center text-sm text-slate-500">Building your roadmap…</main>;
 
@@ -56,7 +67,7 @@ function RoadmapPage() {
   }
 
   return <main className="min-h-screen bg-[radial-gradient(circle_at_10%_5%,rgba(34,211,238,.07),transparent_32%),radial-gradient(circle_at_90%_15%,rgba(124,58,237,.07),transparent_30%),#020617] px-4 py-5 pb-24 sm:px-6 lg:px-8">
-    <div className="mx-auto max-w-6xl space-y-5">
+    <div className="mx-auto max-w-6xl space-y-7">
       <header className="overflow-hidden rounded-[2.25rem] border border-white/[0.08] bg-white/[0.035] p-5 shadow-[0_40px_120px_-80px_rgba(34,211,238,.45)] sm:p-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl"><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[.22em] text-cyan-300/80"><CalendarDays className="h-4 w-4" />Day {roadmap.todayIndex} of {roadmap.roadmap.duration_days} · AI execution mode</div><h1 className="mt-3 text-3xl font-black tracking-[-.035em] text-white sm:text-5xl">{roadmap.roadmap.title}</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">{roadmap.roadmap.goal}</p></div>
@@ -66,6 +77,7 @@ function RoadmapPage() {
         {completedCount > 0 && <div className="mt-6"><div className="flex items-center justify-between text-[10px] font-black uppercase tracking-[.15em] text-slate-600"><span>Execution progress</span><span>{overallProgress}%</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.06]"><div className="h-full rounded-full bg-cyan-300 transition-all" style={{ width: `${overallProgress}%` }} /></div></div>}
       </header>
 
+      {learningMilestones.length > 0 && <InteractiveLearningRoadmap milestones={learningMilestones} />}
       <DailyFocusCard tasks={roadmap.todayTasks} onToggle={roadmap.toggleTask} loading={roadmap.generating} />
 
       <div className="grid gap-5 lg:grid-cols-[1.08fr_.92fr]"><RoadmapVisualizer milestones={roadmap.milestones} todayIndex={roadmap.todayIndex} /><section className="rounded-[2rem] border border-white/[0.08] bg-white/[0.025] p-5 sm:p-7"><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[.2em] text-violet-300/80"><Sparkles className="h-4 w-4" />How your roadmap works</div><h2 className="mt-2 text-2xl font-black text-white">One day at a time.</h2><div className="mt-6 space-y-4"><div className="rounded-2xl border border-white/[0.06] p-4"><p className="text-sm font-black text-white">01 · Follow the clock</p><p className="mt-1 text-xs leading-5 text-slate-500">Each block has a start time, end time, instructions, and a clear definition of done.</p></div><div className="rounded-2xl border border-white/[0.06] p-4"><p className="text-sm font-black text-white">02 · Finish the block</p><p className="mt-1 text-xs leading-5 text-slate-500">Mark it complete only when the success criteria are actually met.</p></div><div className="rounded-2xl border border-white/[0.06] p-4"><p className="text-sm font-black text-white">03 · Reflect tonight</p><p className="mt-1 text-xs leading-5 text-slate-500">The AI uses completion, difficulty, energy and reflection to build tomorrow's schedule.</p></div></div></section></div>
