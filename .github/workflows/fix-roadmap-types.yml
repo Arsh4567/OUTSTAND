@@ -8,11 +8,7 @@ permissions:
   contents: write
 
 jobs:
-  fix:
+  trigger:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Trigger
-        run: echo "Temporary trigger; main runner performs the fix."
+      - run: echo "Triggering the main branch type-fix runner."
