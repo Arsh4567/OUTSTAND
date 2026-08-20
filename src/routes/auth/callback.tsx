@@ -41,8 +41,10 @@ function AuthCallbackPage() {
         if (!data.session) throw new Error("No active session was created. Please try signing in again.");
 
         if (active) {
-          window.history.replaceState({}, document.title, "/auth/callback");
-          navigate({ to: next, replace: true });
+          // Force a clean document navigation after the session is persisted.
+          // This avoids racing TanStack Router's authenticated route guard
+          // against Supabase's auth state restoration during sign-in.
+          window.location.replace(next);
         }
       } catch (err) {
         console.error("OAuth callback failed", err);
@@ -54,7 +56,7 @@ function AuthCallbackPage() {
     return () => {
       active = false;
     };
-  }, [navigate]);
+  }, []);
 
   if (error) {
     return (
