@@ -1,15 +1,17 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+type DbClient = SupabaseClient<any, "public", any, any, any>;
+type AuthResult = { client: DbClient; userId: string } | { error: readonly [number, string] };
 const env = (...names: string[]) => names.map((n) => process.env[n]).find((v) => typeof v === "string" && v.trim());
 const json = (res: VercelResponse, status: number, data: unknown) => res.status(status).setHeader("Cache-Control", "no-store").json(data);
 const bearer = (req: VercelRequest) => req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.slice(7).trim() : "";
 
-async function auth(req: VercelRequest) {
+async function auth(req: VercelRequest): Promise<AuthResult> {
   const token = bearer(req); const url = env("SUPABASE_URL", "VITE_SUPABASE_URL"); const key = env("SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_PUBLISHABLE_KEY");
-  if (!token) return { error: [401, "Authentication required."] as const }; if (!url || !key) return { error: [500, "Supabase server configuration is missing."] as const };
-  const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: `Bearer ${token}` } } });
-  const { data, error } = await client.auth.getUser(token); if (error || !data.user) return { error: [401, "Authentication failed."] as const }; return { client, userId: data.user.id } as const;
+  if (!token) return { error: [401, "Authentication required."] }; if (!url || !key) return { error: [500, "Supabase server configuration is missing."] };
+  const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: `Bearer ${token}` } } }) as DbClient;
+  const { data, error } = await client.auth.getUser(token); if (error || !data.user) return { error: [401, "Authentication failed."] }; return { client, userId: data.user.id };
 }
 
 function parseJson(text: string) { const clean = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim(); try { return JSON.parse(clean); } catch { const a = clean.indexOf("{"); const b = clean.lastIndexOf("}"); if (a >= 0 && b > a) return JSON.parse(clean.slice(a, b + 1)); const c = clean.indexOf("["); const d = clean.lastIndexOf("]"); if (c >= 0 && d > c) return JSON.parse(clean.slice(c, d + 1)); throw new Error("The AI returned invalid structured data."); } }
@@ -21,7 +23,7 @@ async function ai(prompt: string) {
   const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent", { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key }, body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: `You are OUTSTAND Intelligence. Return JSON only. Never invent URLs or claim an unverified resource is curated.\n\n${prompt}` }] }], generationConfig: { responseMimeType: "application/json" } }) }); const raw = await r.text(); if (!r.ok) throw new Error(`AI request failed (${r.status}).`); return parseJson(JSON.parse(raw)?.candidates?.[0]?.content?.parts?.map((p: any) => p?.text || "").join("") || "");
 }
 
-async function fallbackPlan(client: ReturnType<typeof createClient>, category: string, answers: Record<string, unknown>) {
+async function fallbackPlan(client: DbClient, category: string, answers: Record<string, unknown>) {
   const terms = [category, ...Object.values(answers).flatMap((v) => Array.isArray(v) ? v : [v])].filter((v) => typeof v === "string" && v.trim()).join(" ").toLowerCase().split(/[^a-z0-9]+/).filter((v) => v.length >= 3).slice(0, 12);
   const filters = [...new Set(terms)].map((t) => `topic_name.ilike.*${t.replace(/[%_,]/g, "")}*`);
   let resources: any[] = [];
