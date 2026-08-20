@@ -20,13 +20,15 @@ async function authenticate(req: VercelRequest) {
 function extractJson(text: string) {
   const cleaned = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
   try { return JSON.parse(cleaned); } catch {
-    const start = cleaned.indexOf("{"); const end = cleaned.lastIndexOf("}");
-    if (start >= 0 && end > start) return JSON.parse(cleaned.slice(start, end + 1));
+    const objectStart = cleaned.indexOf("{"); const objectEnd = cleaned.lastIndexOf("}");
+    if (objectStart >= 0 && objectEnd > objectStart) return JSON.parse(cleaned.slice(objectStart, objectEnd + 1));
+    const arrayStart = cleaned.indexOf("["); const arrayEnd = cleaned.lastIndexOf("]");
+    if (arrayStart >= 0 && arrayEnd > arrayStart) return JSON.parse(cleaned.slice(arrayStart, arrayEnd + 1));
     throw new Error("The AI returned invalid structured data.");
   }
 }
 
-const baseRules = `You are OUTSTAND Intelligence, an adaptive personal planning AI. Never invent user facts. Ask for missing information before planning. Plans must be realistic, specific and measurable. Use evidence-informed learning methods when relevant: active recall, retrieval practice, spaced repetition, deliberate practice, interleaving, chunking, worked examples, error correction, reflection, and progressive difficulty. These are methodology tags, not guarantees. Every time block must fit the user's stated availability. Never schedule over school, work, sleep, meals, or fixed commitments. Return JSON only.`;
+const baseRules = `You are OUTSTAND Intelligence, an adaptive personal planning AI. Never invent user facts. Ask for missing information before planning. Plans must be realistic, specific and measurable. Use evidence-informed learning methods when relevant: active recall, retrieval practice, spaced repetition, deliberate practice, interleaving, chunking, worked examples, error correction, reflection, and progressive difficulty. Never schedule over school, work, sleep, meals, or fixed commitments. Return JSON only.`;
 
 async function askGroq(prompt: string) {
   const apiKey = env("GROQ_API_KEY");
@@ -64,21 +66,64 @@ async function requestBody(req: VercelRequest) {
   return {};
 }
 
-function validateTime(value: unknown) {
-  return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
-}
+function validateTime(value: unknown) { return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value); }
 
 function validatePlan(plan: any) {
   if (!plan || typeof plan !== "object" || typeof plan.title !== "string" || !Number.isInteger(plan.durationDays) || !Array.isArray(plan.milestones) || plan.milestones.length === 0 || !Array.isArray(plan.dailySchedule)) throw new Error("The AI returned an invalid roadmap structure.");
-  if (!plan.dailySchedule.length) throw new Error("The AI returned no hourly guidance for the first day.");
-  for (const block of plan.dailySchedule) {
-    if (!Number.isInteger(block.day) || block.day < 1 || typeof block.title !== "string" || !validateTime(block.startTime) || !validateTime(block.endTime) || typeof block.instructions !== "string") throw new Error("The AI returned an invalid hourly schedule block.");
-  }
-  for (const milestone of plan.milestones) {
-    if (!Number.isInteger(milestone.day) || typeof milestone.title !== "string" || !Array.isArray(milestone.actions)) throw new Error("The AI returned an invalid milestone.");
-    for (const action of milestone.actions) if (typeof action !== "string" && (!action || typeof action.title !== "string")) throw new Error("The AI returned an invalid roadmap task.");
-  }
+  if (!plan.dailySchedule.length) throw new Error("The AI returned no roadmap schedule.");
+  for (const block of plan.dailySchedule) if (!Number.isInteger(block.day) || block.day < 1 || typeof block.title !== "string" || !validateTime(block.startTime) || !validateTime(block.endTime) || typeof block.instructions !== "string") throw new Error("The AI returned an invalid roadmap schedule block.");
+  for (const milestone of plan.milestones) if (!Number.isInteger(milestone.day) || typeof milestone.title !== "string" || !Array.isArray(milestone.actions)) throw new Error("The AI returned an invalid milestone.");
   return plan;
+}
+
+type CuratedResource = { id: string; topic_name: string; educator_name: string; youtube_url: string; mind_map_url: string; quick_revision_text: string; created_at: string };
+type LearningMilestone = { milestone_title: string; video_url: string; mind_map_url: string; revision_notes: string; quiz: Array<{ question: string; options: string[]; correct_answer: string }> };
+
+function resourceSearchTerms(category: string, answers: Record<string, unknown>) {
+  const raw = [category, answers.goal, answers.target, answers.subject, answers.topic, answers.topics, answers.exam, answers.currentLevel].flatMap((value) => Array.isArray(value) ? value : [value]).filter((value) => typeof value === "string" && value.trim()).join(" ");
+  return [...new Set(raw.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length >= 3 && !["the", "and", "for", "with", "from", "this", "that", "study", "learn"].includes(word)))].slice(0, 10);
+}
+
+async function retrieveCuratedResources(client: ReturnType<typeof createClient>, category: string, answers: Record<string, unknown>) {
+  const terms = resourceSearchTerms(category, answers);
+  const topicFilters = terms.map((term) => `topic_name.ilike.*${term.replace(/[%_,]/g, "")}*`);
+  const query = client.from("curated_resources").select("id,topic_name,educator_name,youtube_url,mind_map_url,quick_revision_text,created_at").limit(40);
+  const { data, error } = topicFilters.length ? await query.or(topicFilters.join(",")) : await query;
+  if (error) throw Object.assign(new Error("Could not retrieve curated learning resources."), { status: 500, code: "CURATED_RESOURCE_QUERY_FAILED" });
+  const rows = (data || []) as CuratedResource[];
+  const haystack = `${category} ${JSON.stringify(answers)}`.toLowerCase();
+  return rows.sort((a, b) => {
+    const score = (resource: CuratedResource) => resource.topic_name.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length >= 3).reduce((total, word) => total + (haystack.includes(word) ? 1 : 0), 0);
+    return score(b) - score(a);
+  }).slice(0, 20);
+}
+
+function validateLearningMilestones(value: unknown, resources: CuratedResource[]) {
+  if (!Array.isArray(value) || value.length === 0) throw new Error("The AI returned no learning milestones.");
+  const byTopic = new Map(resources.map((resource) => [resource.topic_name.trim().toLowerCase(), resource]));
+  return value.map((raw, index) => {
+    if (!raw || typeof raw !== "object") throw new Error(`Milestone ${index + 1} is invalid.`);
+    const item = raw as any;
+    const title = typeof item.milestone_title === "string" ? item.milestone_title.trim() : "";
+    if (!title) throw new Error(`Milestone ${index + 1} is missing milestone_title.`);
+    const resource = byTopic.get(title.toLowerCase());
+    if (!resource) throw new Error(`Milestone ${index + 1} does not map to a curated topic.`);
+    if (!Array.isArray(item.quiz) || item.quiz.length < 3 || item.quiz.length > 5) throw new Error(`Milestone ${index + 1} must contain 3-5 quiz questions.`);
+    const quiz = item.quiz.map((question: any, quizIndex: number) => {
+      if (!question || typeof question.question !== "string" || !Array.isArray(question.options) || question.options.length < 3 || question.options.length > 5 || typeof question.correct_answer !== "string") throw new Error(`Milestone ${index + 1}, quiz question ${quizIndex + 1} is invalid.`);
+      const options = question.options.map(String);
+      if (!options.includes(question.correct_answer)) throw new Error(`Milestone ${index + 1}, quiz question ${quizIndex + 1} has an invalid correct_answer.`);
+      return { question: question.question.trim(), options, correct_answer: question.correct_answer.trim() };
+    });
+    return { milestone_title: resource.topic_name, video_url: resource.youtube_url || "", mind_map_url: resource.mind_map_url || "", revision_notes: resource.quick_revision_text || "", quiz } satisfies LearningMilestone;
+  });
+}
+
+function buildCompatibilityPlan(milestones: LearningMilestone[], durationDays: number, category: string) {
+  const title = `${category || "Learning"} Roadmap`;
+  const legacyMilestones = milestones.map((milestone, index) => ({ day: Math.min(durationDays, index + 1), title: milestone.milestone_title, outcome: "Complete the checkpoint quiz and understand the topic.", actions: [{ title: `Study ${milestone.milestone_title}`, instructions: `Watch the curated lesson, then take the checkpoint quiz.`, estimatedMinutes: 45, taskType: "practice", methodologyTags: ["retrieval_practice"], resources: [{ title: "Curated lesson", url: milestone.video_url, note: "Curated by OUTSTAND." }], spacedRepetitionDay: null, successCriteria: "Pass the checkpoint quiz." }] }));
+  const dailySchedule = legacyMilestones.map((milestone) => ({ day: milestone.day, startTime: "18:00", endTime: "18:45", title: milestone.title, instructions: milestone.actions[0].instructions, taskType: "practice", methodologyTags: ["retrieval_practice"], estimatedMinutes: 45, successCriteria: "Pass the checkpoint quiz.", resources: milestone.actions[0].resources }));
+  return { title, summary: `A curated ${category} learning roadmap with checkpoint quizzes.`, durationDays, difficulty: "adaptive", assumptions: [], milestones: legacyMilestones, dailySchedule, adaptationRule: "Use quiz performance and reflection to adjust future learning." };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -99,17 +144,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (mode === "plan") {
-      const result: any = await ask(`Build a genuinely personalized ${category} roadmap from this interview. The roadmap is ${Math.max(1, Number(answers.durationDays) || 30)} days, but use a rolling execution model: create the high-level milestones for the whole roadmap and create a detailed time-blocked schedule for the FIRST 7 DAYS. Every schedule block must have an explicit startTime and endTime and tell the user exactly what to do. Use 30-60 minute focused blocks, short breaks where useful, and never schedule over fixed commitments. The first block should be realistic for day 1. The schedule should use the user's actual wake/sleep and school/work constraints, not generic times.
-
-Return exactly {"plan":{"title":"string","summary":"string","durationDays":number,"difficulty":"string","assumptions":["string"],"milestones":[{"day":number,"title":"string","outcome":"string","actions":[{"title":"string","instructions":"string","estimatedMinutes":number,"taskType":"practice|review|assessment|reflection|break","methodologyTags":["active_recall"],"resources":[{"title":"string","url":"string","note":"string"}],"spacedRepetitionDay":number|null,"successCriteria":"string"}]}],"dailySchedule":[{"day":number,"startTime":"HH:MM","endTime":"HH:MM","title":"string","instructions":"step-by-step instructions","taskType":"practice|review|assessment|reflection|break","methodologyTags":["active_recall"],"estimatedMinutes":number,"successCriteria":"string","resources":[{"title":"string","url":"string","note":"string"}]}],"adaptationRule":"string"}}. Generate at least 5 useful schedule blocks per available day and cover days 1 through 7 when the user's availability allows it. Do not fill unavailable hours. If essential information is missing return {"needsMoreInfo":true,"questions":[...]}.\n\nCategory: ${category}\nInterview:\n${JSON.stringify(answers)}`);
-      if (result?.needsMoreInfo) return json(res, 200, result);
-      validatePlan(result?.plan);
-      return json(res, 200, { plan: result.plan });
+      const durationDays = Math.max(1, Math.min(730, Number(answers.durationDays) || 30));
+      const resources = await retrieveCuratedResources(auth.client, category, answers);
+      if (!resources.length) return json(res, 422, { error: "No curated learning resources match this roadmap yet.", code: "NO_CURATED_RESOURCES", needsCuratedContent: true });
+      const resourceContext = resources.map((resource) => ({ id: resource.id, topic_name: resource.topic_name, educator_name: resource.educator_name, youtube_url: resource.youtube_url, mind_map_url: resource.mind_map_url, quick_revision_text: resource.quick_revision_text })).slice(0, 20);
+      const rawResult: any = await ask(`Generate the learning milestones for a ${category} roadmap from the user's interview and ONLY the curated resources below. Output ONLY a JSON object with one property named milestones whose value is an array. Each milestone MUST use exactly these fields: milestone_title (string), video_url (string), mind_map_url (string), revision_notes (string), quiz (array of 3-5 MCQ objects). Each quiz object MUST contain exactly question (string), options (array of 4 strings), correct_answer (string). milestone_title MUST exactly equal one of the supplied topic_name values. Do NOT invent URLs, revision notes, educators, topics, or resources. The backend will replace the resource fields from the database, so your resource URLs and notes are treated as references only. Generate contextual quiz questions based on the selected topic and the user's level/goal. Select a coherent sequence of roughly 4-10 milestones appropriate to the requested duration. Avoid duplicate topics.\n\nUSER CATEGORY: ${category}\nUSER INTERVIEW:\n${JSON.stringify(answers)}\n\nCURATED RESOURCE CONTEXT:\n${JSON.stringify(resourceContext)}`);
+      const aiMilestones = Array.isArray(rawResult) ? rawResult : rawResult?.milestones;
+      const milestones = validateLearningMilestones(aiMilestones, resources);
+      const structuredContent = { version: 1, generatedAt: new Date().toISOString(), category, durationDays, milestones };
+      const plan = buildCompatibilityPlan(milestones, durationDays, category);
+      validatePlan(plan);
+      return json(res, 200, { plan, milestones, structuredContent, retrieval: { count: resources.length, resourceIds: resources.map((resource) => resource.id) } });
     }
 
     const roadmapId = typeof context.roadmapId === "string" ? context.roadmapId : "";
     if (!roadmapId) return json(res, 400, { error: "roadmapId is required for adaptation." });
-    const { data: roadmap, error: roadmapError } = await auth.client.from("roadmaps").select("id,title,goal,category,duration_days,questionnaire,generation_metadata").eq("id", roadmapId).eq("user_id", auth.userId).maybeSingle();
+    const { data: roadmap, error: roadmapError } = await auth.client.from("roadmaps").select("id,title,goal,category,duration_days,questionnaire,generation_metadata,structured_content").eq("id", roadmapId).eq("user_id", auth.userId).maybeSingle();
     if (roadmapError || !roadmap) return json(res, 404, { error: "Roadmap not found." });
     const { data: tasks } = await auth.client.from("roadmap_tasks").select("id,day_number,title,instructions,estimated_minutes,methodology_tags,start_time,end_time,guidance").eq("roadmap_id", roadmapId).eq("user_id", auth.userId).order("day_number").order("start_time").order("task_order");
     const { data: progress } = await auth.client.from("roadmap_task_progress").select("task_id,status,completed_at,notes").eq("roadmap_id", roadmapId).eq("user_id", auth.userId);
