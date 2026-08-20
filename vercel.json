@@ -2,9 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     { "source": "/api/roadmap", "destination": "/api/roadmap-v2" }
-  ],
-  "crons": [
-    { "path": "/api/notification-cron", "schedule": "30 2 * * *" },
-    { "path": "/api/notification-cron", "schedule": "30 13 * * *" }
   ]
 }
