@@ -67,6 +67,7 @@ export function useAppState() {
         if(!session?.access_token||!active)return;
         const { habits, sessions, outstand } = syncDataRef.current;
         void refreshCloudStreak(false);
+        if(event!=="SIGNED_IN")return;
         void fetch("/api/sync-productivity-state",{
           method:"POST",
           headers:{"Content-Type":"application/json",Authorization:`Bearer ${session.access_token}`},
