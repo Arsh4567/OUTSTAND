@@ -1,174 +1,36 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+type DbClient = SupabaseClient<any, "public", any, any, any>;
+type AuthResult = { client: DbClient; userId: string } | { error: { status: number; message: string } };
 const env = (...names: string[]) => names.map((name) => process.env[name]).find((value) => typeof value === "string" && value.trim());
 const json = (res: VercelResponse, status: number, data: unknown) => res.status(status).setHeader("Cache-Control", "no-store").json(data);
 const bearer = (req: VercelRequest) => req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.slice(7).trim() : "";
 
-async function authenticate(req: VercelRequest) {
-  const token = bearer(req);
-  if (!token) return { error: { status: 401, message: "Authentication required." } } as const;
-  const url = env("SUPABASE_URL", "VITE_SUPABASE_URL");
-  const key = env("SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_PUBLISHABLE_KEY");
-  if (!url || !key) return { error: { status: 500, message: "Supabase server configuration is missing." } } as const;
-  const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: `Bearer ${token}` } } });
-  const { data, error } = await client.auth.getUser(token);
-  if (error || !data.user) return { error: { status: 401, message: "Authentication failed." } } as const;
-  return { client, userId: data.user.id } as const;
+async function authenticate(req: VercelRequest): Promise<AuthResult> {
+  const token = bearer(req); if (!token) return { error: { status: 401, message: "Authentication required." } };
+  const url = env("SUPABASE_URL", "VITE_SUPABASE_URL"); const key = env("SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_PUBLISHABLE_KEY");
+  if (!url || !key) return { error: { status: 500, message: "Supabase server configuration is missing." } };
+  const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: `Bearer ${token}` } } }) as DbClient;
+  const { data, error } = await client.auth.getUser(token); if (error || !data.user) return { error: { status: 401, message: "Authentication failed." } };
+  return { client, userId: data.user.id };
 }
-
-function extractJson(text: string) {
-  const cleaned = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
-  try { return JSON.parse(cleaned); } catch {
-    const objectStart = cleaned.indexOf("{"); const objectEnd = cleaned.lastIndexOf("}");
-    if (objectStart >= 0 && objectEnd > objectStart) return JSON.parse(cleaned.slice(objectStart, objectEnd + 1));
-    const arrayStart = cleaned.indexOf("["); const arrayEnd = cleaned.lastIndexOf("]");
-    if (arrayStart >= 0 && arrayEnd > arrayStart) return JSON.parse(cleaned.slice(arrayStart, arrayEnd + 1));
-    throw new Error("The AI returned invalid structured data.");
-  }
-}
-
+function extractJson(text: string) { const cleaned = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim(); try { return JSON.parse(cleaned); } catch { const objectStart = cleaned.indexOf("{"); const objectEnd = cleaned.lastIndexOf("}"); if (objectStart >= 0 && objectEnd > objectStart) return JSON.parse(cleaned.slice(objectStart, objectEnd + 1)); const arrayStart = cleaned.indexOf("["); const arrayEnd = cleaned.lastIndexOf("]"); if (arrayStart >= 0 && arrayEnd > arrayStart) return JSON.parse(cleaned.slice(arrayStart, arrayEnd + 1)); throw new Error("The AI returned invalid structured data."); } }
 const baseRules = `You are OUTSTAND Intelligence, an adaptive personal planning AI. Never invent user facts. Ask for missing information before planning. Plans must be realistic, specific and measurable. Use evidence-informed learning methods when relevant: active recall, retrieval practice, spaced repetition, deliberate practice, interleaving, chunking, worked examples, error correction, reflection, and progressive difficulty. Never schedule over school, work, sleep, meals, or fixed commitments. Return JSON only.`;
-
-async function askGroq(prompt: string) {
-  const apiKey = env("GROQ_API_KEY");
-  if (!apiKey) throw Object.assign(new Error("Groq API configuration is missing."), { status: 503, code: "GROQ_CONFIG_MISSING" });
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "llama-3.1-8b-instant", temperature: 0.2, max_tokens: 6000, response_format: { type: "json_object" }, messages: [{ role: "system", content: baseRules }, { role: "user", content: prompt }] }) });
-  const raw = await response.text();
-  if (!response.ok) throw Object.assign(new Error(`Groq request failed (${response.status}).`), { status: response.status, code: response.status === 429 ? "AI_QUOTA_EXCEEDED" : "GROQ_REQUEST_FAILED" });
-  const parsed = JSON.parse(raw); const content = parsed?.choices?.[0]?.message?.content;
-  if (typeof content !== "string" || !content.trim()) throw new Error("Groq returned an empty response.");
-  return extractJson(content);
-}
-
-async function askGemini(prompt: string) {
-  const apiKey = env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY");
-  if (!apiKey) throw Object.assign(new Error("Gemini API configuration is missing."), { status: 503, code: "GEMINI_CONFIG_MISSING" });
-  const model = "gemini-3.1-flash-lite";
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey }, body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: `${baseRules}\n\n${prompt}` }] }], generationConfig: { responseMimeType: "application/json" } }) });
-  const raw = await response.text();
-  if (!response.ok) throw Object.assign(new Error(`Gemini request failed (${response.status}).`), { status: response.status, code: response.status === 429 ? "AI_QUOTA_EXCEEDED" : "GEMINI_REQUEST_FAILED" });
-  const parsed = JSON.parse(raw); const content = parsed?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text || "").join("");
-  if (typeof content !== "string" || !content.trim()) throw new Error("Gemini returned an empty response.");
-  return extractJson(content);
-}
-
-async function ask(prompt: string) {
-  try { return await askGroq(prompt); } catch (error: any) {
-    if ((error?.status === 429 || error?.code === "GROQ_REQUEST_FAILED") && env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")) return askGemini(prompt);
-    throw error;
-  }
-}
-
-async function requestBody(req: VercelRequest) {
-  if (req.body && typeof req.body === "object") return req.body as any;
-  if (typeof req.body === "string") return JSON.parse(req.body);
-  return {};
-}
-
+async function askGroq(prompt: string) { const apiKey = env("GROQ_API_KEY"); if (!apiKey) throw Object.assign(new Error("Groq API configuration is missing."), { status: 503, code: "GROQ_CONFIG_MISSING" }); const response = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: "llama-3.1-8b-instant", temperature: 0.2, max_tokens: 6000, response_format: { type: "json_object" }, messages: [{ role: "system", content: baseRules }, { role: "user", content: prompt }] }) }); const raw = await response.text(); if (!response.ok) throw Object.assign(new Error(`Groq request failed (${response.status}).`), { status: response.status, code: response.status === 429 ? "AI_QUOTA_EXCEEDED" : "GROQ_REQUEST_FAILED" }); const parsed = JSON.parse(raw); const content = parsed?.choices?.[0]?.message?.content; if (typeof content !== "string" || !content.trim()) throw new Error("Groq returned an empty response."); return extractJson(content); }
+async function askGemini(prompt: string) { const apiKey = env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY"); if (!apiKey) throw Object.assign(new Error("Gemini API configuration is missing."), { status: 503, code: "GEMINI_CONFIG_MISSING" }); const model = "gemini-3.1-flash-lite"; const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey }, body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: `${baseRules}\n\n${prompt}` }] }], generationConfig: { responseMimeType: "application/json" } }) }); const raw = await response.text(); if (!response.ok) throw Object.assign(new Error(`Gemini request failed (${response.status}).`), { status: response.status, code: response.status === 429 ? "AI_QUOTA_EXCEEDED" : "GEMINI_REQUEST_FAILED" }); const parsed = JSON.parse(raw); const content = parsed?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text || "").join(""); if (typeof content !== "string" || !content.trim()) throw new Error("Gemini returned an empty response."); return extractJson(content); }
+async function ask(prompt: string) { try { return await askGroq(prompt); } catch (error: any) { if ((error?.status === 429 || error?.code === "GROQ_REQUEST_FAILED") && env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")) return askGemini(prompt); throw error; } }
+async function requestBody(req: VercelRequest) { if (req.body && typeof req.body === "object") return req.body as any; if (typeof req.body === "string") return JSON.parse(req.body); return {}; }
 function validateTime(value: unknown) { return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value); }
-
-function validatePlan(plan: any) {
-  if (!plan || typeof plan !== "object" || typeof plan.title !== "string" || !Number.isInteger(plan.durationDays) || !Array.isArray(plan.milestones) || plan.milestones.length === 0 || !Array.isArray(plan.dailySchedule)) throw new Error("The AI returned an invalid roadmap structure.");
-  if (!plan.dailySchedule.length) throw new Error("The AI returned no roadmap schedule.");
-  for (const block of plan.dailySchedule) if (!Number.isInteger(block.day) || block.day < 1 || typeof block.title !== "string" || !validateTime(block.startTime) || !validateTime(block.endTime) || typeof block.instructions !== "string") throw new Error("The AI returned an invalid roadmap schedule block.");
-  for (const milestone of plan.milestones) if (!Number.isInteger(milestone.day) || typeof milestone.title !== "string" || !Array.isArray(milestone.actions)) throw new Error("The AI returned an invalid milestone.");
-  return plan;
-}
-
+function validatePlan(plan: any) { if (!plan || typeof plan !== "object" || typeof plan.title !== "string" || !Number.isInteger(plan.durationDays) || !Array.isArray(plan.milestones) || plan.milestones.length === 0 || !Array.isArray(plan.dailySchedule)) throw new Error("The AI returned an invalid roadmap structure."); if (!plan.dailySchedule.length) throw new Error("The AI returned no roadmap schedule."); for (const block of plan.dailySchedule) if (!Number.isInteger(block.day) || block.day < 1 || typeof block.title !== "string" || !validateTime(block.startTime) || !validateTime(block.endTime) || typeof block.instructions !== "string") throw new Error("The AI returned an invalid roadmap schedule block."); for (const milestone of plan.milestones) if (!Number.isInteger(milestone.day) || typeof milestone.title !== "string" || !Array.isArray(milestone.actions)) throw new Error("The AI returned an invalid milestone."); return plan; }
 type CuratedResource = { id: string; topic_name: string; educator_name: string; youtube_url: string; mind_map_url: string; quick_revision_text: string; created_at: string };
 type LearningMilestone = { milestone_title: string; video_url: string; mind_map_url: string; revision_notes: string; quiz: Array<{ question: string; options: string[]; correct_answer: string }> };
+function resourceSearchTerms(category: string, answers: Record<string, unknown>) { const raw = [category, answers.goal, answers.target, answers.subject, answers.topic, answers.topics, answers.exam, answers.currentLevel].flatMap((value) => Array.isArray(value) ? value : [value]).filter((value) => typeof value === "string" && value.trim()).join(" "); return [...new Set(raw.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length >= 3 && !["the", "and", "for", "with", "from", "this", "that", "study", "learn"].includes(word)))].slice(0, 10); }
+async function retrieveCuratedResources(client: DbClient, category: string, answers: Record<string, unknown>) { const terms = resourceSearchTerms(category, answers); const topicFilters = terms.map((term) => `topic_name.ilike.*${term.replace(/[%_,]/g, "")}*`); const query = client.from("curated_resources").select("id,topic_name,educator_name,youtube_url,mind_map_url,quick_revision_text,created_at").limit(40); const { data, error } = topicFilters.length ? await query.or(topicFilters.join(",")) : await query; if (error) throw Object.assign(new Error("Could not retrieve curated learning resources."), { status: 500, code: "CURATED_RESOURCE_QUERY_FAILED" }); const rows = (data || []) as CuratedResource[]; const haystack = `${category} ${JSON.stringify(answers)}`.toLowerCase(); return rows.sort((a, b) => { const score = (resource: CuratedResource) => resource.topic_name.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length >= 3).reduce((total, word) => total + (haystack.includes(word) ? 1 : 0), 0); return score(b) - score(a); }).slice(0, 20); }
+function validateLearningMilestones(value: unknown, resources: CuratedResource[]) { if (!Array.isArray(value) || value.length === 0) throw new Error("The AI returned no learning milestones."); const byTopic = new Map(resources.map((resource) => [resource.topic_name.trim().toLowerCase(), resource])); return value.map((raw, index) => { if (!raw || typeof raw !== "object") throw new Error(`Milestone ${index + 1} is invalid.`); const item = raw as any; const title = typeof item.milestone_title === "string" ? item.milestone_title.trim() : ""; if (!title) throw new Error(`Milestone ${index + 1} is missing milestone_title.`); const resource = byTopic.get(title.toLowerCase()); if (!resource) throw new Error(`Milestone ${index + 1} does not map to a curated topic.`); if (!Array.isArray(item.quiz) || item.quiz.length < 3 || item.quiz.length > 5) throw new Error(`Milestone ${index + 1} must contain 3-5 quiz questions.`); const quiz = item.quiz.map((question: any, quizIndex: number) => { if (!question || typeof question.question !== "string" || !Array.isArray(question.options) || question.options.length < 3 || question.options.length > 5 || typeof question.correct_answer !== "string") throw new Error(`Milestone ${index + 1}, quiz question ${quizIndex + 1} is invalid.`); const options = question.options.map(String); if (!options.includes(question.correct_answer)) throw new Error(`Milestone ${index + 1}, quiz question ${quizIndex + 1} has an invalid correct_answer.`); return { question: question.question.trim(), options, correct_answer: question.correct_answer.trim() }; }); return { milestone_title: resource.topic_name, video_url: resource.youtube_url || "", mind_map_url: resource.mind_map_url || "", revision_notes: resource.quick_revision_text || "", quiz } satisfies LearningMilestone; }); }
+function buildCompatibilityPlan(milestones: LearningMilestone[], durationDays: number, category: string) { const title = `${category || "Learning"} Roadmap`; const legacyMilestones = milestones.map((milestone, index) => ({ day: Math.min(durationDays, index + 1), title: milestone.milestone_title, outcome: "Complete the checkpoint quiz and understand the topic.", actions: [{ title: `Study ${milestone.milestone_title}`, instructions: `Watch the curated lesson, then take the checkpoint quiz.`, estimatedMinutes: 45, taskType: "practice", methodologyTags: ["retrieval_practice"], resources: [{ title: "Curated lesson", url: milestone.video_url, note: "Curated by OUTSTAND." }], spacedRepetitionDay: null, successCriteria: "Pass the checkpoint quiz." }] })); const dailySchedule = legacyMilestones.map((milestone) => ({ day: milestone.day, startTime: "18:00", endTime: "18:45", title: milestone.title, instructions: milestone.actions[0].instructions, taskType: "practice", methodologyTags: ["retrieval_practice"], estimatedMinutes: 45, successCriteria: "Pass the checkpoint quiz.", resources: milestone.actions[0].resources })); return { title, summary: `A curated ${category} learning roadmap with checkpoint quizzes.`, durationDays, difficulty: "adaptive", assumptions: [], milestones: legacyMilestones, dailySchedule, adaptationRule: "Use quiz performance and reflection to adjust future learning." }; }
 
-function resourceSearchTerms(category: string, answers: Record<string, unknown>) {
-  const raw = [category, answers.goal, answers.target, answers.subject, answers.topic, answers.topics, answers.exam, answers.currentLevel].flatMap((value) => Array.isArray(value) ? value : [value]).filter((value) => typeof value === "string" && value.trim()).join(" ");
-  return [...new Set(raw.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length >= 3 && !["the", "and", "for", "with", "from", "this", "that", "study", "learn"].includes(word)))].slice(0, 10);
-}
-
-async function retrieveCuratedResources(client: ReturnType<typeof createClient>, category: string, answers: Record<string, unknown>) {
-  const terms = resourceSearchTerms(category, answers);
-  const topicFilters = terms.map((term) => `topic_name.ilike.*${term.replace(/[%_,]/g, "")}*`);
-  const query = client.from("curated_resources").select("id,topic_name,educator_name,youtube_url,mind_map_url,quick_revision_text,created_at").limit(40);
-  const { data, error } = topicFilters.length ? await query.or(topicFilters.join(",")) : await query;
-  if (error) throw Object.assign(new Error("Could not retrieve curated learning resources."), { status: 500, code: "CURATED_RESOURCE_QUERY_FAILED" });
-  const rows = (data || []) as CuratedResource[];
-  const haystack = `${category} ${JSON.stringify(answers)}`.toLowerCase();
-  return rows.sort((a, b) => {
-    const score = (resource: CuratedResource) => resource.topic_name.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length >= 3).reduce((total, word) => total + (haystack.includes(word) ? 1 : 0), 0);
-    return score(b) - score(a);
-  }).slice(0, 20);
-}
-
-function validateLearningMilestones(value: unknown, resources: CuratedResource[]) {
-  if (!Array.isArray(value) || value.length === 0) throw new Error("The AI returned no learning milestones.");
-  const byTopic = new Map(resources.map((resource) => [resource.topic_name.trim().toLowerCase(), resource]));
-  return value.map((raw, index) => {
-    if (!raw || typeof raw !== "object") throw new Error(`Milestone ${index + 1} is invalid.`);
-    const item = raw as any;
-    const title = typeof item.milestone_title === "string" ? item.milestone_title.trim() : "";
-    if (!title) throw new Error(`Milestone ${index + 1} is missing milestone_title.`);
-    const resource = byTopic.get(title.toLowerCase());
-    if (!resource) throw new Error(`Milestone ${index + 1} does not map to a curated topic.`);
-    if (!Array.isArray(item.quiz) || item.quiz.length < 3 || item.quiz.length > 5) throw new Error(`Milestone ${index + 1} must contain 3-5 quiz questions.`);
-    const quiz = item.quiz.map((question: any, quizIndex: number) => {
-      if (!question || typeof question.question !== "string" || !Array.isArray(question.options) || question.options.length < 3 || question.options.length > 5 || typeof question.correct_answer !== "string") throw new Error(`Milestone ${index + 1}, quiz question ${quizIndex + 1} is invalid.`);
-      const options = question.options.map(String);
-      if (!options.includes(question.correct_answer)) throw new Error(`Milestone ${index + 1}, quiz question ${quizIndex + 1} has an invalid correct_answer.`);
-      return { question: question.question.trim(), options, correct_answer: question.correct_answer.trim() };
-    });
-    return { milestone_title: resource.topic_name, video_url: resource.youtube_url || "", mind_map_url: resource.mind_map_url || "", revision_notes: resource.quick_revision_text || "", quiz } satisfies LearningMilestone;
-  });
-}
-
-function buildCompatibilityPlan(milestones: LearningMilestone[], durationDays: number, category: string) {
-  const title = `${category || "Learning"} Roadmap`;
-  const legacyMilestones = milestones.map((milestone, index) => ({ day: Math.min(durationDays, index + 1), title: milestone.milestone_title, outcome: "Complete the checkpoint quiz and understand the topic.", actions: [{ title: `Study ${milestone.milestone_title}`, instructions: `Watch the curated lesson, then take the checkpoint quiz.`, estimatedMinutes: 45, taskType: "practice", methodologyTags: ["retrieval_practice"], resources: [{ title: "Curated lesson", url: milestone.video_url, note: "Curated by OUTSTAND." }], spacedRepetitionDay: null, successCriteria: "Pass the checkpoint quiz." }] }));
-  const dailySchedule = legacyMilestones.map((milestone) => ({ day: milestone.day, startTime: "18:00", endTime: "18:45", title: milestone.title, instructions: milestone.actions[0].instructions, taskType: "practice", methodologyTags: ["retrieval_practice"], estimatedMinutes: 45, successCriteria: "Pass the checkpoint quiz.", resources: milestone.actions[0].resources }));
-  return { title, summary: `A curated ${category} learning roadmap with checkpoint quizzes.`, durationDays, difficulty: "adaptive", assumptions: [], milestones: legacyMilestones, dailySchedule, adaptationRule: "Use quiz performance and reflection to adjust future learning." };
-}
-
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method === "OPTIONS") return res.status(204).end();
-  if (req.method !== "POST") return json(res, 405, { error: "Method not allowed." });
-  const auth = await authenticate(req);
-  if ("error" in auth) return json(res, auth.error.status, { error: auth.error.message });
-  try {
-    const input = await requestBody(req);
-    const mode = ["questions", "plan", "adapt"].includes(input?.mode) ? input.mode : "questions";
-    const category = typeof input?.category === "string" ? input.category : "custom";
-    const answers = input?.answers && typeof input.answers === "object" ? input.answers : {};
-    const context = input?.context && typeof input.context === "object" ? input.context : {};
-
-    if (mode === "questions") {
-      const answered = Object.entries(answers).map(([key, value]) => `${key}: ${String(value)}`).join("\n") || "No answers yet.";
-      return json(res, 200, await ask(`Create the next 4 to 6 highest-value adaptive questions for a ${category} goal. Do not repeat answered information. The interview MUST collect: exact outcome and measurable target; current baseline; deadline; wake and sleep times; fixed commitments such as school/work; realistic daily study/work window; preferred session length; current skill level; and constraints. At least one question must capture the user's normal weekday schedule so the generated roadmap can tell them exactly what to do and when. Return exactly {"questions":[{"id":"string","question":"string","type":"text|number|choice|multiline","required":true,"options":["..."],"placeholder":"..."}]}.\n\nAnswered:\n${answered}\nContext:\n${JSON.stringify(context)}`));
-    }
-
-    if (mode === "plan") {
-      const durationDays = Math.max(1, Math.min(730, Number(answers.durationDays) || 30));
-      const resources = await retrieveCuratedResources(auth.client, category, answers);
-      if (!resources.length) return json(res, 422, { error: "No curated learning resources match this roadmap yet.", code: "NO_CURATED_RESOURCES", needsCuratedContent: true });
-      const resourceContext = resources.map((resource) => ({ id: resource.id, topic_name: resource.topic_name, educator_name: resource.educator_name, youtube_url: resource.youtube_url, mind_map_url: resource.mind_map_url, quick_revision_text: resource.quick_revision_text })).slice(0, 20);
-      const rawResult: any = await ask(`Generate the learning milestones for a ${category} roadmap from the user's interview and ONLY the curated resources below. Output ONLY a JSON object with one property named milestones whose value is an array. Each milestone MUST use exactly these fields: milestone_title (string), video_url (string), mind_map_url (string), revision_notes (string), quiz (array of 3-5 MCQ objects). Each quiz object MUST contain exactly question (string), options (array of 4 strings), correct_answer (string). milestone_title MUST exactly equal one of the supplied topic_name values. Do NOT invent URLs, revision notes, educators, topics, or resources. The backend will replace the resource fields from the database, so your resource URLs and notes are treated as references only. Generate contextual quiz questions based on the selected topic and the user's level/goal. Select a coherent sequence of roughly 4-10 milestones appropriate to the requested duration. Avoid duplicate topics.\n\nUSER CATEGORY: ${category}\nUSER INTERVIEW:\n${JSON.stringify(answers)}\n\nCURATED RESOURCE CONTEXT:\n${JSON.stringify(resourceContext)}`);
-      const aiMilestones = Array.isArray(rawResult) ? rawResult : rawResult?.milestones;
-      const milestones = validateLearningMilestones(aiMilestones, resources);
-      const structuredContent = { version: 1, generatedAt: new Date().toISOString(), category, durationDays, milestones };
-      const plan = buildCompatibilityPlan(milestones, durationDays, category);
-      validatePlan(plan);
-      return json(res, 200, { plan, milestones, structuredContent, retrieval: { count: resources.length, resourceIds: resources.map((resource) => resource.id) } });
-    }
-
-    const roadmapId = typeof context.roadmapId === "string" ? context.roadmapId : "";
-    if (!roadmapId) return json(res, 400, { error: "roadmapId is required for adaptation." });
-    const { data: roadmap, error: roadmapError } = await auth.client.from("roadmaps").select("id,title,goal,category,duration_days,questionnaire,generation_metadata,structured_content").eq("id", roadmapId).eq("user_id", auth.userId).maybeSingle();
-    if (roadmapError || !roadmap) return json(res, 404, { error: "Roadmap not found." });
-    const { data: tasks } = await auth.client.from("roadmap_tasks").select("id,day_number,title,instructions,estimated_minutes,methodology_tags,start_time,end_time,guidance").eq("roadmap_id", roadmapId).eq("user_id", auth.userId).order("day_number").order("start_time").order("task_order");
-    const { data: progress } = await auth.client.from("roadmap_task_progress").select("task_id,status,completed_at,notes").eq("roadmap_id", roadmapId).eq("user_id", auth.userId);
-    const { data: logs } = await auth.client.from("roadmap_daily_logs").select("log_date,planned_tasks,completed_tasks,completion_percent,reflection,energy_level,difficulty_rating").eq("roadmap_id", roadmapId).eq("user_id", auth.userId).order("log_date", { ascending: false }).limit(14);
-    const nextDay = Math.max(1, Number(context.nextDay) || 1);
-    const result: any = await ask(`Analyze tonight's evidence for this roadmap. Never alter completed tasks. Return exactly {"analysis":{"summary":"string","strengths":["string"],"blockers":["string"],"recommendation":"string"},"adapted":boolean,"futureAdjustments":[{"taskId":"string","action":"keep|reduce|split|reschedule|increase","reason":"string"}],"nextDaySchedule":[{"day":number,"startTime":"HH:MM","endTime":"HH:MM","title":"string","instructions":"step-by-step instructions","taskType":"practice|review|assessment|reflection|break","methodologyTags":["active_recall"],"estimatedMinutes":number,"successCriteria":"string","resources":[{"title":"string","url":"string","note":"string"}]}]}. The nextDaySchedule MUST contain at least 5 useful time blocks when the user's availability allows it, use the user's real schedule, and adapt difficulty/volume from today's evidence. Do not schedule over fixed commitments.\n\nRoadmap:\n${JSON.stringify(roadmap)}\nTasks:\n${JSON.stringify(tasks || [])}\nProgress:\n${JSON.stringify(progress || [])}\nDaily logs:\n${JSON.stringify(logs || [])}\nTonight context:\n${JSON.stringify({ ...context, nextDay })}`);
-    return json(res, 200, result);
-  } catch (error: any) {
-    console.error("OUTSTAND roadmap request failed", error);
-    return json(res, error?.status === 429 ? 429 : error?.status === 503 ? 503 : 500, { error: error?.message || "Roadmap service failed.", code: error?.code || "ROADMAP_REQUEST_FAILED" });
-  }
-}
+export default async function handler(req: VercelRequest, res: VercelResponse) { if (req.method === "OPTIONS") return res.status(204).end(); if (req.method !== "POST") return json(res, 405, { error: "Method not allowed." }); const auth = await authenticate(req); if ("error" in auth) return json(res, auth.error.status, { error: auth.error.message }); try { const input = await requestBody(req); const mode = ["questions", "plan", "adapt"].includes(input?.mode) ? input.mode : "questions"; const category = typeof input?.category === "string" ? input.category : "custom"; const answers = input?.answers && typeof input.answers === "object" ? input.answers : {}; const context = input?.context && typeof input.context === "object" ? input.context : {};
+if (mode === "questions") { const answered = Object.entries(answers).map(([key, value]) => `${key}: ${String(value)}`).join("\n") || "No answers yet."; return json(res, 200, await ask(`Create the next 4 to 6 highest-value adaptive questions for a ${category} goal. Do not repeat answered information. The interview MUST collect: exact outcome and measurable target; current baseline; deadline; wake and sleep times; fixed commitments such as school/work; realistic daily study/work window; preferred session length; current skill level; and constraints. At least one question must capture the user's normal weekday schedule so the generated roadmap can tell them exactly what to do and when. Return exactly {"questions":[{"id":"string","question":"string","type":"text|number|choice|multiline","required":true,"options":["..."],"placeholder":"..."}]}.\n\nAnswered:\n${answered}\nContext:\n${JSON.stringify(context)}`)); }
+if (mode === "plan") { const durationDays = Math.max(1, Math.min(730, Number(answers.durationDays) || 30)); const resources = await retrieveCuratedResources(auth.client, category, answers); if (!resources.length) return json(res, 422, { error: "No curated learning resources match this roadmap yet.", code: "NO_CURATED_RESOURCES", needsCuratedContent: true }); const resourceContext = resources.map((resource) => ({ id: resource.id, topic_name: resource.topic_name, educator_name: resource.educator_name, youtube_url: resource.youtube_url, mind_map_url: resource.mind_map_url, quick_revision_text: resource.quick_revision_text })).slice(0, 20); const rawResult: any = await ask(`Generate the learning milestones for a ${category} roadmap from the user's interview and ONLY the curated resources below. Output ONLY a JSON object with one property named milestones whose value is an array. Each milestone MUST use exactly these fields: milestone_title (string), video_url (string), mind_map_url (string), revision_notes (string), quiz (array of 3-5 MCQ objects). Each quiz object MUST contain exactly question (string), options (array of 4 strings), correct_answer (string). milestone_title MUST exactly equal one of the supplied topic_name values. Do NOT invent URLs, revision notes, educators, topics, or resources. The backend will replace the resource fields from the database, so your resource URLs and notes are treated as references only. Generate contextual quiz questions based on the selected topic and the user's level/goal. Select a coherent sequence of roughly 4-10 milestones appropriate to the requested duration. Avoid duplicate topics.\n\nUSER CATEGORY: ${category}\nUSER INTERVIEW:\n${JSON.stringify(answers)}\n\nCURATED RESOURCE CONTEXT:\n${JSON.stringify(resourceContext)}`); const aiMilestones = Array.isArray(rawResult) ? rawResult : rawResult?.milestones; const milestones = validateLearningMilestones(aiMilestones, resources); const structuredContent = { version: 1, generatedAt: new Date().toISOString(), category, durationDays, milestones }; const plan = buildCompatibilityPlan(milestones, durationDays, category); validatePlan(plan); return json(res, 200, { plan, milestones, structuredContent, retrieval: { count: resources.length, resourceIds: resources.map((resource) => resource.id) } }); }
+const roadmapId = typeof context.roadmapId === "string" ? context.roadmapId : ""; if (!roadmapId) return json(res, 400, { error: "roadmapId is required for adaptation." }); const { data: roadmap, error: roadmapError } = await auth.client.from("roadmaps").select("id,title,goal,category,duration_days,questionnaire,generation_metadata,structured_content").eq("id", roadmapId).eq("user_id", auth.userId).maybeSingle(); if (roadmapError || !roadmap) return json(res, 404, { error: "Roadmap not found." }); const { data: tasks } = await auth.client.from("roadmap_tasks").select("id,title,completed,day_index,estimated_minutes").eq("roadmap_id", roadmapId).order("day_index", { ascending: true }); const adaptation = await ask(`Adapt this roadmap from performance data. Return JSON with {"adjustments":[{"task_id":"string","change":"string"}],"summary":"string"}. Roadmap: ${JSON.stringify(roadmap)} Tasks: ${JSON.stringify(tasks || [])}`); return json(res, 200, adaptation); } catch (error: any) { console.error("OUTSTAND roadmap request failed", error); return json(res, error?.status === 503 ? 503 : 500, { error: error?.message || "Roadmap service failed.", code: error?.code || "ROADMAP_FAILED" }); } }
