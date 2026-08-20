@@ -7,7 +7,7 @@ import { AIRoadmapBuilderV2, type AIRoadmapPlan } from "./AIRoadmapBuilderV2";
 import { DashboardExecutionPlan } from "./DashboardExecutionPlan";
 
 const panel = "rounded-[28px] border border-white/[0.08] bg-white/[0.035] shadow-[0_24px_80px_-56px_rgba(34,211,238,.45)] backdrop-blur-xl";
-type DashboardRoadmapPlan = AIRoadmapPlan & { timetable?: { label: string; durationMinutes: number; task: string; why: string }[] };
+type DashboardRoadmapPlan = AIRoadmapPlan & { dailySchedule?: { day: number; startTime: string; endTime: string; title: string; instructions: string; taskType: string; methodologyTags: string[]; estimatedMinutes: number; successCriteria: string; resources: { title: string; url: string; note?: string }[] }[] };
 
 function localDateKey() {
   const now = new Date();
@@ -56,12 +56,15 @@ export function DashboardAISection({ habits, sessions, completedHabits, focusMin
       }
     }
     void loadSavedRoadmap();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [bestStreak, habits, level, name, xp, focusMinutes, completedHabits]);
 
-  const timetable = plan?.timetable?.filter((block) => block?.task).slice(0, 4) ?? [];
+  const timetable = plan?.dailySchedule?.filter((block) => block && block.title && block.instructions).slice(0, 6).map((block) => ({
+    label: `${block.startTime}–${block.endTime}`,
+    durationMinutes: block.estimatedMinutes,
+    task: block.title,
+    why: block.instructions,
+  })) ?? [];
   const completion = Math.round(roadmapProgress?.completionPct ?? 0);
 
   return <>
@@ -71,21 +74,21 @@ export function DashboardAISection({ habits, sessions, completedHabits, focusMin
         <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div className="max-w-2xl">
             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300"><span className="grid h-7 w-7 place-items-center rounded-lg border border-cyan-300/15 bg-cyan-300/[0.07]"><Brain className="h-3.5 w-3.5" /></span>OUTSTAND Intelligence</div>
-            <h2 className="mt-4 text-2xl font-black tracking-tight text-white">Your day, already figured out.</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-400">OUTSTAND turns your goal and real progress into a small number of actions you can actually finish.</p>
+            <h2 className="mt-4 text-2xl font-black tracking-tight text-white">Your plan, hour by hour.</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-400">Your goal, availability and progress become a short list of actions with real times — not a giant roadmap.</p>
           </div>
-          <button type="button" onClick={() => setBuilderOpen(true)} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-slate-950 shadow-[0_16px_40px_-18px_rgba(255,255,255,.45)] transition hover:-translate-y-0.5 hover:bg-cyan-50"><Sparkles className="h-4 w-4" />{plan ? "Adjust plan" : "Build my plan"}</button>
+          <button type="button" onClick={() => setBuilderOpen(true)} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-black text-slate-950 shadow-[0_16px_40px_-18px_rgba(255,255,255,.45)] transition hover:-translate-y-0.5 hover:bg-cyan-50"><Sparkles className="h-4 w-4" />{plan ? "Adjust schedule" : "Build my plan"}</button>
         </div>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Signal icon={<ListChecks />} label="Habits" value={String(habits.length)} detail={habits.length ? habits.slice(0, 2).map((h) => h.name).join(" · ") : "Add habits for better AI context"} />
-          <Signal icon={<CheckCircle2 />} label="Today" value={`${completedHabits}/${habits.length}`} detail="Habits completed" />
+          <Signal icon={<ListChecks />} label="Tasks" value={`${missions.length}`} detail="Only today's top priorities" />
+          <Signal icon={<CheckCircle2 />} label="Done" value={`${completedHabits}/${habits.length}`} detail="Habits completed" />
           <Signal icon={<Clock3 />} label="Focus" value={`${focusMinutes} min`} detail={`${sessions.filter((s) => s.completed).length} sessions`} />
           <Signal icon={<Target />} label="Progress" value={`${completion}%`} detail={`${xp.toLocaleString()} XP · Level ${level}`} />
         </div>
 
         {loadingSavedPlan && <div className="mt-5 rounded-2xl border border-white/[0.07] bg-black/10 p-4"><p className="text-xs text-slate-500">Loading your plan…</p></div>}
-        {!loadingSavedPlan && !plan && <div className="mt-5 rounded-2xl border border-cyan-300/10 bg-cyan-300/[0.025] p-5"><div className="flex items-start gap-3"><BookOpen className="mt-0.5 h-5 w-5 shrink-0 text-cyan-300" /><div><p className="text-sm font-black text-white">No roadmap yet.</p><p className="mt-1 text-xs leading-5 text-slate-500">Tell the AI your goal, deadline and available time. OUTSTAND will generate a practical schedule instead of a giant checklist.</p></div></div></div>}
+        {!loadingSavedPlan && !plan && <div className="mt-5 rounded-2xl border border-cyan-300/10 bg-cyan-300/[0.025] p-5"><div className="flex items-start gap-3"><BookOpen className="mt-0.5 h-5 w-5 shrink-0 text-cyan-300" /><div><p className="text-sm font-black text-white">No daily plan yet.</p><p className="mt-1 text-xs leading-5 text-slate-500">Tell the AI your goal, deadline and available hours. It will turn them into a practical timetable and a few finishable tasks.</p></div></div></div>}
 
         {!loadingSavedPlan && plan && <div className="mt-5 space-y-4">
           <div className="rounded-2xl border border-cyan-300/10 bg-cyan-300/[0.025] p-4 sm:p-5">
@@ -97,7 +100,7 @@ export function DashboardAISection({ habits, sessions, completedHabits, focusMin
           </div>
 
           <DashboardExecutionPlan missions={missions} roadmapProgress={roadmapProgress} timetable={timetable} onCompleteMission={onCompleteMission} />
-          {adapting || adaptationNote ? <div className="rounded-xl border border-violet-300/10 bg-violet-300/[0.035] px-3 py-2 text-[10px] font-semibold text-violet-200/80">{adapting ? "AI is tuning tomorrow from today's progress…" : `Updated: ${adaptationNote}`}</div> : null}
+          {adapting || adaptationNote ? <div className="rounded-xl border border-violet-300/10 bg-violet-300/[0.035] px-3 py-2 text-[10px] font-semibold text-violet-200/80">{adapting ? "AI is tuning your next schedule from today's progress…" : `Updated: ${adaptationNote}`}</div> : null}
         </div>}
       </div>
     </section>
