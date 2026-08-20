@@ -6,17 +6,13 @@ import { useAuth, displayNameOf } from "@/hooks/use-auth";
 import { useAppState } from "@/hooks/use-app-state";
 import { useDailyLog } from "@/hooks/use-dopamine";
 import { DashboardWelcome, DashboardMomentum, DashboardHabits, DashboardActivity } from "@/components/dashboard/DashboardSections";
-import { DashboardAISection } from "@/components/dashboard/DashboardAISection";
-import { RoadmapDailyPath } from "@/components/dashboard/RoadmapDailyPath";
-import { RoadmapProgressHistory } from "@/components/dashboard/RoadmapProgressHistory";
 import { OutstandMotionCore } from "@/components/outstand/OutstandMotionCore";
 import { todayISO, levelFromXP } from "@/lib/habits";
-import type { RoadmapProgress } from "@/hooks/useDashboard";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: DashboardPage });
 
 function DashboardPage() {
-  const { snapshot, isLoading, loadError, completeMission } = useDashboard();
+  const { snapshot, isLoading, loadError } = useDashboard();
   const { user, profile } = useAuth();
   const { habits, sessions, outstand, toggleToday, bestStreak, xp } = useAppState();
   const { log } = useDailyLog();
@@ -28,25 +24,34 @@ function DashboardPage() {
   const today = todayISO();
   const completedHabits = habits.filter((habit) => habit.history?.includes(today)).length;
   const focusMinutes = sessions.filter((session) => session.completed).reduce((sum, session) => sum + Math.max(0, session.durationMin || 0), 0);
-  const nextMission = snapshot.missions.find((mission) => !mission.completed);
-  const roadmapProgress: RoadmapProgress | null = snapshot.roadmapProgress;
   const progress = levelFromXP(xp);
-  const displayXp = xp;
 
   return <MotionConfig reducedMotion="user">
     <div className="relative min-h-screen overflow-x-hidden bg-[#05070d] text-slate-100">
-      <div className="pointer-events-none fixed inset-0 overflow-hidden"><div className="absolute left-[12%] top-[-18rem] h-[42rem] w-[42rem] rounded-full bg-cyan-500/[0.055] blur-[130px]" /><div className="absolute right-[-14rem] top-[28%] h-[34rem] w-[34rem] rounded-full bg-violet-500/[0.045] blur-[130px]" /><div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.014)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.014)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:linear-gradient(to_bottom,black,transparent_78%)]" /></div>
-      <div className="pointer-events-none fixed right-6 top-24 z-[1] hidden opacity-80 lg:block"><OutstandMotionCore size="lg" /></div>
-      <main className="relative z-10 mx-auto w-full max-w-none space-y-5 px-4 pb-20 pt-6 sm:px-6 lg:px-8 lg:pt-9 xl:px-0">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden"><div className="absolute left-[10%] top-[-18rem] h-[42rem] w-[42rem] rounded-full bg-cyan-500/[0.055] blur-[130px]" /><div className="absolute right-[-14rem] top-[34%] h-[34rem] w-[34rem] rounded-full bg-violet-500/[0.045] blur-[130px]" /><div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.014)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.014)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:linear-gradient(to_bottom,black,transparent_78%)]" /></div>
+      <div className="pointer-events-none fixed right-6 top-24 z-[1] hidden opacity-70 lg:block"><OutstandMotionCore size="lg" /></div>
+
+      <main className="relative z-10 mx-auto w-full max-w-7xl space-y-5 px-4 pb-20 pt-6 sm:px-6 lg:px-8 lg:pt-9">
         <DashboardWelcome name={name} quote={snapshot.quote} />
-        <DashboardAISection habits={habits} sessions={sessions} completedHabits={completedHabits} focusMinutes={focusMinutes} bestStreak={bestStreak} nextMission={nextMission} name={name} level={progress.level} xp={displayXp} roadmapProgress={roadmapProgress} />
-        <DashboardMomentum xp={displayXp} level={progress.level} xpPct={progress.progressPct} streak={bestStreak} completedHabits={completedHabits} habitCount={habits.length} focusMinutes={focusMinutes} />
-        <div className="grid gap-5 lg:grid-cols-2 2xl:grid-cols-[1.08fr_0.92fr]">
+
+        <section className="rounded-[28px] border border-cyan-300/10 bg-gradient-to-br from-cyan-300/[0.07] via-white/[0.035] to-violet-300/[0.045] p-5 shadow-[0_30px_90px_-60px_rgba(34,211,238,.45)] sm:p-7">
+          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+            <div className="max-w-2xl"><p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-300">Today</p><h2 className="mt-2 text-3xl font-black tracking-[-0.04em] text-white sm:text-4xl">Make today count.</h2><p className="mt-3 text-sm leading-6 text-slate-400">Your dashboard is a command center, not a second roadmap. Finish what matters, protect your rhythm, and get back to the work.</p></div>
+            <div className="rounded-2xl border border-white/[0.08] bg-black/15 px-4 py-3 md:min-w-[180px]"><p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-600">Roadmap actions</p><p className="mt-1 text-2xl font-black text-white">{snapshot.completedCount}/{snapshot.missions.length || 0}</p><p className="mt-1 text-[10px] text-slate-500">done today</p></div>
+          </div>
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-white/[0.07] bg-black/10 p-4"><p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-600">Habits</p><p className="mt-2 text-2xl font-black text-white">{completedHabits}/{habits.length || 0}</p><p className="mt-1 text-[10px] text-slate-500">completed today</p></div>
+            <div className="rounded-2xl border border-white/[0.07] bg-black/10 p-4"><p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-600">Focus</p><p className="mt-2 text-2xl font-black text-white">{focusMinutes}m</p><p className="mt-1 text-[10px] text-slate-500">completed focus time</p></div>
+            <div className="rounded-2xl border border-white/[0.07] bg-black/10 p-4"><p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-600">Daily score</p><p className="mt-2 text-2xl font-black text-white">{log?.score ?? "—"}</p><p className="mt-1 text-[10px] text-slate-500">latest check-in</p></div>
+          </div>
+        </section>
+
+        <DashboardMomentum xp={xp} level={progress.level} xpPct={progress.progressPct} streak={bestStreak} completedHabits={completedHabits} habitCount={habits.length} focusMinutes={focusMinutes} />
+
+        <div className="grid gap-5 lg:grid-cols-2">
           <DashboardHabits habits={habits} onToggle={toggleToday} />
-          <RoadmapDailyPath missions={snapshot.missions} nextMission={nextMission} onCompleteMission={completeMission} />
+          <DashboardActivity sessions={sessions} outstand={outstand} dailyScore={log?.score ?? null} />
         </div>
-        <RoadmapProgressHistory />
-        <DashboardActivity sessions={sessions} outstand={outstand} dailyScore={log?.score ?? null} />
       </main>
     </div>
   </MotionConfig>;
