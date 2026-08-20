@@ -1,167 +1,44 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { MessageCircle, Search, UserPlus, X } from "lucide-react";
+import { Camera, Check, Edit3, MessageCircle, Search, UserPlus, X } from "lucide-react";
 import { ProfileSocialUpgrade } from "@/components/profile/ProfileSocialUpgrade";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useProfileState } from "@/hooks/use-profile-state";
 
-type Profile = {
-  id: string;
-  display_name: string | null;
-  full_name: string | null;
-  username: string | null;
-  avatar_url: string | null;
-};
+type Profile = { id:string; display_name:string|null; full_name:string|null; username:string|null; avatar_url:string|null };
+const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const personName=(profile:Profile)=>profile.display_name||profile.full_name||(profile.username?`@${profile.username}`:"OUTSTAND user");
 
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export function ProfileSocialActions(){
+ const profileState=useProfileState(); const {profile,user,isEditing,setIsEditing,draftName,setDraftName,draftBio,setDraftBio,draftUsername,setDraftUsername,isUploading,fileInputRef,beginEdit,saveProfile,handleAvatarUpload}=profileState;
+ const [open,setOpen]=useState(false); const [query,setQuery]=useState(""); const [results,setResults]=useState<Profile[]>([]); const [userId,setUserId]=useState<string|null>(null); const [busy,setBusy]=useState<string|null>(null);
+ useEffect(()=>{void supabase.auth.getUser().then(({data})=>setUserId(data.user?.id??null))},[]);
+ useEffect(()=>{if(!open||!userId)return;const timer=window.setTimeout(async()=>{const clean=query.trim().replace(/^@/,"");if(!clean){setResults([]);return}const request=uuidPattern.test(clean)?supabase.from("profiles").select("id,display_name,full_name,username,avatar_url").eq("id",clean).neq("id",userId).limit(8):supabase.from("profiles").select("id,display_name,full_name,username,avatar_url").or(`username.ilike.%${clean}%,display_name.ilike.%${clean}%,full_name.ilike.%${clean}%`).neq("id",userId).limit(8);const{data,error}=await request;if(error){toast.error("Could not search users.");setResults([]);return}setResults(data||[])},250);return()=>window.clearTimeout(timer)},[open,query,userId]);
+ const sendFriendRequest=async(target:Profile)=>{if(!userId||busy)return;setBusy(target.id);const{error}=await supabase.rpc("send_friend_request",{target_user:target.id});if(error)toast.error(error.message?.includes("Already friends")?"You're already friends.":"Could not send friend request.");else{toast.success(`Friend request sent to ${personName(target)}`);setResults(current=>current.filter(p=>p.id!==target.id))}setBusy(null)};
+ return <div className="space-y-4">
+  <div className="flex flex-wrap gap-3 rounded-[2rem] border border-white/[0.08] bg-white/[0.035] p-4 backdrop-blur-2xl sm:p-5">
+   <button type="button" onClick={beginEdit} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2.5 text-xs font-black text-white transition hover:border-cyan-300/25 hover:bg-cyan-300/10"><Edit3 className="h-4 w-4 text-cyan-300"/> Edit profile</button>
+   <button type="button" onClick={()=>fileInputRef.current?.click()} disabled={isUploading||!user} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2.5 text-xs font-black text-white transition hover:border-cyan-300/25 hover:bg-cyan-300/10 disabled:opacity-50"><Camera className="h-4 w-4 text-cyan-300"/>{isUploading?"Uploading…":"Change avatar"}</button>
+   <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleAvatarUpload} className="hidden"/>
+   <button type="button" onClick={()=>setOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-2.5 text-xs font-black text-slate-950 transition hover:bg-cyan-200"><UserPlus className="h-4 w-4"/> Add friends</button>
+   <Link to="/chat" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2.5 text-xs font-black text-white transition hover:border-cyan-300/20 hover:bg-cyan-300/10"><MessageCircle className="h-4 w-4 text-cyan-300"/> Messages</Link>
+  </div>
 
-const personName = (profile: Profile) =>
-  profile.display_name || profile.full_name || (profile.username ? `@${profile.username}` : "OUTSTAND user");
-
-export function ProfileSocialActions() {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<Profile[]>([]);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-
-  useEffect(() => {
-    void supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
-  }, []);
-
-  useEffect(() => {
-    if (!open || !userId) return;
-    const timer = window.setTimeout(async () => {
-      const clean = query.trim().replace(/^@/, "");
-      if (!clean) {
-        setResults([]);
-        return;
-      }
-
-      const request = uuidPattern.test(clean)
-        ? supabase
-            .from("profiles")
-            .select("id,display_name,full_name,username,avatar_url")
-            .eq("id", clean)
-            .neq("id", userId)
-            .limit(8)
-        : supabase
-            .from("profiles")
-            .select("id,display_name,full_name,username,avatar_url")
-            .or(`username.ilike.%${clean}%,display_name.ilike.%${clean}%,full_name.ilike.%${clean}%`)
-            .neq("id", userId)
-            .limit(8);
-
-      const { data, error } = await request;
-      if (error) {
-        toast.error("Could not search users.");
-        setResults([]);
-        return;
-      }
-      setResults(data || []);
-    }, 250);
-
-    return () => window.clearTimeout(timer);
-  }, [open, query, userId]);
-
-  const sendFriendRequest = async (target: Profile) => {
-    if (!userId || busy) return;
-    setBusy(target.id);
-
-    const { error } = await supabase.rpc("send_friend_request", {
-      target_user: target.id,
-    });
-
-    if (error) {
-      const message = error.message?.includes("Already friends")
-        ? "You're already friends."
-        : error.message?.includes("Invalid friend target")
-          ? "You can't add this user."
-          : "Could not send friend request.";
-      toast.error(message);
-    } else {
-      toast.success(`Friend request sent to ${personName(target)}`);
-      setResults((current) => current.filter((profile) => profile.id !== target.id));
-    }
-
-    setBusy(null);
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-3 rounded-[2rem] border border-white/[0.08] bg-white/[0.035] p-4 backdrop-blur-2xl sm:p-5">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-2.5 text-xs font-black text-slate-950 transition hover:bg-cyan-200"
-        >
-          <UserPlus className="h-4 w-4" /> Add friends
-        </button>
-        <Link
-          to="/chat"
-          className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2.5 text-xs font-black text-white transition hover:border-cyan-300/20 hover:bg-cyan-300/10"
-        >
-          <MessageCircle className="h-4 w-4 text-cyan-300" /> Messages
-        </Link>
-      </div>
-
-      {open && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="friend-search-title">
-          <div className="w-full max-w-lg overflow-hidden rounded-[2rem] border border-white/10 bg-[#0b1020] shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/[0.06] p-5">
-              <div>
-                <h2 id="friend-search-title" className="text-xl font-black text-white">Find a friend</h2>
-                <p className="mt-1 text-xs text-slate-500">Search by name, username, or exact User ID.</p>
-              </div>
-              <button type="button" onClick={() => { setOpen(false); setQuery(""); setResults([]); }} aria-label="Close friend search" className="rounded-xl p-2 text-slate-500 transition hover:bg-white/5 hover:text-white">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="p-5">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600" />
-                <input
-                  autoFocus
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Name, @username, or User ID…"
-                  className="w-full rounded-2xl border border-white/10 bg-black/25 py-4 pl-11 pr-4 text-sm font-semibold text-white outline-none placeholder:text-slate-700 focus:border-cyan-300/40"
-                />
-              </div>
-
-              <div className="mt-4 max-h-[55vh] space-y-2 overflow-y-auto">
-                {query.trim() && results.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-600">No users found.</div>
-                ) : results.map((profile) => (
-                  <div key={profile.id} className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-slate-950 text-sm font-black text-cyan-200">
-                        {profile.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" /> : personName(profile).slice(0, 1).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-black text-white">{personName(profile)}</p>
-                        {profile.username && <p className="truncate text-xs text-slate-600">@{profile.username}</p>}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={Boolean(busy)}
-                      onClick={() => void sendFriendRequest(profile)}
-                      className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950 transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <UserPlus className="h-3.5 w-3.5" />
-                      {busy === profile.id ? "Sending…" : "Add friend"}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <ProfileSocialUpgrade />
+  {isEditing&&<div className="rounded-[2rem] border border-cyan-300/15 bg-cyan-300/[0.025] p-5 shadow-2xl sm:p-7">
+   <div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-black uppercase tracking-[.22em] text-cyan-300">Profile settings</p><h2 className="mt-2 text-xl font-black text-white">Make your profile yours.</h2></div><button type="button" onClick={()=>setIsEditing(false)} className="rounded-xl p-2 text-slate-500 hover:bg-white/5 hover:text-white" aria-label="Close profile editor"><X className="h-5 w-5"/></button></div>
+   <div className="mt-6 flex flex-col gap-6 sm:flex-row sm:items-start">
+    <div className="shrink-0"><button type="button" onClick={()=>fileInputRef.current?.click()} disabled={isUploading} className="group relative grid h-24 w-24 place-items-center overflow-hidden rounded-[1.75rem] border border-white/10 bg-slate-950 text-3xl font-black text-cyan-200"><span>{profile?.avatar_url?<img src={profile.avatar_url} alt="Current avatar" className="h-full w-full object-cover"/>:(draftName||"U").slice(0,1).toUpperCase()}</span><span className="absolute inset-0 grid place-items-center bg-black/55 text-white opacity-0 transition group-hover:opacity-100"><Camera className="h-6 w-6"/></span></button><p className="mt-2 text-center text-[10px] text-slate-600">JPG, PNG or WebP · 4 MB</p></div>
+    <div className="grid min-w-0 flex-1 gap-4 sm:grid-cols-2">
+     <label className="block"><span className="text-[10px] font-black uppercase tracking-[.18em] text-slate-600">Display name</span><input value={draftName} onChange={e=>setDraftName(e.target.value)} maxLength={80} className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm font-semibold text-white outline-none focus:border-cyan-300/40"/></label>
+     <label className="block"><span className="text-[10px] font-black uppercase tracking-[.18em] text-slate-600">Username</span><input value={draftUsername} onChange={e=>setDraftUsername(e.target.value)} maxLength={24} placeholder="@username" className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm font-semibold text-white outline-none focus:border-cyan-300/40"/></label>
+     <label className="block sm:col-span-2"><span className="text-[10px] font-black uppercase tracking-[.18em] text-slate-600">Bio</span><textarea value={draftBio} onChange={e=>setDraftBio(e.target.value)} maxLength={240} rows={4} placeholder="Tell people a little about yourself…" className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-6 text-white outline-none focus:border-cyan-300/40"/><span className="mt-1 block text-right text-[10px] text-slate-700">{draftBio.length}/240</span></label>
     </div>
-  );
+   </div>
+   <div className="mt-6 flex justify-end gap-2"><button type="button" onClick={()=>setIsEditing(false)} className="rounded-xl border border-white/10 px-4 py-2.5 text-xs font-black text-slate-400 hover:text-white">Cancel</button><button type="button" onClick={()=>void saveProfile()} className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-5 py-2.5 text-xs font-black text-slate-950 hover:bg-cyan-200"><Check className="h-4 w-4"/> Save changes</button></div>
+  </div>}
+
+  {open&&<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="friend-search-title"><div className="w-full max-w-lg overflow-hidden rounded-[2rem] border border-white/10 bg-[#0b1020] shadow-2xl"><div className="flex items-center justify-between border-b border-white/[0.06] p-5"><div><h2 id="friend-search-title" className="text-xl font-black text-white">Find a friend</h2><p className="mt-1 text-xs text-slate-500">Search by name, username, or exact User ID.</p></div><button type="button" onClick={()=>{setOpen(false);setQuery("");setResults([])}} aria-label="Close friend search" className="rounded-xl p-2 text-slate-500 hover:bg-white/5 hover:text-white"><X className="h-5 w-5"/></button></div><div className="p-5"><div className="relative"><Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600"/><input autoFocus value={query} onChange={e=>setQuery(e.target.value)} placeholder="Name, @username, or User ID…" className="w-full rounded-2xl border border-white/10 bg-black/25 py-4 pl-11 pr-4 text-sm font-semibold text-white outline-none placeholder:text-slate-700 focus:border-cyan-300/40"/></div><div className="mt-4 max-h-[55vh] space-y-2 overflow-y-auto">{query.trim()&&results.length===0?<div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-600">No users found.</div>:results.map(p=><div key={p.id} className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-3"><div className="flex min-w-0 items-center gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-slate-950 text-sm font-black text-cyan-200">{p.avatar_url?<img src={p.avatar_url} alt="" className="h-full w-full object-cover"/>:personName(p).slice(0,1).toUpperCase()}</div><div className="min-w-0"><p className="truncate text-sm font-black text-white">{personName(p)}</p>{p.username&&<p className="truncate text-xs text-slate-600">@{p.username}</p>}</div></div><button type="button" disabled={Boolean(busy)} onClick={()=>void sendFriendRequest(p)} className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-950 disabled:opacity-50"><UserPlus className="h-3.5 w-3.5"/>{busy===p.id?"Sending…":"Add friend"}</button></div>)}</div></div></div></div>}
+  <ProfileSocialUpgrade/>
+ </div>;
 }
