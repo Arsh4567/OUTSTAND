@@ -23,6 +23,10 @@ export function useAppState() {
   const sessions = Array.isArray(rawSessions) ? rawSessions : [];
   const outstand = Array.isArray(rawOutstand) ? rawOutstand.map((item) => ({ ...item, xp: Number.isFinite(item?.xp) ? Math.max(0, item.xp) : 0 })) : [];
   const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null); const hasSyncedOnce = useRef(false); const syncAbortRef = useRef<AbortController | null>(null);
+  // Keep the latest local state available to the stable auth listener without
+  // recreating the Supabase subscription every time a habit/session changes.
+  const syncDataRef = useRef({ habits, sessions, outstand });
+  syncDataRef.current = { habits, sessions, outstand };
 
   const refreshCloudStreak = useCallback(async (recordToday = false) => {
     try {
@@ -51,7 +55,28 @@ export function useAppState() {
     syncTimer.current=setTimeout(sync,hasSyncedOnce.current?1200:250); return()=>{if(syncTimer.current)clearTimeout(syncTimer.current);controller.abort();if(syncAbortRef.current===controller)syncAbortRef.current=null};
   }, [habits, sessions, outstand]);
 
-  useEffect(() => { let active=true; let unsubscribe:(()=>void)|undefined; void import("@/integrations/supabase/client").then(({supabase})=>{if(!active)return;const subscription=supabase.auth.onAuthStateChange((event,session)=>{if(event!=="SIGNED_IN"&&event!=="TOKEN_REFRESHED")return;if(!session?.access_token||!active)return;void refreshCloudStreak(false);void fetch("/api/sync-productivity-state",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${session.access_token}`},body:JSON.stringify({habits,sessions,outstand})}).then(response=>{if(response.ok)hasSyncedOnce.current=true}).catch(error=>{if(!isAbortError(error))console.warn("Outstand auth-triggered sync failed:",error)})});unsubscribe=()=>subscription.data.subscription.unsubscribe()});return()=>{active=false;unsubscribe?.()}},[habits,sessions,outstand,refreshCloudStreak]);
+  // Subscribe once per mounted app. The ref above keeps the auth-triggered sync
+  // payload current without tearing down/recreating the realtime auth listener
+  // whenever local productivity state changes.
+  useEffect(() => {
+    let active=true; let unsubscribe:(()=>void)|undefined;
+    void import("@/integrations/supabase/client").then(({supabase})=>{
+      if(!active)return;
+      const subscription=supabase.auth.onAuthStateChange((event,session)=>{
+        if(event!=="SIGNED_IN"&&event!=="TOKEN_REFRESHED")return;
+        if(!session?.access_token||!active)return;
+        const { habits, sessions, outstand } = syncDataRef.current;
+        void refreshCloudStreak(false);
+        void fetch("/api/sync-productivity-state",{
+          method:"POST",
+          headers:{"Content-Type":"application/json",Authorization:`Bearer ${session.access_token}`},
+          body:JSON.stringify({habits,sessions,outstand})
+        }).then(response=>{if(response.ok)hasSyncedOnce.current=true}).catch(error=>{if(!isAbortError(error))console.warn("Outstand auth-triggered sync failed:",error)});
+      });
+      unsubscribe=()=>subscription.data.subscription.unsubscribe();
+    });
+    return()=>{active=false;unsubscribe?.()};
+  }, [refreshCloudStreak]);
 
   const xp = useMemo(() => calculateLocalXp(habits, sessions, outstand), [habits, sessions, outstand]); const levelState = useMemo(() => levelFromXP(xp), [xp]);
   const markTodayActive = useCallback(() => { void refreshCloudStreak(true); }, [refreshCloudStreak]);
