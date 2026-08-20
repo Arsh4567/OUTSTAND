@@ -25,6 +25,7 @@ function DashboardPage() {
   const completedHabits = habits.filter((habit) => habit.history?.includes(today)).length;
   const focusMinutes = sessions.filter((session) => session.completed).reduce((sum, session) => sum + Math.max(0, session.durationMin || 0), 0);
   const progress = levelFromXP(xp);
+  const completionPct = snapshot.completionPct;
 
   return <MotionConfig reducedMotion="user">
     <div className="relative min-h-screen overflow-x-hidden bg-[#05070d] text-slate-100">
@@ -37,7 +38,7 @@ function DashboardPage() {
         <section className="rounded-[28px] border border-cyan-300/10 bg-gradient-to-br from-cyan-300/[0.07] via-white/[0.035] to-violet-300/[0.045] p-5 shadow-[0_30px_90px_-60px_rgba(34,211,238,.45)] sm:p-7">
           <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <div className="max-w-2xl"><p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-300">Today</p><h2 className="mt-2 text-3xl font-black tracking-[-0.04em] text-white sm:text-4xl">Make today count.</h2><p className="mt-3 text-sm leading-6 text-slate-400">Your dashboard is a command center, not a second roadmap. Finish what matters, protect your rhythm, and get back to the work.</p></div>
-            <div className="rounded-2xl border border-white/[0.08] bg-black/15 px-4 py-3 md:min-w-[180px]"><p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-600">Roadmap actions</p><p className="mt-1 text-2xl font-black text-white">{snapshot.completedCount}/{snapshot.missions.length || 0}</p><p className="mt-1 text-[10px] text-slate-500">done today</p></div>
+            <div className="rounded-2xl border border-white/[0.08] bg-black/15 px-4 py-3 md:min-w-[180px]"><p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-600">Today’s missions</p><p className="mt-1 text-2xl font-black text-white">{snapshot.completedCount}/{snapshot.missions.length || 0}</p><p className="mt-1 text-[10px] text-slate-500">{snapshot.missions.length ? `${completionPct}% complete` : "No mock tasks"}</p></div>
           </div>
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-white/[0.07] bg-black/10 p-4"><p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-600">Habits</p><p className="mt-2 text-2xl font-black text-white">{completedHabits}/{habits.length || 0}</p><p className="mt-1 text-[10px] text-slate-500">completed today</p></div>
