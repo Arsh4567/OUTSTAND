@@ -1,5 +1,5 @@
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Component, useEffect, useMemo, useRef, useState, type ErrorInfo, type ReactNode } from "react";
 import * as THREE from "three";
 import {
   getPerformanceProfile,
@@ -81,6 +81,37 @@ function Scene({ accent, active, reducedMotion }: Required<Props>) {
   );
 }
 
+class CanvasGuard extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.warn("[OUTSTAND] Decorative canvas disabled after runtime error.", error, info.componentStack);
+  }
+
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
+function StaticCore({ accent, active }: { accent: string; active: boolean }) {
+  return (
+    <div className="absolute inset-0" aria-hidden="true">
+      <div
+        className="absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-300/20 bg-cyan-400/[0.06] shadow-[0_0_50px_rgba(34,211,238,.12)]"
+        style={{ borderColor: `${accent}55`, opacity: active ? 1 : 0.72 }}
+      />
+      <div
+        className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-200/30 blur-[1px]"
+        style={{ backgroundColor: `${accent}66` }}
+      />
+    </div>
+  );
+}
+
 export function OutstandCanvas({
   accent = "#67e8f9",
   active = false,
@@ -93,12 +124,40 @@ export function OutstandCanvas({
   const [profile, setProfile] = useState(() =>
     getPerformanceProfile(reducedMotion || prefersReducedMotion),
   );
+  const [canRender3D, setCanRender3D] = useState(false);
 
   useEffect(() => {
     setProfile(getPerformanceProfile(reducedMotion || prefersReducedMotion));
   }, [reducedMotion, prefersReducedMotion]);
 
+  useEffect(() => {
+    if (reducedMotion || prefersReducedMotion || typeof window === "undefined") {
+      setCanRender3D(false);
+      return;
+    }
+
+    // This canvas is decorative. Never let a missing/blocked WebGL context become
+    // a fatal dependency for the surrounding product UI, especially on mobile or
+    // browsers that disable hardware acceleration.
+    const desktop = window.matchMedia("(min-width: 1024px)").matches;
+    if (!desktop) {
+      setCanRender3D(false);
+      return;
+    }
+
+    try {
+      const canvas = document.createElement("canvas");
+      const context =
+        canvas.getContext("webgl2", { failIfMajorPerformanceCaveat: false }) ??
+        canvas.getContext("webgl", { failIfMajorPerformanceCaveat: false });
+      setCanRender3D(Boolean(context));
+    } catch {
+      setCanRender3D(false);
+    }
+  }, [prefersReducedMotion, reducedMotion]);
+
   const shouldAnimate = visible && pageVisible && !profile.reducedMotion;
+  const fallback = <StaticCore accent={accent} active={active} />;
 
   return (
     <div
@@ -107,26 +166,32 @@ export function OutstandCanvas({
       aria-hidden="true"
       style={{ contain: "layout paint" }}
     >
-      <Canvas
-        dpr={profile.dpr}
-        frameloop={shouldAnimate ? "always" : "never"}
-        gl={{
-          antialias: false,
-          alpha: true,
-          powerPreference: "high-performance",
-          depth: true,
-          stencil: false,
-          preserveDrawingBuffer: false,
-        }}
-        camera={{ position: [0, 0, 5.4], fov: 42 }}
-        performance={{ min: 0.65, max: 1, debounce: 120 }}
-      >
-        <Scene
-          accent={accent}
-          active={active}
-          reducedMotion={!shouldAnimate || profile.reducedMotion}
-        />
-      </Canvas>
+      {canRender3D ? (
+        <CanvasGuard fallback={fallback}>
+          <Canvas
+            dpr={profile.dpr}
+            frameloop={shouldAnimate ? "always" : "never"}
+            gl={{
+              antialias: false,
+              alpha: true,
+              powerPreference: "high-performance",
+              depth: true,
+              stencil: false,
+              preserveDrawingBuffer: false,
+            }}
+            camera={{ position: [0, 0, 5.4], fov: 42 }}
+            performance={{ min: 0.65, max: 1, debounce: 120 }}
+          >
+            <Scene
+              accent={accent}
+              active={active}
+              reducedMotion={!shouldAnimate || profile.reducedMotion}
+            />
+          </Canvas>
+        </CanvasGuard>
+      ) : (
+        fallback
+      )}
     </div>
   );
 }
