@@ -1,207 +1,129 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Coffee, Pause, Play, RotateCcw, Timer, Flame, Zap, Moon, Target, Maximize2, Minimize2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Pause, Play, RotateCcw, Timer, CheckCircle2 } from "lucide-react";
 import { useAppState } from "@/hooks/use-app-state";
-import { useDailyLog } from "@/hooks/use-dopamine";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/focus")({
   head: () => ({
     meta: [
       { title: "Focus — Outstand" },
-      { name: "description", content: "Run focused Pomodoro sessions, track breaks, and build attention consistency." },
+      { name: "description", content: "A simple distraction-free focus timer." },
     ],
   }),
   component: FocusPage,
 });
 
-type Mode = "focus" | "short" | "long";
-const DURATIONS: Record<Mode, number> = { focus: 25 * 60, short: 5 * 60, long: 15 * 60 };
-const LABELS: Record<Mode, string> = { focus: "Deep Focus", short: "Short Break", long: "Deep Rest" };
-
-const THEMES: Record<Mode, { color: string; bg: string; border: string; glow: string; aura: string; hex: string; icon: React.ReactNode }> = {
-  focus: { color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/30", glow: "shadow-[0_0_40px_rgba(251,191,36,0.15)]", aura: "bg-amber-500/20", hex: "251, 191, 36", icon: <Flame size={14} className="text-amber-400" /> },
-  short: { color: "text-cyan-400", bg: "bg-cyan-500/10", border: "border-cyan-500/30", glow: "shadow-[0_0_40px_rgba(6,182,212,0.15)]", aura: "bg-cyan-500/20", hex: "34, 211, 238", icon: <Zap size={14} className="text-cyan-400" /> },
-  long: { color: "text-indigo-400", bg: "bg-indigo-500/10", border: "border-indigo-500/30", glow: "shadow-[0_0_40px_rgba(99,102,241,0.15)]", aura: "bg-indigo-500/20", hex: "129, 140, 248", icon: <Moon size={14} className="text-indigo-400" /> },
-};
+const FOCUS_MINUTES = 25;
+const BREAK_MINUTES = 5;
 
 function FocusPage() {
   const { sessions, recordSession } = useAppState();
-  const { addPositive, addNegative } = useDailyLog();
-  const [mode, setMode] = useState<Mode>("focus");
-  const [remaining, setRemaining] = useState(DURATIONS.focus);
+  const [minutes, setMinutes] = useState(FOCUS_MINUTES);
+  const [seconds, setSeconds] = useState(0);
   const [running, setRunning] = useState(false);
-  const [intent, setIntent] = useState("");
-  const [zenMode, setZenMode] = useState(false);
-  const [shake, setShake] = useState(false);
+  const [task, setTask] = useState("");
+  const [mode, setMode] = useState<"focus" | "break">("focus");
   const intervalRef = useRef<number | null>(null);
-  const shakeTimeoutRef = useRef<number | null>(null);
-  const startedAtRef = useRef<number | null>(null);
-  const activeTheme = THEMES[mode];
 
   useEffect(() => {
     if (!running) return;
-    const intervalId = window.setInterval(() => {
-      setRemaining((current) => {
-        if (current > 1) return current - 1;
-        setRunning(false);
-        if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 500]);
-        if (mode === "focus") {
-          recordSession(DURATIONS.focus / 60, true);
-          addPositive("pomodoro");
-          toast.success("Focus session complete", { description: "+25 XP · nice work." });
-          setZenMode(false);
-        } else {
-          toast("Break over", { description: "Back to work." });
-        }
-        intervalRef.current = null;
-        return 0;
+    intervalRef.current = window.setInterval(() => {
+      setSeconds((current) => {
+        if (current > 0) return current - 1;
+        setMinutes((currentMinutes) => {
+          if (currentMinutes > 0) return currentMinutes - 1;
+          setRunning(false);
+          if (mode === "focus") {
+            recordSession(FOCUS_MINUTES, true);
+            toast.success("Focus session complete", { description: "Take a short break." });
+            setMode("break");
+            setMinutes(BREAK_MINUTES);
+          } else {
+            toast.success("Break complete", { description: "Ready for another focus session." });
+            setMode("focus");
+            setMinutes(FOCUS_MINUTES);
+          }
+          return mode === "focus" ? 0 : 0;
+        });
+        return 59;
       });
     }, 1000);
-    intervalRef.current = intervalId;
     return () => {
-      window.clearInterval(intervalId);
-      if (intervalRef.current === intervalId) intervalRef.current = null;
+      if (intervalRef.current) window.clearInterval(intervalRef.current);
+      intervalRef.current = null;
     };
-  }, [running, mode, recordSession, addPositive]);
+  }, [running, mode, recordSession]);
 
   useEffect(() => () => {
     if (intervalRef.current) window.clearInterval(intervalRef.current);
-    if (shakeTimeoutRef.current) window.clearTimeout(shakeTimeoutRef.current);
   }, []);
 
-  const switchMode = (nextMode: Mode) => {
-    if (running) {
-      toast.error("Pause the timer first", { description: "Pause before switching modes." });
-      return;
-    }
-    setMode(nextMode);
-    setRemaining(DURATIONS[nextMode]);
-    startedAtRef.current = null;
-  };
-
-  const toggle = () => {
-    if (!running && startedAtRef.current == null) startedAtRef.current = Date.now();
-    setRunning((current) => !current);
-  };
-
   const reset = () => {
-    if (running && mode === "focus" && remaining < DURATIONS.focus) {
-      setShake(true);
-      if (shakeTimeoutRef.current) window.clearTimeout(shakeTimeoutRef.current);
-      shakeTimeoutRef.current = window.setTimeout(() => setShake(false), 500);
-      recordSession(Math.round((DURATIONS.focus - remaining) / 60), false);
-      addNegative("broke_focus");
-      toast.error("Focus session reset", { description: "Your partial session was saved." });
-    }
     setRunning(false);
-    setRemaining(DURATIONS[mode]);
-    startedAtRef.current = null;
+    setMinutes(mode === "focus" ? FOCUS_MINUTES : BREAK_MINUTES);
+    setSeconds(0);
   };
 
-  const total = DURATIONS[mode];
-  const progress = 1 - remaining / total;
-  const mins = Math.floor(remaining / 60);
-  const secs = remaining % 60;
-  const completedFocus = sessions.filter((session) => session.completed).length;
-  const totalMinutes = sessions.filter((session) => session.completed).reduce((sum, session) => sum + session.durationMin, 0);
-  const CIRCUMFERENCE = 289.026;
-  const strokeDashoffset = CIRCUMFERENCE - progress * CIRCUMFERENCE;
+  const toggle = () => setRunning((value) => !value);
+  const completedSessions = sessions.filter((session) => session.completed).length;
+  const focusMinutes = sessions.filter((session) => session.completed).reduce((total, session) => total + session.durationMin, 0);
+  const totalSeconds = (mode === "focus" ? FOCUS_MINUTES * 60 : BREAK_MINUTES * 60);
+  const remainingSeconds = minutes * 60 + seconds;
+  const progress = Math.max(0, Math.min(1, 1 - remainingSeconds / totalSeconds));
+  const circumference = 2 * Math.PI * 108;
 
   return (
-    <>
-      <WarpSpeedCanvas isActive={running} colorRgb={activeTheme.hex} />
-      <AnimatePresence>
-        {zenMode && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.8 }} className="fixed inset-0 z-40 pointer-events-none bg-[#030712]/70 backdrop-blur-sm" aria-hidden="true" />
-        )}
-      </AnimatePresence>
+    <main className="min-h-[calc(100vh-72px)] px-4 py-8 sm:px-6 sm:py-12">
+      <div className="mx-auto max-w-3xl">
+        <header className="mb-8">
+          <div className="flex items-center gap-3 text-cyan-300">
+            <div className="grid h-10 w-10 place-items-center rounded-xl border border-cyan-300/15 bg-cyan-300/10"><Timer className="h-5 w-5" /></div>
+            <span className="text-[10px] font-black uppercase tracking-[.25em] text-slate-500">Focus</span>
+          </div>
+          <h1 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-4xl">One thing. For 25 minutes.</h1>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">Choose one task, start the timer, and ignore everything else until it ends.</p>
+        </header>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0, x: shake ? [-15, 15, -10, 10, -5, 5, 0] : 0 }}
-        transition={{ duration: shake ? 0.4 : 0.7 }}
-        className={cn("relative mx-auto max-w-5xl space-y-8 px-4 pb-20 sm:px-6", zenMode ? "z-50 mt-12" : "z-10")}
-      >
-        <AnimatePresence>
-          {!zenMode && (
-            <motion.div initial={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0, overflow: "hidden" }} className="pt-8 text-center">
-              <h1 className="text-3xl font-black tracking-tight text-transparent bg-gradient-to-br from-white to-zinc-500 bg-clip-text md:text-5xl">Pomodoro</h1>
-              <p className="mt-2 text-sm text-zinc-400 md:text-base">Master your attention. Conquer your tasks.</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <div className={cn("relative mx-auto w-full max-w-xl rounded-[2.5rem] border p-4 backdrop-blur-2xl transition-all duration-700 sm:p-8", running ? "bg-black/60 shadow-2xl" : "bg-zinc-900/50", activeTheme.border, running ? activeTheme.glow : "", zenMode && "border-transparent bg-transparent shadow-none")}>
-          <button aria-label={zenMode ? "Exit zen mode" : "Enter zen mode"} onClick={() => setZenMode((current) => !current)} className="absolute right-6 top-6 z-20 rounded-full p-2 text-zinc-500 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300">
-            {zenMode ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-          </button>
-
-          <div className="relative z-10 mx-auto flex w-fit max-w-full gap-1 overflow-x-auto rounded-full border border-white/5 bg-black/40 p-1.5 no-scrollbar">
-            {(["focus", "short", "long"] as Mode[]).map((currentMode) => (
-              <button key={currentMode} type="button" aria-pressed={mode === currentMode} onClick={() => switchMode(currentMode)} className="relative shrink-0 rounded-full px-3 py-2 text-[10px] font-bold uppercase tracking-widest transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 sm:px-5 sm:text-xs">
-                {mode === currentMode && <motion.div layoutId="active-mode" className={cn("absolute inset-0 rounded-full", THEMES[currentMode].bg)} transition={{ type: "spring", bounce: 0.2, duration: 0.6 }} />}
-                <span className={cn("relative z-20 flex items-center gap-1.5 sm:gap-2", mode === currentMode ? THEMES[currentMode].color : "text-zinc-500 hover:text-zinc-300")}>{mode === currentMode && THEMES[currentMode].icon}{LABELS[currentMode]}</span>
-              </button>
-            ))}
+        <section className="overflow-hidden rounded-[2rem] border border-white/[0.08] bg-white/[0.035] shadow-2xl backdrop-blur-xl">
+          <div className="border-b border-white/[0.06] p-5 sm:p-7">
+            <div className="flex gap-2">
+              <button type="button" onClick={() => { if (!running) { setMode("focus"); setMinutes(FOCUS_MINUTES); setSeconds(0); } }} className={`rounded-xl px-4 py-2 text-xs font-black ${mode === "focus" ? "bg-cyan-300 text-slate-950" : "text-slate-500 hover:bg-white/5 hover:text-white"}`}>Focus · 25m</button>
+              <button type="button" onClick={() => { if (!running) { setMode("break"); setMinutes(BREAK_MINUTES); setSeconds(0); } }} className={`rounded-xl px-4 py-2 text-xs font-black ${mode === "break" ? "bg-white text-slate-950" : "text-slate-500 hover:bg-white/5 hover:text-white"}`}>Break · 5m</button>
+            </div>
+            <label className="mt-5 block"><span className="text-[10px] font-black uppercase tracking-[.18em] text-slate-600">What are you working on?</span><input value={task} onChange={(event) => setTask(event.target.value)} disabled={running} maxLength={120} placeholder="e.g. Finish chemistry notes" className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm font-semibold text-white outline-none placeholder:text-slate-700 focus:border-cyan-300/40 disabled:opacity-60" /></label>
           </div>
 
-          <div className="relative z-10 mx-auto mt-8 max-w-xs">
-            {running && intent ? (
-              <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className={cn("text-center font-medium tracking-wide drop-shadow-md", activeTheme.color)}>Target: {intent}</motion.div>
-            ) : (
-              <div className="group relative">
-                <Target className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500 transition-colors group-focus-within:text-indigo-400" aria-hidden="true" />
-                <input type="text" maxLength={120} placeholder="What is your mission?" aria-label="Focus mission" value={intent} onChange={(event) => setIntent(event.target.value)} disabled={running} className="w-full rounded-xl border border-white/5 bg-black/20 py-2 pl-10 pr-4 text-center text-sm text-white placeholder:text-zinc-600 transition-all focus:border-indigo-500/50 focus:bg-black/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
+          <div className="flex flex-col items-center px-5 py-10 sm:py-14">
+            <div className="relative h-64 w-64 sm:h-72 sm:w-72">
+              <svg viewBox="0 0 240 240" className="h-full w-full -rotate-90" aria-hidden="true">
+                <circle cx="120" cy="120" r="108" fill="none" stroke="currentColor" strokeWidth="6" className="text-white/[0.06]" />
+                <circle cx="120" cy="120" r="108" fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" className="text-cyan-300 transition-all duration-1000" strokeDasharray={circumference} strokeDashoffset={circumference * (1 - progress)} />
+              </svg>
+              <div className="absolute inset-0 grid place-items-center text-center">
+                <div><p className="font-mono text-6xl font-black tabular-nums tracking-tight text-white sm:text-7xl">{String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}</p><p className="mt-2 text-[10px] font-black uppercase tracking-[.25em] text-slate-600">{mode === "focus" ? "Focus" : "Break"}</p></div>
               </div>
-            )}
+            </div>
+
+            {task && <p className="mt-5 max-w-md truncate text-center text-sm font-bold text-slate-400">{task}</p>}
+            <div className="mt-7 flex items-center gap-3">
+              <Button onClick={toggle} className="h-12 rounded-xl bg-cyan-300 px-7 text-sm font-black text-slate-950 hover:bg-cyan-200">{running ? <><Pause className="mr-2 h-4 w-4" /> Pause</> : <><Play className="mr-2 h-4 w-4" /> Start focus</>}</Button>
+              <Button variant="ghost" onClick={reset} className="h-12 w-12 rounded-xl text-slate-500 hover:bg-white/5 hover:text-white" aria-label="Reset timer"><RotateCcw className="h-4 w-4" /></Button>
+            </div>
           </div>
+        </section>
 
-          <div className="relative mx-auto mt-8 flex h-[260px] w-[260px] items-center justify-center sm:h-[320px] sm:w-[320px]">
-            <AnimatePresence>{running && <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: [1, 1.2, 1] }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }} className={cn("absolute inset-0 -z-10 rounded-full blur-[60px]", activeTheme.aura)} aria-hidden="true" />}</AnimatePresence>
-            <svg viewBox="0 0 100 100" className="absolute inset-0 z-10 h-full w-full -rotate-90 drop-shadow-2xl" aria-hidden="true">
-              <circle cx="50" cy="50" r="46" fill="none" className="stroke-white/5" strokeWidth="2" />
-              <circle cx="50" cy="50" r="46" fill="none" stroke={`url(#${mode}Grad)`} strokeWidth="3" strokeLinecap="round" strokeDasharray={CIRCUMFERENCE} strokeDashoffset={strokeDashoffset} style={{ transition: "stroke-dashoffset 1s linear" }} />
-              <defs>
-                <linearGradient id="focusGrad" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#f59e0b" /><stop offset="100%" stopColor="#ea580c" /></linearGradient>
-                <linearGradient id="shortGrad" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#2dd4bf" /><stop offset="100%" stopColor="#0891b2" /></linearGradient>
-                <linearGradient id="longGrad" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stopColor="#818cf8" /><stop offset="100%" stopColor="#4f46e5" /></linearGradient>
-              </defs>
-            </svg>
-
-            <motion.div animate={running ? { scale: [1, 1.03, 1] } : { scale: 1 }} transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }} className={cn("z-20 flex h-[210px] w-[210px] flex-col items-center justify-center rounded-full border bg-black/50 shadow-inner backdrop-blur-md transition-colors duration-500 sm:h-[260px] sm:w-[260px]", running ? activeTheme.border : "border-white/5")} role="timer" aria-live="off" aria-label={`${LABELS[mode]} ${mins} minutes ${secs} seconds remaining`}>
-              <div className={cn("font-mono text-6xl font-black tabular-nums tracking-tighter transition-all duration-500 sm:text-7xl", activeTheme.color)} style={{ textShadow: running ? `0 0 30px rgba(${activeTheme.hex}, 0.6)` : "none" }}>{String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}</div>
-              <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.3em] text-zinc-500 sm:text-xs">{LABELS[mode]}</div>
-            </motion.div>
-          </div>
-
-          <div className="relative z-20 mt-10 flex items-center justify-center gap-4 sm:mt-12">
-            <motion.div whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }}>
-              <Button onClick={toggle} aria-label={running ? "Pause focus timer" : "Start focus timer"} className={cn("h-14 rounded-2xl border px-8 text-lg font-bold transition-all", activeTheme.bg, activeTheme.border, activeTheme.color, "shadow-lg hover:bg-opacity-20")}>{running ? <><Pause className="mr-2 h-5 w-5" /> Pause</> : <><Play className="mr-2 h-5 w-5" /> Start</>}</Button>
-            </motion.div>
-            <motion.div whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }}><Button variant="ghost" onClick={reset} aria-label="Reset focus timer" className="h-14 rounded-2xl px-4 text-zinc-500 transition hover:bg-white/5 hover:text-white"><RotateCcw className="h-5 w-5" /></Button></motion.div>
-          </div>
-        </div>
-
-        <div className="mx-auto grid max-w-xl grid-cols-2 gap-3 sm:grid-cols-3">
-          <StatCard icon={<Timer />} label="Sessions" value={completedFocus.toString()} />
-          <StatCard icon={<Clock3Icon />} label="Focus time" value={`${totalMinutes}m`} />
-          <StatCard icon={<Flame />} label="Status" value={running ? "Active" : "Ready"} />
-        </div>
-      </motion.div>
-    </>
+        <section className="mt-5 grid gap-3 sm:grid-cols-3">
+          <SimpleStat icon={<CheckCircle2 />} label="Completed" value={completedSessions} />
+          <SimpleStat icon={<Timer />} label="Focus time" value={`${focusMinutes}m`} />
+          <SimpleStat icon={<span className="text-base">✓</span>} label="Next" value={mode === "focus" ? "Take a break" : "Focus again"} />
+        </section>
+      </div>
+    </main>
   );
 }
 
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-center"><div className="mx-auto mb-2 flex w-fit text-zinc-500" aria-hidden="true">{icon}</div><div className="text-lg font-black text-white">{value}</div><div className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">{label}</div></div>;
-}
-
-function Clock3Icon() { return <Timer className="h-4 w-4" />; }
-
-function WarpSpeedCanvas({ isActive, colorRgb }: { isActive: boolean; colorRgb: string }) {
-  return <div aria-hidden="true" className={cn("fixed inset-0 -z-20 pointer-events-none transition-opacity duration-700", isActive ? "opacity-100" : "opacity-40")} style={{ background: `radial-gradient(circle at center, rgba(${colorRgb}, 0.06), transparent 48%)` }} />;
+function SimpleStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
+  return <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4"><div className="flex items-center gap-2 text-cyan-300">{icon}<span className="text-[9px] font-black uppercase tracking-[.18em] text-slate-600">{label}</span></div><p className="mt-2 text-lg font-black text-white">{value}</p></div>;
 }
