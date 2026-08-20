@@ -1,5 +1,5 @@
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { Component, useEffect, useMemo, useRef, useState, type ErrorInfo, type ReactNode } from "react";
 import * as THREE from "three";
 import {
   getPerformanceProfile,
@@ -40,11 +40,7 @@ function Scene({ accent, reducedMotion }: { accent: string; reducedMotion: boole
     const t = state.clock.elapsedTime;
     if (root.current) {
       root.current.rotation.y += delta * 0.08;
-      root.current.rotation.x = THREE.MathUtils.lerp(
-        root.current.rotation.x,
-        state.pointer.y * -0.025,
-        0.03,
-      );
+      root.current.rotation.x = THREE.MathUtils.lerp(root.current.rotation.x, state.pointer.y * -0.025, 0.03);
     }
     if (core.current) {
       const pulse = 1 + Math.sin(t * 1.15) * 0.035;
@@ -78,16 +74,36 @@ function Scene({ accent, reducedMotion }: { accent: string; reducedMotion: boole
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[particles, 3]} />
         </bufferGeometry>
-        <pointsMaterial
-          color={color}
-          size={0.022}
-          sizeAttenuation
-          transparent
-          opacity={0.42}
-          depthWrite={false}
-        />
+        <pointsMaterial color={color} size={0.022} sizeAttenuation transparent opacity={0.42} depthWrite={false} />
       </points>
     </group>
+  );
+}
+
+class CanvasGuard extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.warn("[OUTSTAND] Decorative 3D scene disabled after runtime error.", error, info.componentStack);
+  }
+
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
+function StaticCore({ accent, size, className }: { accent: string; size: "sm" | "md" | "lg"; className: string }) {
+  const sizes = { sm: "h-24 w-24", md: "h-40 w-40", lg: "h-56 w-56" } as const;
+  return (
+    <div className={`pointer-events-none relative ${sizes[size]} ${className}`} aria-hidden="true">
+      <div className="absolute inset-2 rounded-full border border-cyan-300/20 bg-cyan-400/[0.06] shadow-[0_0_50px_rgba(34,211,238,.12)]" />
+      <div className="absolute inset-[24%] rounded-full border border-cyan-200/30" style={{ borderColor: `${accent}55` }} />
+      <div className="absolute inset-[40%] rounded-full bg-cyan-200/50 blur-[1px]" style={{ backgroundColor: `${accent}99` }} />
+    </div>
   );
 }
 
@@ -97,8 +113,41 @@ export function OutstandMotionCore({ className = "", accent = "#67e8f9", size = 
   const pageVisible = usePageVisibility();
   const reducedMotion = useReducedMotion();
   const profile = getPerformanceProfile(reducedMotion);
+  const [canRender3D, setCanRender3D] = useState(false);
   const sizes = { sm: "h-24 w-24", md: "h-40 w-40", lg: "h-56 w-56" } as const;
   const shouldAnimate = visible && pageVisible && !reducedMotion;
+
+  useEffect(() => {
+    if (reducedMotion || typeof window === "undefined") {
+      setCanRender3D(false);
+      return;
+    }
+
+    // The dashboard previously mounted the WebGL scene even when Tailwind's
+    // `hidden lg:block` made it invisible on mobile. Some mobile browsers can
+    // throw while creating a WebGL context; a decorative scene must never take
+    // down the authenticated application.
+    const desktop = window.matchMedia("(min-width: 1024px)").matches;
+    if (!desktop) {
+      setCanRender3D(false);
+      return;
+    }
+
+    try {
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("webgl2", { failIfMajorPerformanceCaveat: false })
+        ?? canvas.getContext("webgl", { failIfMajorPerformanceCaveat: false });
+      setCanRender3D(Boolean(context));
+      const media = window.matchMedia("(min-width: 1024px)");
+      const onChange = () => setCanRender3D(media.matches && Boolean(context));
+      media.addEventListener?.("change", onChange);
+      return () => media.removeEventListener?.("change", onChange);
+    } catch {
+      setCanRender3D(false);
+    }
+  }, [reducedMotion]);
+
+  const fallback = <StaticCore accent={accent} size={size} className={className} />;
 
   return (
     <div
@@ -108,22 +157,19 @@ export function OutstandMotionCore({ className = "", accent = "#67e8f9", size = 
       style={{ contain: "layout paint" }}
     >
       <div className="absolute inset-0 rounded-full bg-cyan-400/[0.07] blur-2xl" />
-      <Canvas
-        dpr={profile.dpr}
-        frameloop={shouldAnimate ? "always" : "never"}
-        camera={{ position: [0, 0, 4.2], fov: 42 }}
-        gl={{
-          antialias: false,
-          alpha: true,
-          powerPreference: "high-performance",
-          depth: true,
-          stencil: false,
-          preserveDrawingBuffer: false,
-        }}
-        performance={{ min: 0.65, max: 1, debounce: 120 }}
-      >
-        <Scene accent={accent} reducedMotion={!shouldAnimate} />
-      </Canvas>
+      {!canRender3D ? fallback : (
+        <CanvasGuard fallback={fallback}>
+          <Canvas
+            dpr={profile.dpr}
+            frameloop={shouldAnimate ? "always" : "never"}
+            camera={{ position: [0, 0, 4.2], fov: 42 }}
+            gl={{ antialias: false, alpha: true, powerPreference: "high-performance", depth: true, stencil: false, preserveDrawingBuffer: false }}
+            performance={{ min: 0.65, max: 1, debounce: 120 }}
+          >
+            <Scene accent={accent} reducedMotion={!shouldAnimate} />
+          </Canvas>
+        </CanvasGuard>
+      )}
     </div>
   );
 }
