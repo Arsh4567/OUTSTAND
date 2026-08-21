@@ -15,7 +15,10 @@ const Progress = React.forwardRef<
     {...props}
   >
     <ProgressPrimitive.Indicator
-      className="h-full w-full flex-1 bg-primary transition-all"
+      // Only the transform changes as progress updates. Restricting the transition
+      // to transform avoids transition-all's accidental layout/paint work for a
+      // shared primitive used throughout the app.
+      className="h-full w-full flex-1 bg-primary transition-transform duration-200"
       style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
     />
   </ProgressPrimitive.Root>
