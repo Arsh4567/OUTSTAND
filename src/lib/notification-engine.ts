@@ -20,7 +20,24 @@ const DEFAULTS: NotificationPreferences = { push_enabled: false, habits_enabled:
 const QUOTES = ["Small wins compound. Just take the next step. 🔵", "You don't need a perfect day. You need one good decision.", "Momentum starts with something small enough to do right now. ⚡", "Progress is still progress when nobody else sees it.", "Make today a little better than yesterday. 🎯"];
 
 export function motivationalMessage(seed = Date.now()) { return QUOTES[Math.abs(seed) % QUOTES.length]; }
-export function isWithinQuietHours(now = new Date(), preferences: NotificationPreferences = DEFAULTS) { if (!preferences.quiet_hours_enabled) return false; const [startH, startM] = preferences.quiet_start.split(":").map(Number); const [endH, endM] = preferences.quiet_end.split(":").map(Number); const current = now.getHours() * 60 + now.getMinutes(); const start = startH * 60 + startM; const end = endH * 60 + endM; return start > end ? current >= start || current < end : current >= start && current < end; }
+export function isWithinQuietHours(now = new Date(), preferences: NotificationPreferences = DEFAULTS) {
+  if (!preferences.quiet_hours_enabled) return false;
+  const [startH, startM] = preferences.quiet_start.split(":").map(Number);
+  const [endH, endM] = preferences.quiet_end.split(":").map(Number);
+  const timezone = preferences.timezone || "UTC";
+  let current: number;
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", { timeZone: timezone, hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(now);
+    const hour = Number(parts.find((part) => part.type === "hour")?.value ?? 0);
+    const minute = Number(parts.find((part) => part.type === "minute")?.value ?? 0);
+    current = hour * 60 + minute;
+  } catch {
+    current = now.getHours() * 60 + now.getMinutes();
+  }
+  const start = startH * 60 + startM;
+  const end = endH * 60 + endM;
+  return start > end ? current >= start || current < end : current >= start && current < end;
+}
 export function canNotify(category: NotificationCategory, preferences: NotificationPreferences, now = new Date()) { if (!preferences.push_enabled || isWithinQuietHours(now, preferences)) return false; if (category === "habit" && !preferences.habits_enabled) return false; if (category === "goal" && !preferences.goals_enabled) return false; if (category === "motivation" && !preferences.motivational_enabled) return false; if (category === "update" && !preferences.updates_enabled) return false; if (category === "coaching" && !preferences.coaching_enabled) return false; return true; }
 export async function getNotificationPreferences(): Promise<NotificationPreferences> { const { data: { user } } = await supabase.auth.getUser(); if (!user) return DEFAULTS; const { data, error } = await supabase.from("notification_preferences").select("*").eq("user_id", user.id).maybeSingle(); if (error || !data) return { ...DEFAULTS, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" }; return { ...DEFAULTS, ...data } as NotificationPreferences; }
 export async function saveNotificationPreferences(patch: Partial<NotificationPreferences>) { const { data: { user } } = await supabase.auth.getUser(); if (!user) throw new Error("Please sign in to change notification settings."); const current = await getNotificationPreferences(); const next = { ...current, ...patch, user_id: user.id }; const { error } = await supabase.from("notification_preferences").upsert(next, { onConflict: "user_id" }); if (error) throw error; return next; }
