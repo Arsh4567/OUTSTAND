@@ -66,8 +66,10 @@ export function useAppState() {
         if(event!=="SIGNED_IN"&&event!=="TOKEN_REFRESHED")return;
         if(!session?.access_token||!active)return;
         const { habits, sessions, outstand } = syncDataRef.current;
-        void refreshCloudStreak(false);
+        // Token refreshes only rotate credentials. They do not change streak data,
+        // so avoid another profiles read on every routine refresh event.
         if(event!=="SIGNED_IN")return;
+        void refreshCloudStreak(false);
         void fetch("/api/sync-productivity-state",{
           method:"POST",
           headers:{"Content-Type":"application/json",Authorization:`Bearer ${session.access_token}`},
