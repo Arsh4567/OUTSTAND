@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
-import { Menu, X, Home, Timer, Zap, Brain, Sparkles, ChevronRight, Map, Settings, Trophy, Flame } from "lucide-react";
+import { Menu, X, Home, Timer, Zap, Brain, Sparkles, ChevronRight, Settings, Trophy, Flame, Map } from "lucide-react";
 import { useAuth, displayNameOf } from "@/hooks/use-auth";
 import { useAppState } from "@/hooks/use-app-state";
 import { levelFromXP } from "@/lib/habits";
@@ -19,8 +19,15 @@ const customEase = [0.22, 1, 0.36, 1] as const;
 
 export default function SidebarLayout({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false); const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">(() => typeof window !== "undefined" && window.localStorage.getItem("outstand-theme") === "light" ? "light" : "dark");
   const pathname = useRouterState({ select: (s) => s.location.pathname }); const { user, profile } = useAuth(); const { xp, currentStreak = 0 } = useAppState();
   const safeXp = xp || 0; const { level, progressPct } = levelFromXP(safeXp); const safeName = displayNameOf(user, profile) || "Student"; const initial = safeName.trim().charAt(0).toUpperCase() || "S";
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.style.colorScheme = theme;
+    localStorage.setItem("outstand-theme", theme);
+  }, [theme]);
   useEffect(() => { document.body.style.overflow = isOpen ? "hidden" : ""; return () => { document.body.style.overflow = ""; }; }, [isOpen]); useEffect(() => { setIsOpen(false); }, [pathname]);
   if (pathname === "/roadmap") return <>{children}</>;
   return <MotionConfig reducedMotion="user"><div className="min-h-screen bg-[#050508] font-sans text-slate-100 selection:bg-cyan-400/20 selection:text-cyan-100">
@@ -39,6 +46,6 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
     <nav className="relative z-10 flex-1 overflow-y-auto px-4 py-6" aria-label="Main navigation"><div className="mb-3 px-3 text-[10px] font-black uppercase tracking-[.24em] text-slate-600">Workspace</div><div className="space-y-1.5">{NAV_ITEMS.map((item,index)=>{const active=pathname===item.to||(item.to!=="/dashboard"&&pathname.startsWith(item.to));return <motion.div key={item.to} initial={{opacity:0,x:-12}} animate={{opacity:1,x:0}} transition={{delay:index*.035,duration:.25}}><Link to={item.to} className={cn("group relative flex items-center gap-3 rounded-2xl border px-3 py-3 transition",active?"border-cyan-300/15 bg-cyan-400/[.08] text-white":"border-transparent text-slate-400 hover:border-white/8 hover:bg-white/[.045] hover:text-white")}><div className={cn("grid h-10 w-10 place-items-center rounded-xl border",active?"border-cyan-300/15 bg-cyan-300/10 text-cyan-200":"border-white/7 bg-white/[.025] text-slate-500 group-hover:text-slate-200")}><item.icon className="h-[18px] w-[18px]"/></div><div className="min-w-0 flex-1"><div className="text-sm font-bold">{item.label}</div><div className="mt-0.5 text-[10px] text-slate-600">{active?"Currently active":"Open section"}</div></div><ChevronRight className="h-4 w-4 text-slate-700"/></Link></motion.div>})}</div></nav>
     <div className="relative z-10 flex items-center justify-end border-t border-white/7 bg-[#060911]/80 p-4 backdrop-blur-xl"><button type="button" onClick={()=>{setIsOpen(false);setIsSettingsOpen(true)}} aria-label="Open settings" className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/[.04] text-slate-500 hover:border-cyan-300/20 hover:bg-cyan-300/[.08] hover:text-cyan-200"><Settings className="h-4 w-4"/></button></div>
    </motion.aside></>}</AnimatePresence>
-   <AppSettingsSheet isOpen={isSettingsOpen} onClose={()=>setIsSettingsOpen(false)} onNavigateProfile={()=>window.location.assign("/profile")}/>
+   <AppSettingsSheet theme={theme} onThemeChange={setTheme} isOpen={isSettingsOpen} onClose={()=>setIsSettingsOpen(false)} onNavigateProfile={()=>window.location.assign("/profile")}/>
   </div></MotionConfig>;
 }
