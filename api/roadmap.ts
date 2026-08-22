@@ -40,23 +40,23 @@ async function callGemini(prompt: string) {
   try { const parsed = JSON.parse(raw); const content = parsed?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text || "").join(""); if (!content?.trim()) throw new Error("The AI returned an empty response."); return parseJson(content); } catch (error) { throw error instanceof Error ? error : new Error("The AI returned invalid structured data."); }
 }
 
-const GROQ_DEFAULT_MODEL = "llama-3.3-70b-versatile";
-const GROQ_SAFE_MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
+const GROQ_DEFAULT_MODEL = "openai/gpt-oss-120b";
+const GROQ_FALLBACK_MODEL = "openai/gpt-oss-20b";
+const GROQ_ALLOWED_MODELS = new Set([GROQ_DEFAULT_MODEL, GROQ_FALLBACK_MODEL]);
 
 async function resolveGroqModel(groq: string) {
   const configured = env("GROQ_MODEL");
-  // Never allow a stale/removed model setting to keep production broken.
-  if (configured && GROQ_SAFE_MODELS.includes(configured)) return configured;
+  if (configured && GROQ_ALLOWED_MODELS.has(configured)) return configured;
   try {
     const response = await fetch("https://api.groq.com/openai/v1/models", { headers: { Authorization: `Bearer ${groq}` } });
     if (response.ok) {
       const data = await response.json() as { data?: Array<{ id?: string; active?: boolean }> };
       const available = new Set((data.data || []).filter((model) => model.active !== false).map((model) => model.id).filter(Boolean));
       if (available.has(GROQ_DEFAULT_MODEL)) return GROQ_DEFAULT_MODEL;
-      if (available.has("llama-3.1-8b-instant")) return "llama-3.1-8b-instant";
+      if (available.has(GROQ_FALLBACK_MODEL)) return GROQ_FALLBACK_MODEL;
     }
   } catch (error) {
-    console.warn("[OUTSTAND] Could not resolve Groq model list; using default", error);
+    console.warn("[OUTSTAND] Could not resolve Groq model list; using GPT-OSS 120B", error);
   }
   return GROQ_DEFAULT_MODEL;
 }
@@ -64,9 +64,8 @@ async function resolveGroqModel(groq: string) {
 async function callGroq(prompt: string) {
   const groq = env("GROQ_API_KEY");
   if (!groq) throw Object.assign(new Error("Groq API key is not configured."), { status: 503 });
-  // Groq is the primary provider. Only Meta Llama models are selected here; Gemini is the fallback provider.
   const model = await resolveGroqModel(groq);
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${groq}`, "Content-Type": "application/json" }, body: JSON.stringify({ model, temperature: 0.15, max_tokens: 5000, response_format: { type: "json_object" }, messages: [{ role: "system", content: rules }, { role: "user", content: prompt }] }) });
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${groq}`, "Content-Type": "application/json" }, body: JSON.stringify({ model, temperature: 0.15, max_tokens: 5000, reasoning_effort: "medium", response_format: { type: "json_object" }, messages: [{ role: "system", content: rules }, { role: "user", content: prompt }] }) });
   const raw = await response.text();
   if (!response.ok) {
     let detail = "";
