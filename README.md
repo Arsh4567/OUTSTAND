@@ -4,7 +4,7 @@
 
 ### Turn attention into momentum.
 
-**A cinematic productivity system for focus, consistency, and meaningful progress.**
+**An AI-powered productivity system that turns goals into daily execution.**
 
 <p>
   <a href="https://outstand-by-arsh.vercel.app"><strong>Launch OUTSTAND ↗</strong></a>
@@ -18,9 +18,8 @@
   <img src="https://img.shields.io/badge/React-19-149eca?style=for-the-badge&logo=react" alt="React 19" />
   <img src="https://img.shields.io/badge/TypeScript-5.x-3178c6?style=for-the-badge&logo=typescript" alt="TypeScript" />
   <img src="https://img.shields.io/badge/TanStack%20Start-1.x-ff4154?style=for-the-badge" alt="TanStack Start" />
-  <img src="https://img.shields.io/badge/Tailwind%20CSS-4.x-06b6d4?style=for-the-badge&logo=tailwindcss" alt="Tailwind CSS" />
+  <img src="https://img.shields.io/badge/Tailwind%20CSS-4.x-06b6d4?style=for-the-badge&logo=tailwindcss" alt="Tailwind CSS 4" />
   <img src="https://img.shields.io/badge/Supabase-Backend-3ecf8e?style=for-the-badge&logo=supabase" alt="Supabase" />
-  <img src="https://img.shields.io/badge/Three.js-3D-000000?style=for-the-badge&logo=three.js" alt="Three.js" />
   <img src="https://img.shields.io/badge/Vercel-Deploy-000000?style=for-the-badge&logo=vercel" alt="Vercel" />
 </p>
 
@@ -28,131 +27,164 @@
 
 ---
 
-## The idea
+## What is OUTSTAND?
 
-Most productivity tools are built around lists, timers, and reminders.
+OUTSTAND is built around one idea:
 
-**OUTSTAND is built around momentum.**
+> **Don't just plan your goals. Execute them every day.**
 
-It turns focused work and daily habits into a visible progression loop: complete meaningful actions, earn XP, maintain streaks, advance through levels, and watch your progress become tangible.
+Instead of another generic to-do list, OUTSTAND connects goals, schedules, focus sessions, habits, progress, reflection, and AI into one execution loop.
 
-The goal is not to make productivity feel like a game for the sake of gaming. The goal is to make **good behavior easier to see, easier to repeat, and more rewarding to sustain.**
+The product takes a user's goal and turns it into **specific work for today**, then uses what actually happened to improve the plan for tomorrow.
 
-> **Focus → Complete → Earn → Progress → Repeat**
+```text
+Goal
+  ↓
+AI roadmap
+  ↓
+Timed daily blocks
+  ↓
+Focused execution
+  ↓
+Completion + real activity
+  ↓
+Nightly reflection
+  ↓
+A better tomorrow
+```
 
 ---
 
-## Why OUTSTAND feels different
+## Core experience
 
-### 🎯 Focus over friction
+### 🧠 AI Roadmaps
 
-A dedicated focus experience keeps the next useful action front and center instead of turning productivity into dashboard archaeology.
+Build a roadmap around what you're actually trying to achieve: skill learning, academics, exam preparation, chess, fitness, content creation, business, or productivity.
 
-### ⚡ Progress you can feel
+OUTSTAND gathers context such as your starting point and availability, then generates a structured plan with milestones and daily execution blocks.
 
-XP, levels, streaks, missions, completion states, and visual feedback make consistency visible instead of abstract.
+Roadmaps are not static documents. Users can:
 
-### 🌆 Your progress has a world
+- Edit their roadmap directly.
+- Ask AI to change the roadmap using natural-language requests.
+- See today's progress and the next task.
+- Review the day and let AI adapt the next schedule.
+- Work through learning milestones and quizzes when the generated roadmap includes them.
 
-**My City** transforms progression into a 3D visual layer, giving users something more memorable than another percentage bar.
+### ⏱️ Daily execution
 
-### ✨ Motion with purpose
+The roadmap is designed around **time-boxed work**, not an endless list of vague tasks. Daily blocks can include start time, end time, estimated duration, instructions, and a clear completion state.
 
-Animations, portal transitions, hover states, loading feedback, and reward moments are designed to reinforce state changes—not compete with the task.
+### 🎯 Focus
 
-### ☁️ Built around persistent state
+A dedicated focus experience gives users a place to protect attention and complete a work block without turning the whole product into a complicated dashboard.
 
-Authentication and application data are backed by Supabase so a user's progress can survive sessions and stay synchronized with the product.
+### 📊 A useful dashboard
 
-### 📱 Designed for the real world
+The dashboard is centered on what matters today: personalized context, habits, focus activity, progress, and a clear **Right now** action. Recent activity is derived from actual habits, focus sessions, Outstand activity, and the daily score.
 
-Responsive layouts and clear primary actions keep the experience useful across desktop and mobile screens.
+### 🌙 Nightly review
+
+At the end of the day, users can reflect on what happened, report energy and difficulty, and let OUTSTAND adapt tomorrow's schedule.
+
+### 🔁 Momentum loop
+
+OUTSTAND keeps progress visible through completion, XP, levels, streaks, and productivity signals while keeping the primary goal simple:
+
+**Make the next useful action obvious.**
 
 ---
 
 ## Product surface
 
-| Experience | What it does |
+| Experience | Purpose |
 | --- | --- |
-| **Dashboard** | Personalized home base for XP, levels, streaks, missions, progress, and quick actions |
-| **Focus** | Dedicated workflow for focused challenges and completion states |
-| **Outstand** | Challenge-driven productivity flow connected to the dashboard experience |
-| **Habits & Quests** | Daily actions, completion tracking, and XP rewards |
-| **Progression** | Levels, streaks, completion signals, and visual reinforcement |
-| **My City** | 3D progress visualization built with Three.js / React Three Fiber |
-| **Immersive UI** | Portal effects, transitions, micro-interactions, toasts, and visual feedback |
-| **Authentication** | Supabase-backed sign-in, onboarding, and profile state |
-| **AI Layer** | AI SDK integrations and assistant-oriented UI infrastructure already present in the stack |
+| **Dashboard** | Daily command center with real productivity signals, habits, focus activity, momentum, and the next best action |
+| **Roadmap** | Goal → milestones → timed daily execution plan |
+| **AI Roadmap Editing** | Change an existing roadmap by describing what should be different |
+| **Daily Focus** | See and complete today's planned work blocks |
+| **Focus** | Dedicated focused-work experience |
+| **Habits** | Repeatable daily actions and completion tracking |
+| **Progress & Momentum** | XP, levels, streaks, completion, and productivity signals |
+| **Nightly Review** | Reflect on the day and adapt tomorrow |
+| **Learning Milestones** | Structured milestone content and optional quizzes inside roadmaps |
+| **Authentication** | User accounts and persistent personal data via Supabase |
+| **AI Layer** | AI generation and assistant-oriented infrastructure |
 
 ---
 
-## Experience architecture
+## Architecture
 
 ```text
-                    ┌─────────────────────┐
-                    │       OUTSTAND      │
-                    │   Personal system   │
-                    │     for momentum    │
-                    └──────────┬──────────┘
-                               │
-          ┌────────────────────┼────────────────────┐
-          │                    │                    │
-          ▼                    ▼                    ▼
-     FOCUS LOOP          PROGRESS LOOP        WORLD LOOP
-          │                    │                    │
-   Missions / Focus      XP / Levels /       My City / 3D
-   Completion states     Streaks / Quests   Visual feedback
-          │                    │                    │
-          └────────────────────┼────────────────────┘
-                               ▼
-                      Consistent daily action
+                         ┌─────────────────────┐
+                         │       OUTSTAND      │
+                         │  Goal → Execution   │
+                         └──────────┬──────────┘
+                                    │
+          ┌─────────────────────────┼─────────────────────────┐
+          │                         │                         │
+          ▼                         ▼                         ▼
+    ROADMAP ENGINE            DAILY EXECUTION          MOMENTUM SYSTEM
+          │                         │                         │
+   Goal + context             Timed tasks               Habits
+   AI generation              Daily focus               XP / levels
+   Milestones                 Completion                Streaks
+   AI editing                 Reflection                Activity
+          │                         │                         │
+          └─────────────────────────┼─────────────────────────┘
+                                    ▼
+                              LEARNING LOOP
+                                    │
+                            Today's results
+                                    ↓
+                              Nightly review
+                                    ↓
+                           Tomorrow's schedule
 ```
 
-The codebase follows the same product philosophy: route-level flows are separated from reusable UI, hooks, integrations, and specialized visual engines.
+The codebase separates route-level experiences from reusable components, hooks, Supabase integrations, and AI/API handlers. Roadmap functionality is split into dedicated onboarding, visualization, daily-focus, task-list, editing, and nightly-review components.
 
 ---
 
 ## Tech stack
 
-### Core
+### Frontend
 
-- **React 19** — component-driven UI
-- **TypeScript** — type-safe application code
-- **TanStack Start** — full-stack React application framework
-- **TanStack Router** — route and navigation architecture
-- **Vite** — development and build tooling
-- **Tailwind CSS 4** — utility-first styling
-- **Radix UI** — accessible UI primitives
-- **Lucide React** — iconography
+- **React 19**
+- **TypeScript**
+- **TanStack Start**
+- **TanStack Router**
+- **Vite**
+- **Tailwind CSS 4**
+- **Radix UI**
+- **Lucide React**
+- **Framer Motion / Motion**
 
-### Motion & 3D
+### Data & infrastructure
 
-- **Framer Motion / Motion** — product motion and interaction states
-- **Three.js** — 3D rendering
-- **React Three Fiber** — React renderer for Three.js
-- **React Three Drei** — reusable 3D helpers
-- **Canvas / shader-style effects** — immersive visual layers
-
-### Data & product infrastructure
-
-- **Supabase Auth** — authentication
-- **Supabase** — persistent application state and backend services
+- **Supabase** — authentication and persistent application data
 - **TanStack Query** — client-side data fetching and caching
-- **Zod** — runtime validation
-- **React Hook Form** — structured form state
+- **Zod** — validation
+- **React Hook Form** — forms
+- **Vercel** — deployment
 
-### AI & interactive systems
+### AI & rich interaction
 
 - **Vercel AI SDK ecosystem**
-- **Google / Groq / OpenAI-compatible AI providers**
+- **Google AI SDK**
+- **Groq AI SDK**
+- **OpenAI-compatible AI providers**
 - **CopilotKit UI infrastructure**
-- **Markdown, code, math, and streaming-oriented rendering support**
+- **React Markdown / Streamdown**
 
-### Deployment
+### Visual systems
 
-- **Vercel** — production deployment
+- **Three.js**
+- **React Three Fiber**
+- **React Three Drei**
+- **Framer Motion / Motion**
 
-_Source of truth for the stack: [`package.json`](./package.json)._ 
+The authoritative dependency list lives in [`package.json`](./package.json).
 
 ---
 
@@ -162,33 +194,28 @@ _Source of truth for the stack: [`package.json`](./package.json)._
 src/
 ├── routes/
 │   ├── auth.tsx
+│   ├── index.tsx
+│   ├── roadmap.tsx
 │   └── _authenticated/
-│       ├── dashboard.tsx
-│       ├── onboarding.tsx
-│       ├── outstand.tsx
-│       ├── focus.tsx
-│       └── ...
+│       └── dashboard.tsx
 │
 ├── components/
-│   ├── city/
-│   ├── outstand/
+│   ├── dashboard/
+│   ├── roadmap/
 │   ├── ai-elements/
 │   └── ui/
 │
 ├── hooks/
+│   ├── use-roadmap.ts
+│   ├── useDashboard.ts
 │   ├── use-auth.ts
-│   ├── use-outstand.tsx
 │   └── ...
 │
-├── lib/
-│   ├── portal-effect.ts
-│   └── ...
+├── integrations/
+│   └── supabase/
 │
-└── integrations/
-    └── supabase/
+└── lib/
 ```
-
-This separation keeps product experiences, reusable components, application hooks, backend integrations, and visual effects maintainable as OUTSTAND grows.
 
 ---
 
@@ -196,7 +223,7 @@ This separation keeps product experiences, reusable components, application hook
 
 ### Prerequisites
 
-- Node.js 20+ **or** Bun
+- Node.js 20+ or Bun
 - A Supabase project
 - Git
 
@@ -207,7 +234,7 @@ git clone https://github.com/Arsh4567/OUTSTAND.git
 cd OUTSTAND
 ```
 
-### 2. Install
+### 2. Install dependencies
 
 ```bash
 bun install
@@ -219,9 +246,9 @@ Or:
 npm install
 ```
 
-### 3. Configure environment
+### 3. Configure environment variables
 
-Create a local environment file with the Supabase values expected by the application.
+Create a local environment file using the Supabase values expected by the application.
 
 ```env
 VITE_SUPABASE_URL=your_supabase_project_url
@@ -230,9 +257,9 @@ SUPABASE_URL=your_supabase_project_url
 SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_key
 ```
 
-> **Security:** never commit service-role keys, database passwords, private tokens, or other secrets.
+> Never commit service-role keys, database passwords, private tokens, or other secrets.
 
-### 4. Run locally
+### 4. Start the dev server
 
 ```bash
 bun run dev
@@ -251,152 +278,115 @@ npm run dev
 | Command | Purpose |
 | --- | --- |
 | `bun run dev` | Start the development server |
-| `bun run build` | Create a production build |
-| `bun run build:vercel` | Build with the Vercel Nitro preset |
-| `bun run build:dev` | Build in development mode |
+| `bun run build` | Production build |
+| `bun run build:vercel` | Vercel/Nitro production build |
+| `bun run build:dev` | Development-mode build |
 | `bun run preview` | Preview the production build locally |
 | `bun run lint` | Run ESLint |
 | `bun run typecheck` | Run TypeScript checks |
 | `bun run format` | Format the repository with Prettier |
 
-Using npm? Replace `bun run` with `npm run`.
-
 ---
 
 ## Supabase
 
-OUTSTAND uses Supabase as a core part of its product architecture.
+Supabase is a core part of OUTSTAND's application architecture.
 
-The application uses the backend for authentication and persisted product state, including progression-oriented data and user-specific activity.
+It is used for authentication and persistent user/product state. Roadmap changes are saved to the database and reloaded after updates so the product remains stateful across sessions.
 
-For local development, make sure your Supabase project matches the tables, policies, RPCs, and server/client expectations referenced by the application code.
-
----
-
-## Deployment
-
-OUTSTAND is configured for **Vercel + TanStack Start** deployment.
-
-```text
-Git push
-   ↓
-Vercel detects commit
-   ↓
-Install dependencies
-   ↓
-bun run build:vercel
-   ↓
-TanStack Start server output
-   ↓
-Production deployment
-```
-
-For the repository's exact deployment requirements, read [`VERCEL_DEPLOYMENT.md`](./VERCEL_DEPLOYMENT.md).
-
-The current deployment flow specifically accounts for server-rendered routes and refreshes on protected pages; Vercel should build the TanStack Start server output rather than treating the app as a static SPA.
+For local development, make sure your Supabase project contains the tables, policies, RPCs, and environment configuration expected by the application.
 
 ---
 
-## Design principles
+## Product principles
 
-### 01 — Product clarity
+### 01 — Make the next action obvious
 
-Every screen should make the next useful action obvious.
+A productivity app should answer **"What should I do right now?"** before it shows everything else.
 
-### 02 — Motion as feedback
+### 02 — Plans should adapt to reality
 
-Animation should explain state, reward completion, or guide attention—not create noise.
+The schedule should change when real life changes. Completion and nightly reflection feed back into tomorrow's plan.
 
-### 03 — Progress should be tangible
+### 03 — Progress must be tangible
 
-Numbers matter, but memorable visual feedback helps users understand momentum.
+Habits, focus sessions, completion, streaks, XP, and daily signals turn progress into something users can actually see.
 
-### 04 — Optimistic interaction
+### 04 — AI should edit the system, not just chat
 
-When safe, interfaces should acknowledge user intent immediately and synchronize persistent state afterward.
+AI is most useful when it can make concrete changes to a user's plan and workflow, not only return another paragraph of advice.
 
-### 05 — Responsive by default
+### 05 — Premium does not mean noisy
 
-A premium experience should survive narrow screens, touch interactions, and less powerful hardware.
+Motion, visual effects, and polish should make state changes clearer without distracting from the work.
 
-### 06 — Build for maintainability
+### 06 — Real data over fake activity
 
-Reusable components, focused hooks, typed data boundaries, and clear route structure matter as much as visual polish.
-
----
-
-## Performance mindset
-
-OUTSTAND uses rich motion and 3D rendering, so performance is treated as part of the product experience.
-
-When extending the app, prefer:
-
-- Purposeful animation over continuously running effects.
-- Conditional or lazy rendering for expensive visual experiences.
-- Reusable primitives over duplicated visual logic.
-- Small, efficient data flows over unnecessary client work.
-- Responsive behavior that respects lower-powered devices.
-- Profiling before optimizing based on assumptions.
-
-**Premium UI should still feel fast.**
+Product surfaces should represent the user's actual behavior whenever possible.
 
 ---
 
 ## Project status
 
-OUTSTAND is an actively evolving product and codebase.
+OUTSTAND is an actively evolving product.
 
-The repository currently contains a substantial foundation across:
+The current codebase already contains a substantial foundation for:
 
-- Authentication and onboarding
-- Personalized dashboard experiences
-- Focus and Outstand workflows
-- Habit / quest progression
-- XP, levels, and streak-oriented state
-- 3D city and immersive visual systems
-- Supabase-backed persistence
-- AI-oriented UI and SDK infrastructure
-- Vercel deployment configuration
+- AI-generated goal roadmaps
+- Timed daily schedules
+- Roadmap editing and AI-powered roadmap changes
+- Daily task execution
+- Nightly reflection and schedule adaptation
+- Personalized dashboard intelligence
+- Habit tracking
+- Focus sessions
+- Progress, XP, levels, and streaks
+- Supabase-backed authentication and persistence
+- AI integrations and streaming-oriented UI infrastructure
+- Responsive, motion-rich product interfaces
 
-The product is intentionally being built as a system that can expand without losing its core identity: **clear action, visible progress, and momentum.**
+The product direction is moving toward a tighter loop:
+
+> **Decide → Schedule → Focus → Complete → Reflect → Adapt → Repeat**
 
 ---
 
 ## Roadmap direction
 
-The exact roadmap will evolve with the product, but the north-star direction includes:
+The implementation roadmap will continue to evolve, but the product direction is focused on making OUTSTAND more useful every day rather than simply adding more screens.
 
-- Deeper productivity analytics and history
-- More flexible focus workflows
-- Richer achievements and reward systems
-- More expressive city/progression states
-- Stronger accessibility coverage
-- Automated tests and broader CI confidence
-- Performance profiling across lower-end mobile hardware
-- More capable AI-assisted productivity workflows
+Planned areas include:
+
+- More adjustable focus workflows and controls
+- Stronger productivity analytics and real recent activity
+- A more useful dopamine / digital-friction experience
+- Better light-theme parity without losing the premium feel
+- Deeper AI assistance across the product
+- Stronger social and accountability features
+- More adaptive academic and syllabus planning
+- More polished onboarding, accessibility, and performance
 
 ---
 
 ## Contributing
 
-OUTSTAND is open to thoughtful engineering and product feedback.
+Thoughtful engineering and product feedback are welcome.
 
 Before opening a pull request:
 
-1. Keep the change focused.
+1. Keep changes focused and explain why they matter.
 2. Preserve existing behavior unless the change intentionally modifies it.
 3. Run `bun run lint` and `bun run typecheck` where applicable.
-4. Run a production build for changes that affect routing, rendering, deployment, or shared infrastructure.
+4. Run a production build for routing, rendering, deployment, or shared-infrastructure changes.
 5. Never commit secrets or generated local artifacts.
-6. Explain **why** the change matters, not only what files changed.
 
-For large product changes, an issue or design discussion first can make implementation and review much smoother.
+For larger product changes, opening an issue first can make implementation and review smoother.
 
 ---
 
 ## Security
 
-Never publish credentials, private keys, service-role secrets, database passwords, or other sensitive configuration.
+Never publish credentials, private keys, service-role secrets, database passwords, or sensitive configuration.
 
 For security-sensitive issues, use a private disclosure route rather than posting exploitable details publicly.
 
@@ -412,7 +402,7 @@ See the repository's license file for the authoritative licensing terms.
 
 ### OUTSTAND
 
-**Focus with intention. Build with consistency. Become someone you're proud of.**
+**Focus with intention. Execute with consistency. Keep moving.**
 
 Built by **Arsh**.
 
