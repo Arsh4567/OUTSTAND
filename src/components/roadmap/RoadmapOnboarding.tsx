@@ -14,35 +14,18 @@ export function RoadmapOnboarding({ questions, answers, onChange, onNext, genera
   const [index, setIndex] = useState(0);
   const current = questions[index];
 
-  // Reset whenever the actual question set changes, even when the new set has
-  // the same number or the same IDs as the previous set.
-  useEffect(() => {
-    setIndex(0);
-  }, [questions]);
-
-  // Keep the UI safe if a follow-up response contains fewer questions than the
-  // previous set while React is reconciling state.
-  useEffect(() => {
-    if (questions.length > 0 && index >= questions.length) setIndex(questions.length - 1);
-  }, [index, questions.length]);
+  useEffect(() => { setIndex(0); }, [questions]);
+  useEffect(() => { if (questions.length > 0 && index >= questions.length) setIndex(questions.length - 1); }, [index, questions.length]);
 
   const value = current ? String(answers[current.id] ?? "") : "";
   const canContinue = !current?.required || value.trim().length > 0;
-  const progress = useMemo(
-    () => questions.length ? ((index + 1) / questions.length) * 100 : 0,
-    [index, questions.length],
-  );
+  const progress = useMemo(() => questions.length ? ((index + 1) / questions.length) * 100 : 0, [index, questions.length]);
 
   if (!current) return null;
-
   const setValue = (next: string) => onChange({ ...answers, [current.id]: next });
-
   const next = async () => {
     if (!canContinue || generating) return;
-    if (index < questions.length - 1) {
-      setIndex((value) => value + 1);
-      return;
-    }
+    if (index < questions.length - 1) { setIndex((value) => value + 1); return; }
     await onNext();
   };
 
