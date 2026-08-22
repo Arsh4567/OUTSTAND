@@ -2,11 +2,12 @@ import { RefreshCw, Smartphone, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDuration, frictionLevel, type DigitalFrictionSnapshot } from "@/lib/digital-friction";
 
-export function DigitalFrictionCard({ snapshot, connected, loading, onRefresh }: {
+export function DigitalFrictionCard({ snapshot, connected, loading, onRefresh, onSaveManual: _onSaveManual }: {
   snapshot: DigitalFrictionSnapshot | null;
   connected: boolean;
   loading: boolean;
   onRefresh: () => void;
+  onSaveManual?: (screenMinutes: number, distractionMinutes: number) => void;
 }) {
   const level = snapshot ? frictionLevel(snapshot.distractionMinutes) : null;
 
@@ -39,9 +40,7 @@ export function DigitalFrictionCard({ snapshot, connected, loading, onRefresh }:
         <div className="mt-4 flex items-center justify-between rounded-2xl border border-rose-400/10 bg-rose-500/5 p-4"><div className="flex items-center gap-3"><Target className="h-4 w-4 text-rose-300" /><div><p className="text-xs font-bold uppercase tracking-widest text-rose-300">Biggest attention leak</p><p className="mt-1 font-black text-white">{snapshot.topApp.appName}</p></div></div><span className="font-black text-rose-200">{formatDuration(snapshot.topApp.minutes)}</span></div>
       )}
 
-      {!connected && !snapshot && (
-        <p className="mt-5 text-xs text-slate-600">No usage data is being invented or estimated. Connect usage access to populate this section.</p>
-      )}
+      {!connected && !snapshot && <p className="mt-5 text-xs text-slate-600">No usage data is being invented or estimated. Connect usage access to populate this section.</p>}
     </section>
   );
 }
