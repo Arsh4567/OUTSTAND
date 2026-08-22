@@ -5,7 +5,8 @@ import { useDashboard } from "@/hooks/useDashboard";
 import { useAuth, displayNameOf } from "@/hooks/use-auth";
 import { useAppState } from "@/hooks/use-app-state";
 import { useDailyLog } from "@/hooks/use-dopamine";
-import { DashboardWelcome, DashboardHabits, DashboardActivity } from "@/components/dashboard/DashboardSections";
+import { DashboardWelcome, DashboardHabits } from "@/components/dashboard/DashboardSections";
+import { RecentActivityPanel } from "@/components/dashboard/RecentActivityPanel";
 import { todayISO } from "@/lib/habits";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({ component: DashboardPage });
@@ -29,7 +30,7 @@ function DashboardPage() {
 
   return <MotionConfig reducedMotion="user"><div className="min-h-screen overflow-x-hidden bg-[#05070d] text-slate-100"><main className="mx-auto w-full max-w-7xl space-y-4 px-4 pb-20 pt-5 sm:px-6 lg:px-8 lg:pt-7"><DashboardWelcome name={name} quote={snapshot.quote} />
     <section className="rounded-[24px] border border-white/[0.07] bg-white/[0.025] p-5 sm:p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-[9px] font-black uppercase tracking-[0.2em] text-cyan-300">Today</p><h1 className="mt-1.5 text-2xl font-black tracking-[-0.035em] text-white sm:text-3xl">One clear plan.</h1><p className="mt-1.5 max-w-2xl text-sm leading-6 text-slate-400">Your roadmap lives in one place now. Use it when you want to plan; use this screen to execute your routine.</p></div><div className="rounded-xl border border-white/[0.06] bg-black/10 px-3.5 py-2.5 sm:min-w-[150px]"><p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-600">Focus today</p><p className="mt-1 text-xl font-black text-white">{focusMinutes}m</p><p className="mt-0.5 text-[9px] text-slate-500">completed focus</p></div></div><div className="mt-4 grid gap-2 sm:grid-cols-3"><QuickStat label="Habits" value={productivity ? `${completedHabits}/${habitCount}` : "—"} detail="done today" /><QuickStat label="Focus" value={productivity ? `${focusMinutes}m` : "—"} detail="completed" /><QuickStat label="Score" value={log?.score != null ? String(log.score) : "—"} detail="latest check-in" /></div></section>
-    <div className="grid gap-4 lg:grid-cols-2"><DashboardHabits habits={productivity?.habits ?? []} onToggle={toggleToday} /><DashboardActivity sessions={productivity?.sessions ?? []} outstand={productivity?.outstand ?? []} dailyScore={log?.score ?? null} /></div>
+    <div className="grid gap-4 lg:grid-cols-2"><DashboardHabits habits={productivity?.habits ?? []} onToggle={toggleToday} /><RecentActivityPanel habits={productivity?.habits ?? []} sessions={productivity?.sessions ?? []} outstand={productivity?.outstand ?? []} dailyScore={log?.score ?? null} /></div>
   </main></div></MotionConfig>;
 }
 
