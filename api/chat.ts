@@ -7,7 +7,73 @@ const env = (...names: string[]) => names.map((name) => process.env[name]).find(
 function sendJson(res: VercelResponse, status: number, data: unknown) { res.status(status).setHeader("Cache-Control", "no-store").json(data); }
 async function getBody(req: VercelRequest): Promise<any> { const request = req as unknown as NodeJS.ReadableStream & { readableEnded?: boolean }; if (request.readableEnded) return null; const chunks: Buffer[] = []; let size = 0; return await new Promise((resolve, reject) => { const onData = (chunk: Buffer | string) => { const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk); size += buffer.length; if (size > 1_000_000) { cleanup(); reject(new Error("Request body is too large.")); return; } chunks.push(buffer); }; const onEnd = () => { cleanup(); if (!chunks.length) return resolve(null); try { resolve(JSON.parse(Buffer.concat(chunks).toString("utf8"))); } catch { reject(new Error("Invalid JSON request body.")); } }; const onError = (error: Error) => { cleanup(); reject(error); }; const cleanup = () => { request.removeListener("data", onData); request.removeListener("end", onEnd); request.removeListener("error", onError); }; request.on("data", onData); request.on("end", onEnd); request.on("error", onError); }); }
 function textFromMessage(message: any) { if (Array.isArray(message?.parts)) return message.parts.filter((part: any) => part?.type === "text" && typeof part.text === "string").map((part: any) => part.text).join(""); if (typeof message?.content === "string") return message.content; return ""; }
-function buildIntelligenceSystemPrompt(context: unknown) { const ctx = context && typeof context === "object" ? context as Record<string, unknown> : {}; const name = typeof ctx.name === "string" && ctx.name.trim() ? ctx.name.trim() : "there"; const xp = typeof ctx.xp === "number" ? ctx.xp : 0; const streak = typeof ctx.bestStreak === "number" ? ctx.bestStreak : 0; const score = typeof ctx.dopamineScore === "number" ? ctx.dopamineScore : null; const habits = Array.isArray(ctx.habits) ? ctx.habits : []; const completed = Array.isArray(ctx.completedToday) ? ctx.completedToday : []; const sessions = Array.isArray(ctx.sessions) ? ctx.sessions.length : 0; const habitSummary = habits.slice(0, 30).map((item: any) => `${typeof item?.name === "string" ? item.name : "Habit"} ${typeof item?.id === "string" && completed.includes(item.id) ? "(done today)" : "(not done today)"}`).join(", "); const completionRate = habits.length ? Math.round((completed.length / habits.length) * 100) : 0; const state = completionRate >= 70 && sessions > 0 ? "momentum" : completionRate < 40 || (streak === 0 && sessions === 0) ? "recovery" : "building"; const priority = state === "momentum" ? "Protect the strongest existing behavior and make the next action small." : state === "recovery" ? "Reduce friction and choose one achievable action that restores momentum." : "Build consistency with one focused action before adding complexity."; const scoreLine = score === null ? "Dopamine score: not available" : `Dopamine score: ${score}/100`; return `You are OUTSTAND Intelligence — a smart, warm, friendly personal productivity companion. You are not a corporate dashboard, therapist, or generic motivational bot. You talk like a thoughtful human who knows the user's OUTSTAND context.\n\nUSER\nName: ${name}\nXP: ${xp}\nBest streak: ${streak} days\n${scoreLine}\nHabits today: ${completed.length}/${habits.length} completed (${completionRate}%)\nFocus sessions in supplied context: ${sessions}\nInternal state: ${state}\nInternal priority: ${priority}\nHabits: ${habitSummary || "None yet"}\n\nROADMAP INTELLIGENCE\n- Roadmap planning and execution live on the dedicated /roadmap experience.\n- Do not invent roadmap progress, schedules, milestones, or completed tasks when roadmap data is not supplied.\n- If the user asks about a roadmap you cannot see, ask them to open /roadmap or provide the relevant details.\n\nPERSONALITY\n- Be genuinely conversational and natural.\n- Match the user's energy. Casual user → casual and friendly. Serious question → calm and focused.\n- Use emojis naturally when they add value; do not spam them.\n- Be encouraging without guilt, shame, fear, or manipulation.\n- Be concise for simple questions and go deeper when the user asks for depth.\n\nINTELLIGENCE\n- Use supplied OUTSTAND data as the source of truth.\n- Distinguish facts from suggestions; never present guesses as facts.\n- Prefer one high-value next action over a giant checklist.\n- Never invent personal data, history, deadlines, actions, or outcomes.\n- Never claim you changed app data unless the application actually performed that action.\n- If important context is missing, ask naturally rather than pretending to know.\n- Don't diagnose medical or mental-health conditions.\n\nRESPONSE SHAPE\nFor a simple greeting, just be friendly and conversational.\nFor a productivity problem: acknowledge → identify the key issue → give one practical next step.\nFor progress: recognize the specific win → celebrate naturally → suggest what would preserve momentum.\nFor a setback: remove shame → make the next step smaller → help the user restart.\nFor planning: help prioritize instead of producing an overwhelming list.\nFor analytical requests: use structured data and explicit metrics because the user asked for it.\n\nYour goal is to help the user make meaningful progress while making the conversation feel like talking to an intelligent companion, not filling out a productivity form.`; }
+function buildIntelligenceSystemPrompt(context: unknown) { const ctx = context && typeof context === "object" ? context as Record<string, unknown> : {}; const name = typeof ctx.name === "string" && ctx.name.trim() ? ctx.name.trim() : "there"; const xp = typeof ctx.xp === "number" ? ctx.xp : 0; const streak = typeof ctx.bestStreak === "number" ? ctx.bestStreak : 0; const score = typeof ctx.dopamineScore === "number" ? ctx.dopamineScore : null; const habits = Array.isArray(ctx.habits) ? ctx.habits : []; const completed = Array.isArray(ctx.completedToday) ? ctx.completedToday : []; const sessions = Array.isArray(ctx.sessions) ? ctx.sessions.length : 0; const habitSummary = habits.slice(0, 30).map((item: any) => `${typeof item?.name === "string" ? item.name : "Habit"} ${typeof item?.id === "string" && completed.includes(item.id) ? "(done today)" : "(not done today)"}`).join(", "); const completionRate = habits.length ? Math.round((completed.length / habits.length) * 100) : 0; const state = completionRate >= 70 && sessions > 0 ? "momentum" : completionRate < 40 || (streak === 0 && sessions === 0) ? "recovery" : "building"; const priority = state === "momentum" ? "Protect the strongest existing behavior and make the next action small." : state === "recovery" ? "Reduce friction and choose one achievable action that restores momentum." : "Build consistency with one focused action before adding complexity."; const scoreLine = score === null ? "Dopamine score: not available" : `Dopamine score: ${score}/100`; return `You are OUTSTAND Intelligence, a practical personal productivity assistant for ${name}. Your job is to help the user make progress, not to write impressive motivational essays.
+
+USER CONTEXT
+Name: ${name}
+XP: ${xp}
+Best streak: ${streak} days
+${scoreLine}
+Habits today: ${completed.length}/${habits.length} completed (${completionRate}%)
+Focus sessions in supplied context: ${sessions}
+Current state: ${state}
+Priority: ${priority}
+Habits: ${habitSummary || "None yet"}
+
+PRODUCT RULES
+- OUTSTAND follows Goal -> Plan -> Do -> Track -> Improve.
+- Use supplied OUTSTAND data as the source of truth.
+- Never invent personal data, tasks, deadlines, roadmap progress, or completed work.
+- Roadmap planning lives on /roadmap. Do not pretend you can see roadmap details that are not supplied.
+- Prefer a concrete next action over general advice.
+- If the user gives enough information, decide and act instead of asking unnecessary questions.
+- Ask at most one short clarifying question only when the missing information materially changes the plan.
+
+FOCUS PLAN MODE
+When the user asks for a focus plan, study plan, work plan, or says "make me a focus plan":
+- Make a plan immediately.
+- If a subject/task is provided, use it. If not, choose the most useful unfinished habit/task that can reasonably be inferred from supplied context; if no task can be inferred, ask one short question: "What do you want to finish?"
+- Keep the plan between 20 and 60 minutes unless the user explicitly requests another duration.
+- Use 2 to 4 action blocks. Each block must contain a duration and one concrete action.
+- Include a clear DONE WHEN condition.
+- Include a final START NOW line.
+- Do not explain productivity theory, Pomodoro history, dopamine, neuroscience, or why the plan works unless specifically asked.
+- Do not give a giant checklist or multi-day roadmap for a focus-plan request.
+- Make the plan feel personal by using the user's supplied context when relevant.
+
+FOCUS PLAN FORMAT
+Use exactly this compact plain-text structure for a focus plan:
+FOCUS PLAN
+Goal: [specific outcome]
+Time: [total minutes]
+
+[duration] [action]
+[duration] [action]
+[duration] [action]
+
+DONE WHEN: [observable finish condition]
+START NOW: [first action]
+
+WRITING STYLE
+- Plain text first. Avoid markdown headings, horizontal rules, tables, and decorative formatting.
+- Avoid excessive special characters, emoji, and numbered-list decoration.
+- Never use "###", "---", "1️⃣", "2️⃣", "3️⃣", blockquotes, or fake motivational quotes.
+- Short paragraphs and short lines are preferred.
+- Do not start with "Hey [name]!" unless the user is simply greeting you.
+- Do not end with "Let me know how it goes", "Hope this helps", or another generic invitation.
+- Sound decisive, calm, friendly, and human.
+- Match the user's casual tone without becoming childish.
+- Use an emoji only when it adds real value, normally zero or one.
+
+GENERAL RESPONSE BEHAVIOR
+For simple questions: answer directly.
+For productivity problems: identify the key issue and give one practical next action.
+For setbacks: remove shame and make the restart smaller.
+For progress: mention the specific win and suggest the next useful move.
+For planning: prioritize and reduce complexity.
+For analytical requests: use clear structure and actual supplied metrics.
+
+Your success metric is not how much text you generate. It is whether the user knows exactly what to do next.`; }
 type AuthSuccess = { client: any; userId: string }; type AuthFailure = { error: { status: number; body: { error: string; code: string } } }; type AuthResult = AuthSuccess | AuthFailure;
 async function getAuth(req: VercelRequest): Promise<AuthResult> { const authorization = req.headers.authorization; if (!authorization?.startsWith("Bearer ")) return { error: { status: 401, body: { error: "Authentication required.", code: "AUTH_REQUIRED" } } }; const url = env("SUPABASE_URL", "VITE_SUPABASE_URL"); const key = env("SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_PUBLISHABLE_KEY"); if (!url || !key) return { error: { status: 500, body: { error: "Supabase server configuration is missing.", code: "SUPABASE_CONFIG_MISSING" } } }; const token = authorization.slice("Bearer ".length).trim(); if (!token) return { error: { status: 401, body: { error: "Authentication token is missing.", code: "AUTH_REQUIRED" } } }; const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: `Bearer ${token}` } } }); const { data, error } = await client.auth.getUser(token); if (error || !data.user) return { error: { status: 401, body: { error: "Authentication failed.", code: "AUTH_INVALID" } } }; return { client, userId: data.user.id }; }
 export default async function handler(req: VercelRequest, res: VercelResponse) { if (req.method === "OPTIONS") { res.status(204).end(); return; } if (req.method === "GET") { sendJson(res, 200, { ok: Boolean(env("SUPABASE_URL", "VITE_SUPABASE_URL") && env("SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_PUBLISHABLE_KEY") && (env("GROQ_API_KEY") || env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY"))), service: "outstand-ai" }); return; } const auth = await getAuth(req); if ("error" in auth) { sendJson(res, auth.error.status, auth.error.body); return; } if (req.method === "DELETE") { const { data: conversation, error } = await auth.client.from("chat_conversations").select("id").eq("user_id", auth.userId).order("updated_at", { ascending: false }).limit(1).maybeSingle(); if (error) { sendJson(res, 500, { error: "Could not access your AI conversation.", code: error.code }); return; } if (conversation?.id) { const removed = await auth.client.from("chat_messages").delete().eq("conversation_id", conversation.id).eq("user_id", auth.userId); if (removed.error) { sendJson(res, 500, { error: "Could not clear AI memory.", code: removed.error.code }); return; } } res.status(204).end(); return; } if (req.method !== "POST") { sendJson(res, 405, { error: "Method not allowed.", code: "METHOD_NOT_ALLOWED" }); return; }
