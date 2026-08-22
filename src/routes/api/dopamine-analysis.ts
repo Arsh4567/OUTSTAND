@@ -12,11 +12,6 @@ const BodySchema = z.object({
     positives: z.array(z.string()).default([]),
     negatives: z.array(z.string()).default([]),
   })).max(14),
-  friction: z.object({
-    screenMinutes: z.number(),
-    distractionMinutes: z.number(),
-    topApp: z.string().optional(),
-  }).nullable(),
 });
 
 function json(data: unknown, status = 200) {
@@ -58,11 +53,11 @@ export const Route = createFileRoute("/api/dopamine-analysis")({
           const parsed = BodySchema.safeParse(await request.json().catch(() => null));
           if (!parsed.success) return json({ error: "Invalid analysis payload." }, 400);
 
-          const { logs, friction } = parsed.data;
+          const { logs } = parsed.data;
           const average = logs.length ? Math.round(logs.reduce((sum, log) => sum + log.score, 0) / logs.length) : 50;
           const best = logs.length ? Math.max(...logs.map((log) => log.score)) : average;
           const worst = logs.length ? Math.min(...logs.map((log) => log.score)) : average;
-          const prompt = `Analyze this user's OUTSTAND momentum data. Do not diagnose health conditions and do not claim to measure dopamine. Identify one likely execution pattern, one friction point, and one practical next action. Use only supplied data. Keep it under 140 words.\n\n7-day average score: ${average}/100\nBest day: ${best}/100\nLowest day: ${worst}/100\nDaily logs: ${JSON.stringify(logs)}\nDigital friction: ${JSON.stringify(friction)}\n\nFormat:\nPATTERN\n...\nFRICTION\n...\nNEXT MOVE\n...`;
+          const prompt = `Analyze this user's OUTSTAND momentum data. Do not diagnose health conditions and do not claim to measure dopamine. Identify one likely execution pattern, one friction point, and one practical next action. Use only supplied data. Keep it under 140 words.\n\n7-day average score: ${average}/100\nBest day: ${best}/100\nLowest day: ${worst}/100\nDaily logs: ${JSON.stringify(logs)}\n\nFormat:\nPATTERN\n...\nFRICTION\n...\nNEXT MOVE\n...`;
 
           const result = await generateText({ model: provider(), prompt, maxOutputTokens: 220, maxRetries: 0 });
           return json({ analysis: result.text.trim() });
