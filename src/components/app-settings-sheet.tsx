@@ -1,11 +1,10 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, ChevronRight, Edit3, LogOut, Moon, Send, Settings, Smartphone, Sparkles, Sun, Trash2, X, MessageSquare } from "lucide-react";
+import { Bell, ChevronRight, Edit3, LogOut, Moon, Send, Settings, Smartphone, Sparkles, Trash2, X, MessageSquare } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { requestPushPermission, disablePushNotifications, getNotificationPreferences, saveNotificationPreferences, type NotificationPreferences } from "@/lib/notification-engine";
-import { getUsageBridge, openUsageAccessSettings } from "@/lib/digital-friction";
 
 interface AppSettingsSheetProps {
   isOpen?: boolean;
@@ -31,7 +30,6 @@ export function AppSettingsSheet(props: AppSettingsSheetProps) {
   const [theme, setTheme] = useState<"dark" | "light">(props.theme ?? "dark");
   const [haptics, setHaptics] = useState(props.haptics ?? true);
   const [notificationsGranted, setNotificationsGranted] = useState(props.isNotificationsGranted ?? false);
-  const [usageAccessGranted, setUsageAccessGranted] = useState(false);
   const [testing, setTesting] = useState(false);
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
   const [feedback, setFeedback] = useState("");
@@ -47,8 +45,6 @@ export function AppSettingsSheet(props: AppSettingsSheetProps) {
     if (!isOpen) return;
     void getNotificationPreferences().then(setPreferences).catch(() => undefined);
     if (typeof window !== "undefined" && "Notification" in window) setNotificationsGranted(Notification.permission === "granted");
-    const bridge = getUsageBridge();
-    if (bridge?.hasUsageAccess) void Promise.resolve(bridge.hasUsageAccess()).then(setUsageAccessGranted).catch(() => setUsageAccessGranted(false));
   }, [isOpen]);
 
   const changeTheme = (next: "dark" | "light") => { setTheme(next); props.onThemeChange?.(next); localStorage.setItem("outstand-theme", next); };
@@ -71,13 +67,6 @@ export function AppSettingsSheet(props: AppSettingsSheetProps) {
       setPreferences(await getNotificationPreferences());
       toast.success("Notifications paused.");
     } catch (error) { toast.error(error instanceof Error ? error.message : "Could not disable notifications."); }
-  };
-
-  const enableUsageAccess = async () => {
-    try {
-      await openUsageAccessSettings();
-      toast.success("Choose OUTSTAND and allow Usage access, then return here.");
-    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not open Usage access settings."); }
   };
 
   const testPush = async () => {
@@ -152,11 +141,6 @@ export function AppSettingsSheet(props: AppSettingsSheetProps) {
                   </div>
                 </section>
 
-                <section className="rounded-3xl border border-violet-300/10 bg-violet-400/[0.035] p-4">
-                  <div className="mb-4 flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-400/10 text-violet-200"><Smartphone className="h-5 w-5" /></div><div><h3 className="font-bold text-white">Usage access</h3><p className="text-xs text-slate-500">Connect device usage so OUTSTAND can find attention leaks.</p></div></div>
-                  <div className="flex items-center justify-between rounded-2xl bg-black/20 p-4"><div><p className="font-semibold text-slate-200">{usageAccessGranted ? "Usage access connected" : "Allow usage access"}</p><p className="text-xs text-slate-500">You can turn this off anytime in Android Settings.</p></div><button onClick={() => void enableUsageAccess()} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", usageAccessGranted ? "bg-emerald-500/15 text-emerald-200" : "bg-violet-500 text-white hover:bg-violet-400")}>{usageAccessGranted ? "Manage" : "Connect"}</button></div>
-                </section>
-
                 {preferences && <section className="rounded-3xl border border-white/8 bg-white/[0.025] p-4"><div className="mb-4 flex items-center gap-2"><Sparkles className="h-4 w-4 text-cyan-300" /><h3 className="font-bold text-white">Set notifications</h3></div><div className="space-y-2">
                   {[['habits_enabled','Habit reminders'],['goals_enabled','Goal reminders'],['motivational_enabled','Motivation'],['updates_enabled','OUTSTAND updates']].map(([key,label]) => <div key={key} className="flex items-center justify-between rounded-2xl bg-white/[0.025] p-3"><span className="text-sm text-slate-200">{label}</span><button disabled={!notificationsGranted} onClick={() => void updatePreference({ [key]: !preferences[key as keyof NotificationPreferences] })} className={cn("h-6 w-10 rounded-full p-1", preferences[key as keyof NotificationPreferences] ? "bg-cyan-500" : "bg-slate-700", !notificationsGranted && "opacity-40")}><motion.div layout className="h-4 w-4 rounded-full bg-white" animate={{ x: preferences[key as keyof NotificationPreferences] ? 16 : 0 }} /></button></div>)}
                   <div className="flex items-center justify-between rounded-2xl bg-white/[0.025] p-3"><span className="text-sm text-slate-200">Quiet hours</span><button onClick={() => void updatePreference({ quiet_hours_enabled: !preferences.quiet_hours_enabled })} className={cn("h-6 w-10 rounded-full p-1", preferences.quiet_hours_enabled ? "bg-cyan-500" : "bg-slate-700")}><motion.div layout className="h-4 w-4 rounded-full bg-white" animate={{ x: preferences.quiet_hours_enabled ? 16 : 0 }} /></button></div>
@@ -164,9 +148,10 @@ export function AppSettingsSheet(props: AppSettingsSheetProps) {
 
                 <section className="rounded-3xl border border-white/8 bg-white/[0.025] p-4"><div className="mb-3 flex items-center gap-2"><MessageSquare className="h-4 w-4 text-cyan-300" /><h3 className="font-bold text-white">Feedback</h3></div><textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} maxLength={2000} rows={4} placeholder="Tell us what you like, what is broken, or what you want next…" className="w-full resize-none rounded-2xl border border-white/10 bg-black/20 p-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-300/30" /><div className="mt-2 flex items-center justify-between"><span className="text-[10px] text-slate-600">{feedback.length}/2000</span><button disabled={sendingFeedback} onClick={() => void sendFeedback()} className="rounded-xl bg-cyan-500 px-4 py-2 text-xs font-bold text-slate-950 disabled:opacity-50">{sendingFeedback ? "Sending…" : "Send feedback"}</button></div></section>
 
-                <section className="rounded-3xl border border-white/8 bg-white/[0.025] p-4"><h3 className="mb-3 font-bold text-white">Preferences</h3><div className="space-y-2"><div className="flex items-center justify-between rounded-2xl bg-white/[0.025] p-3"><div className="flex items-center gap-3"><Smartphone className="h-4 w-4 text-indigo-300" /><span className="text-sm text-slate-200">Haptic feedback</span></div><button onClick={() => changeHaptics(!haptics)} className={cn("h-6 w-10 rounded-full p-1", haptics ? "bg-indigo-500" : "bg-slate-700")}><motion.div layout className="h-4 w-4 rounded-full bg-white" animate={{ x: haptics ? 16 : 0 }} /></button></div><div className="flex items-center justify-between rounded-2xl bg-white/[0.025] p-3"><div className="flex items-center gap-3">{theme === "dark" ? <Moon className="h-4 w-4 text-amber-300" /> : <Sun className="h-4 w-4 text-amber-300" />}<span className="text-sm text-slate-200">Theme</span></div><div className="flex gap-1 rounded-xl bg-black/20 p-1"><button onClick={() => changeTheme("dark")} className={cn("rounded-lg px-3 py-1 text-xs font-bold", theme === "dark" ? "bg-white/10 text-white" : "text-slate-500")}>Dark</button><button onClick={() => changeTheme("light")} className={cn("rounded-lg px-3 py-1 text-xs font-bold", theme === "light" ? "bg-white/10 text-white" : "text-slate-500")}>Light</button></div></div></div></section>
+                <section className="rounded-3xl border border-white/8 bg-white/[0.025] p-4"><h3 className="mb-3 font-bold text-white">Preferences</h3><div className="space-y-2"><div className="flex items-center justify-between rounded-2xl bg-white/[0.025] p-3"><div className="flex items-center gap-3"><Smartphone className="h-4 w-4 text-indigo-300" /><span className="text-sm text-slate-200">Haptic feedback</span></div><button onClick={() => changeHaptics(!haptics)} className={cn("h-6 w-10 rounded-full p-1", haptics ? "bg-cyan-500" : "bg-slate-700")}><motion.div layout className="h-4 w-4 rounded-full bg-white" animate={{ x: haptics ? 16 : 0 }} /></button></div><div className="flex items-center justify-between rounded-2xl bg-white/[0.025] p-3"><div className="flex items-center gap-3"><Moon className="h-4 w-4 text-indigo-300" /><span className="text-sm text-slate-200">Theme</span></div><div className="flex rounded-xl bg-black/20 p-1"><button onClick={() => changeTheme("dark")} className={cn("rounded-lg px-3 py-1.5 text-xs font-bold", theme === "dark" ? "bg-white/10 text-white" : "text-slate-500")}>Dark</button><button onClick={() => changeTheme("light")} className={cn("rounded-lg px-3 py-1.5 text-xs font-bold", theme === "light" ? "bg-white/10 text-white" : "text-slate-500")}>Light</button></div></div></div></section>
 
-                <section className="rounded-3xl border border-white/8 bg-white/[0.025] p-4"><button onClick={() => { close(); props.onNavigateProfile?.(); }} className="flex w-full items-center gap-3 rounded-2xl p-3 text-left hover:bg-white/[0.04]"><Edit3 className="h-4 w-4 text-blue-300" /><span className="text-sm font-semibold text-slate-200">Edit profile</span></button><button onClick={clearData} className="mt-1 flex w-full items-center gap-3 rounded-2xl p-3 text-left text-red-300 hover:bg-red-500/5"><Trash2 className="h-4 w-4" /><span className="text-sm font-semibold">Clear local data</span></button><button onClick={() => { close(); void signOut(); }} className="mt-1 flex w-full items-center gap-3 rounded-2xl p-3 text-left text-red-300 hover:bg-red-500/5"><LogOut className="h-4 w-4" /><span className="text-sm font-semibold">Sign out</span></button></section>
+                <div className="grid gap-2 sm:grid-cols-2"><button onClick={() => { close(); props.onNavigateProfile?.(); }} className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-bold text-slate-200"><Edit3 className="h-4 w-4" />Profile</button><button onClick={() => { clearData(); toast.success("Local data cleared."); }} className="flex items-center justify-center gap-2 rounded-2xl border border-rose-300/10 bg-rose-400/5 px-4 py-3 text-sm font-bold text-rose-200"><Trash2 className="h-4 w-4" />Clear local data</button></div>
+                <button onClick={() => void signOut()} className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-bold text-slate-300"><LogOut className="h-4 w-4" />Sign out</button>
               </div>
             </motion.div>
           </>
