@@ -11,14 +11,14 @@ import SidebarLayout from "@/components/layout/SidebarLayout";
 import { QuickActions } from "@/components/global/QuickActions";
 
 function NotFoundComponent() {
-  return <div className="flex min-h-screen items-center justify-center bg-[#05070d] px-4"><div className="relative z-10 max-w-md rounded-[24px] border border-white/[0.07] bg-white/[0.025] p-8 text-center backdrop-blur-xl"><div className="mx-auto mb-5 grid h-12 w-12 place-items-center rounded-xl border border-cyan-300/15 bg-cyan-300/[0.05] text-cyan-300"><Bot className="h-6 w-6" /></div><h1 className="text-5xl font-black tracking-[-0.05em] text-white">404</h1><h2 className="mt-3 text-base font-bold text-slate-200">Page not found</h2><p className="mt-2 text-xs leading-5 text-slate-500">This page doesn't exist or has moved.</p><Link to="/" className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-300 px-4 py-2.5 text-xs font-black text-slate-950 transition hover:bg-cyan-200"><Home className="h-4 w-4" /> Return home</Link></div></div>;
+  return <div className="flex min-h-screen bg-background px-4 text-foreground"><div className="relative z-10 m-auto max-w-md rounded-[24px] border border-border bg-card p-8 text-center backdrop-blur-xl"><div className="mx-auto mb-5 grid h-12 w-12 place-items-center rounded-xl border border-cyan-300/15 bg-cyan-300/[0.05] text-cyan-300"><Bot className="h-6 w-6" /></div><h1 className="text-5xl font-black tracking-[-0.05em]">404</h1><h2 className="mt-3 text-base font-bold">Page not found</h2><p className="mt-2 text-xs leading-5 text-muted-foreground">This page doesn't exist or has moved.</p><Link to="/" className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-300 px-4 py-2.5 text-xs font-black text-slate-950 transition hover:bg-cyan-200"><Home className="h-4 w-4" /> Return home</Link></div></div>;
 }
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
   useEffect(() => { reportLovableError(error, { boundary: "tanstack_root_error_component" }); }, [error]);
-  return <div className="flex min-h-screen items-center justify-center bg-[#05070d] px-4"><div className="max-w-md rounded-[24px] border border-rose-400/15 bg-white/[0.025] p-8 text-center backdrop-blur-xl"><div className="mx-auto mb-5 grid h-12 w-12 place-items-center rounded-xl border border-rose-400/15 bg-rose-400/[0.05] text-rose-300"><ShieldAlert className="h-6 w-6" /></div><h1 className="text-lg font-black text-white">Something went wrong</h1><p className="mt-2 text-xs leading-5 text-slate-500">The page hit an unexpected error. Your saved data is safe.</p><div className="mt-5 flex flex-col gap-2"><Button onClick={() => { router.invalidate(); reset(); }} variant="default" className="w-full"><RefreshCw className="h-4 w-4" /> Try again</Button><Link to="/" className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-xs font-bold text-slate-300 transition hover:bg-white/[0.06] hover:text-white"><Home className="h-4 w-4" /> Go home</Link></div></div></div>;
+  return <div className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground"><div className="max-w-md rounded-[24px] border border-rose-400/15 bg-card p-8 text-center backdrop-blur-xl"><div className="mx-auto mb-5 grid h-12 w-12 place-items-center rounded-xl border border-rose-400/15 bg-rose-400/[0.05] text-rose-300"><ShieldAlert className="h-6 w-6" /></div><h1 className="text-lg font-black">Something went wrong</h1><p className="mt-2 text-xs leading-5 text-muted-foreground">The page hit an unexpected error. Your saved data is safe.</p><div className="mt-5 flex flex-col gap-2"><Button onClick={() => { router.invalidate(); reset(); }} variant="default" className="w-full"><RefreshCw className="h-4 w-4" /> Try again</Button><Link to="/" className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-muted px-4 py-2.5 text-xs font-bold text-foreground transition hover:bg-accent hover:text-accent-foreground"><Home className="h-4 w-4" /> Go home</Link></div></div></div>;
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
@@ -30,6 +30,22 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   shellComponent: RootShell, component: RootComponent, notFoundComponent: NotFoundComponent, errorComponent: ErrorComponent,
 });
 
-function RootShell({ children }: { children: ReactNode }) { return <html lang="en" className="dark bg-[#05070d] text-slate-100 antialiased"><head><HeadContent /></head><body className="min-h-screen bg-[#05070d] text-slate-100 selection:bg-cyan-300/20">{children}<Scripts /></body></html>; }
+function RootShell({ children }: { children: ReactNode }) { return <html lang="en" className="bg-background text-foreground antialiased"><head><HeadContent /></head><body className="min-h-screen bg-background text-foreground selection:bg-cyan-300/20">{children}<Scripts /></body></html>; }
 
-function RootComponent() { const { queryClient } = Route.useRouteContext(); const { pathname } = useLocation(); const isPublicExperience = pathname === "/" || pathname === "/roadmap" || pathname.startsWith("/auth") || pathname.startsWith("/onboarding"); return <QueryClientProvider client={queryClient}>{isPublicExperience ? <AppShell /> : <SidebarLayout><AppShell /></SidebarLayout>}<Toaster /><QuickActions /></QueryClientProvider>; }
+function RootComponent() {
+  const { queryClient } = Route.useRouteContext();
+  const { pathname } = useLocation();
+  useEffect(() => {
+    const applyTheme = () => {
+      const theme = localStorage.getItem("outstand-theme") === "light" ? "light" : "dark";
+      document.documentElement.classList.toggle("dark", theme === "dark");
+      document.documentElement.dataset.theme = theme;
+      document.body.dataset.theme = theme;
+    };
+    applyTheme();
+    window.addEventListener("storage", applyTheme);
+    return () => window.removeEventListener("storage", applyTheme);
+  }, []);
+  const isPublicExperience = pathname === "/" || pathname === "/roadmap" || pathname.startsWith("/auth") || pathname.startsWith("/onboarding");
+  return <QueryClientProvider client={queryClient}>{isPublicExperience ? <AppShell /> : <SidebarLayout><AppShell /></SidebarLayout>}<Toaster /><QuickActions /></QueryClientProvider>;
+}
