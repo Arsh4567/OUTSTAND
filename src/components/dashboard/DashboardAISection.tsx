@@ -21,7 +21,11 @@ export function DashboardAISection({ habits, sessions, completedHabits, focusMin
     let cancelled = false;
     async function loadSavedRoadmap() {
       setLoadingSavedPlan(true);
-      const { data, error } = await supabase.from("ai_roadmaps").select("plan").eq("is_active", true).order("updated_at", { ascending: false }).limit(1).maybeSingle();
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) { setLoadingSavedPlan(false); return; }
+
+      const { data, error } = await supabase.from("ai_roadmaps").select("plan").eq("user_id", userId).eq("is_active", true).order("updated_at", { ascending: false }).limit(1).maybeSingle();
       if (cancelled) return;
       if (error) console.warn("[OUTSTAND] Could not load saved AI roadmap:", error.message);
       const savedPlan = data?.plan;
