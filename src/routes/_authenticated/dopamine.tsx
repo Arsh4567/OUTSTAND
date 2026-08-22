@@ -59,29 +59,40 @@ function MomentumPage() {
       <motion.div className="fixed inset-0 -z-20 opacity-30 blur-[150px]" animate={{ background: `radial-gradient(circle 800px at 50% -20%, ${color.hex}40, transparent 80%)` }} transition={{ duration: 2, ease: smoothEase }} />
       <div className="fixed inset-0 -z-10 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.12] mix-blend-overlay" />
 
-      <div className="mx-auto max-w-7xl p-4 pt-8 sm:p-6 sm:pt-10 lg:p-8">
-        <header className="mb-7 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-          <div>
+      <div className="mx-auto w-full max-w-[1600px] px-4 pt-8 sm:px-6 sm:pt-10 md:px-8 lg:px-10 xl:px-12 2xl:px-16">
+        <header className="mb-7 flex flex-col gap-5 md:flex-row md:items-end md:justify-between lg:mb-9 xl:mb-10">
+          <div className="min-w-0">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-2 text-[10px] font-black uppercase tracking-[0.25em] text-slate-400"><Activity className="h-3.5 w-3.5 text-cyan-400" /> Attention & recovery OS</div>
-            <h1 className="text-4xl font-black tracking-tighter sm:text-5xl md:text-7xl">Momentum <span className="bg-gradient-to-r from-indigo-400 via-cyan-300 to-indigo-400 bg-clip-text text-transparent">Matrix.</span></h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">Understand the patterns behind your execution, then turn them into one clear action.</p>
+            <h1 className="text-4xl font-black tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl">Momentum <span className="bg-gradient-to-r from-indigo-400 via-cyan-300 to-indigo-400 bg-clip-text text-transparent">Matrix.</span></h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400 lg:text-base lg:leading-7">Understand the patterns behind your execution, then turn them into one clear action.</p>
           </div>
-          <div className="flex gap-2.5"><Button variant="outline" disabled={!brainState} onClick={() => brainState && navigator.clipboard.writeText(`My OUTSTAND momentum state is ${brainState.overall}/100.`)} className="h-10 rounded-xl border-white/10 bg-white/5 text-xs"><Share className="mr-2 h-3.5 w-3.5" /> Share</Button><Button asChild variant="outline" className="h-10 rounded-xl border-white/10 bg-white/5 text-xs"><Link to="/profile">Timeline <ArrowRight className="ml-2 h-3.5 w-3.5" /></Link></Button></div>
+          <div className="flex shrink-0 gap-2.5"><Button variant="outline" disabled={!brainState} onClick={() => brainState && navigator.clipboard.writeText(`My OUTSTAND momentum state is ${brainState.overall}/100.`)} className="h-10 rounded-xl border-white/10 bg-white/5 text-xs lg:h-11"><Share className="mr-2 h-3.5 w-3.5" /> Share state</Button><Button asChild variant="outline" className="h-10 rounded-xl border-white/10 bg-white/5 text-xs lg:h-11"><Link to="/profile">Timeline <ArrowRight className="ml-2 h-3.5 w-3.5" /></Link></Button></div>
         </header>
 
-        <div className="space-y-5 sm:space-y-6">
+        <div className="space-y-5 sm:space-y-6 xl:space-y-7">
           <BrainStateCard state={brainState} />
           <WeeklyAnalysisCard onAnalyze={analyzeWeek} />
 
-          <div className="grid gap-5 lg:grid-cols-[1.35fr_.65fr]">
-            <ExecutionSystemsCard logs={monthlyLogs} />
-            <AdaptiveChallengeCard logs={monthlyLogs} />
-          </div>
+          <section className="grid gap-5 lg:grid-cols-12 xl:gap-7">
+            <div className="lg:col-span-8 xl:col-span-9"><ExecutionSystemsCard logs={monthlyLogs} /></div>
+            <div className="lg:col-span-4 xl:col-span-3"><AdaptiveChallengeCard logs={monthlyLogs} /></div>
+          </section>
 
-          <div className="grid gap-5 lg:grid-cols-2">
+          <section className="grid gap-5 md:grid-cols-2 xl:gap-7">
             <TriggerMapCard logs={monthlyLogs} />
             <ThirtyDayIntelligenceCard logs={monthlyLogs} />
-          </div>
+          </section>
+
+          <section className="grid gap-5 lg:grid-cols-12 xl:gap-7">
+            <section className="relative flex min-h-[320px] flex-col items-center justify-center overflow-hidden rounded-[2rem] border border-white/7 bg-[#0a0f1a]/70 p-6 shadow-2xl lg:col-span-4 lg:min-h-[380px] xl:col-span-4 xl:min-h-[430px] xl:p-8">
+              <div className="mb-5 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.25em] text-indigo-300"><Sparkles className="h-4 w-4" /> Current momentum</div>
+              <CoreReactor score={score} color={color.hex} label={color.label} />
+            </section>
+            <section className="rounded-[2rem] border border-white/7 bg-[#0a0f1a]/70 p-5 shadow-2xl sm:p-7 lg:col-span-8 xl:col-span-8 xl:p-8">
+              <div className="mb-5 flex items-center gap-3"><div className="rounded-xl border border-indigo-400/20 bg-indigo-500/10 p-2.5"><TrendingUp className="h-4 w-4 text-indigo-300" /></div><div><h2 className="text-lg font-black xl:text-xl">Trajectory & signals</h2><p className="text-sm text-slate-500">Your recent behavior signals</p></div></div>
+              <div className="grid gap-5 lg:grid-cols-2"><div className="rounded-2xl border border-white/7 bg-black/20 p-5"><div className="mb-4 flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-500"><Brain className="h-3.5 w-3.5" /> What stands out</div><div className="space-y-3">{insights.slice(0, 4).map((insight, index) => <div key={index} className="flex gap-3 text-sm leading-6 text-slate-300"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" />{insight}</div>)}</div></div><div className="min-h-[210px] rounded-2xl border border-white/7 bg-black/20 p-5"><h4 className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-500">Past 7 days</h4><NeuralChart color={color.hex} /></div></div>
+            </section>
+          </section>
 
           <details className="group overflow-hidden rounded-[2rem] border border-white/10 bg-[#0a0f1a]/70 shadow-2xl">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 sm:p-7 [&::-webkit-details-marker]:hidden">
@@ -93,11 +104,6 @@ function MomentumPage() {
               <section className="rounded-2xl border border-rose-500/15 bg-rose-950/10 p-5"><h3 className="mb-4 text-xs font-black uppercase tracking-[0.2em] text-rose-300">Friction signals</h3><div className="grid gap-2.5 sm:grid-cols-2">{NEGATIVES.map((item) => <ActionCard key={item.key} active={negatives.includes(item.key)} emoji={item.emoji} label={item.label} description={item.description} points={item.points} tone="bad" onClick={() => toggleNegative(item.key)} />)}</div></section>
             </div>
           </details>
-
-          <section className="rounded-[2rem] border border-white/7 bg-[#0a0f1a]/60 p-5 shadow-xl sm:p-7">
-            <div className="mb-5 flex items-center gap-3"><div className="rounded-xl border border-indigo-400/20 bg-indigo-500/10 p-2.5"><TrendingUp className="h-4 w-4 text-indigo-300" /></div><div><h2 className="text-lg font-black">Trajectory & signals</h2><p className="text-sm text-slate-500">Your recent behavior signals</p></div></div>
-            <div className="grid gap-5 lg:grid-cols-2"><div className="rounded-2xl border border-white/7 bg-black/20 p-5"><div className="mb-4 flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-500"><Brain className="h-3.5 w-3.5" /> What stands out</div><div className="space-y-3">{insights.slice(0, 4).map((insight, index) => <div key={index} className="flex gap-3 text-sm leading-6 text-slate-300"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" />{insight}</div>)}</div></div><div className="min-h-[210px] rounded-2xl border border-white/7 bg-black/20 p-5"><h4 className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-500">Past 7 days</h4><NeuralChart color={color.hex} /></div></div>
-          </section>
         </div>
       </div>
     </div>
