@@ -1,6 +1,7 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+type VercelRequest = { method?: string; body?: unknown; headers: Record<string, string | undefined> };
+type VercelResponse = { status: (code: number) => VercelResponse; setHeader: (name: string, value: string) => VercelResponse; json: (body: unknown) => VercelResponse; end: () => void };
 type Db = SupabaseClient<any, "public", any, any, any>;
 const env = (...names: string[]) => names.map((name) => process.env[name]).find((value) => typeof value === "string" && value.trim());
 const json = (res: VercelResponse, status: number, body: unknown) => res.status(status).setHeader("Cache-Control", "no-store").json(body);
@@ -74,7 +75,7 @@ function validatePlan(plan: any) {
 function normalizePlan(plan: any) { plan.milestones = plan.milestones.slice(0, 6).map((m: any) => ({ ...m, actions: m.actions.slice(0, 3) })); plan.dailySchedule = plan.dailySchedule.slice(0, Math.max(1, Math.min(plan.durationDays, 90))); plan.today = Array.isArray(plan.today) ? plan.today.slice(0, 3) : plan.dailySchedule.filter((b: any) => b.day === 1).slice(0, 3).map((b: any) => b.title); plan.metrics = Array.isArray(plan.metrics) ? plan.metrics.slice(0, 4) : []; plan.assumptions = Array.isArray(plan.assumptions) ? plan.assumptions.slice(0, 4) : []; return plan; }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method === "OPTIONS") return res.status(204).end();
+  if (req.method === "OPTIONS") { res.status(204).end(); return; }
   if (req.method !== "POST") return json(res, 405, { error: "Method not allowed." });
   try {
     const { client, userId } = await auth(req); const input = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
