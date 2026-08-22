@@ -30,11 +30,11 @@ function FocusPage() {
   const [budget, setBudget] = useState(120);
   const [breakingDown, setBreakingDown] = useState(false);
   const [showTimerSettings, setShowTimerSettings] = useState(false);
-  const [customMinutes, setCustomMinutes] = useState(25);
+  const [customMinutes, setCustomMinutes] = useState(FOCUS_MINUTES);
 
-  const [timerDuration, setTimerDuration] = useState(25);
-  const handleFocusSuccess = () => {
-    recordSession(timerDuration, true);
+  const handleFocusSuccess = (completedMinutes: number) => {
+    if (mode !== "focus") return;
+    recordSession(completedMinutes, true);
     const active = queue.find((item) => !item.completed && item.title === task);
     if (active) setQueue((items) => items.map((item) => item.id === active.id ? { ...item, completed: true } : item));
     toast.success("Focus session complete", { description: "Nice work. Take a short break." });
@@ -45,13 +45,13 @@ function FocusPage() {
 
   function setTimerMinutes(value: number) {
     const safe = Math.min(240, Math.max(1, Math.round(value)));
-    setCustomMinutes(safe); setTimerDuration(safe); setDuration(safe);
+    setCustomMinutes(safe); setDuration(safe);
   }
 
   useEffect(() => setQueue(loadQueue()), []);
   useEffect(() => { localStorage.setItem(QUEUE_KEY, JSON.stringify(queue)); }, [queue]);
   useEffect(() => { if (saveError) toast.error(saveError); }, [saveError]);
-  useEffect(() => { const raw = Number(localStorage.getItem("outstand_timer_duration")); if (Number.isFinite(raw) && raw > 0) { const mins = Math.min(240, Math.max(1, Math.round(raw / 60000))); setCustomMinutes(mins); setTimerDuration(mins); } }, []);
+  useEffect(() => { const raw = Number(localStorage.getItem("outstand_timer_duration")); if (Number.isFinite(raw) && raw > 0) { const mins = Math.min(240, Math.max(1, Math.round(raw / 60000))); setCustomMinutes(mins); } }, []);
 
   const createBreakdown = async () => {
     const value = milestone.trim();
