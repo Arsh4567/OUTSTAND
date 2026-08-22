@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { QUOTES } from "@/lib/quotes";
-import { levelFromXP, todayISO } from "@/lib/habits";
+import { levelFromXP, todayISO, type FocusSession, type Habit, type OutstandCompletion } from "@/lib/habits";
 
 export type DashboardMission = { id: string; title: string; category: string; difficulty: string; xpReward: number; completed: boolean; mutating: boolean };
 export type RoadmapProgress = { roadmapId: string; day: number; total: number; completed: number; completionPct: number };
-export type DashboardSnapshot = { userName: string; totalXp: number; level: number; streak: number; xpPct: number; missions: DashboardMission[]; completedCount: number; completionPct: number; quote: { quote: string; author: string }; roadmapProgress: RoadmapProgress | null };
+export type DashboardProductivity = { habits: Habit[]; sessions: FocusSession[]; outstand: OutstandCompletion[] };
+export type DashboardSnapshot = { userName: string; totalXp: number; level: number; streak: number; xpPct: number; missions: DashboardMission[]; completedCount: number; completionPct: number; quote: { quote: string; author: string }; roadmapProgress: RoadmapProgress | null; productivity: DashboardProductivity | null };
 type Stats = { total_xp?: number; level?: number; streak_days?: number };
 type Quest = { id: string; title: string; category: string; difficulty: string; xp_reward: number };
 type QuestRow = { id: string; completed: boolean | null; quests: Quest | Quest[] | null };
@@ -20,8 +21,20 @@ function quoteOfTheDay() {
   return { quote: q.quote, author: q.author };
 }
 
+function isHabit(value: unknown): value is Habit {
+  return Boolean(value && typeof value === "object" && typeof (value as Habit).id === "string" && typeof (value as Habit).name === "string" && Array.isArray((value as Habit).history));
+}
+
+function isFocusSession(value: unknown): value is FocusSession {
+  return Boolean(value && typeof value === "object" && typeof (value as FocusSession).id === "string" && typeof (value as FocusSession).startedAt === "string" && typeof (value as FocusSession).durationMin === "number" && typeof (value as FocusSession).completed === "boolean");
+}
+
+function isOutstandCompletion(value: unknown): value is OutstandCompletion {
+  return Boolean(value && typeof value === "object" && typeof (value as OutstandCompletion).id === "string" && typeof (value as OutstandCompletion).title === "string" && typeof (value as OutstandCompletion).completedAt === "string");
+}
+
 export function useDashboard() {
-  const [snapshot, setSnapshot] = useState<DashboardSnapshot>({ userName: "there", totalXp: 0, level: 1, streak: 0, xpPct: 0, missions: [], completedCount: 0, completionPct: 0, quote: quoteOfTheDay(), roadmapProgress: null });
+  const [snapshot, setSnapshot] = useState<DashboardSnapshot>({ userName: "there", totalXp: 0, level: 1, streak: 0, xpPct: 0, missions: [], completedCount: 0, completionPct: 0, quote: quoteOfTheDay(), roadmapProgress: null, productivity: null });
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -45,6 +58,17 @@ export function useDashboard() {
     const { data: created, error: createError } = await supabase.from("user_stats").upsert({ user_id: uid, total_xp: 0, level: 1, streak_days: 0 }, { onConflict: "user_id" }).select("total_xp, level, streak_days").single();
     if (createError) throw createError;
     return created as Stats;
+  }, []);
+
+  const loadProductivity = useCallback(async (uid: string) => {
+    const { data, error } = await supabase.from("user_productivity_state").select("habits, sessions, outstand, updated_at").eq("user_id", uid).maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+
+    const habits = Array.isArray(data.habits) ? data.habits.filter(isHabit) : [];
+    const sessions = Array.isArray(data.sessions) ? data.sessions.filter(isFocusSession) : [];
+    const outstand = Array.isArray(data.outstand) ? data.outstand.filter(isOutstandCompletion) : [];
+    return { habits, sessions, outstand } satisfies DashboardProductivity;
   }, []);
 
   const loadRoadmapProgress = useCallback(async () => {
@@ -74,22 +98,26 @@ export function useDashboard() {
     if (signal?.aborted) return;
 
     const localDate = todayISO();
-    const [statsResult, questsResult, progressResult] = await Promise.allSettled([
+    const [statsResult, questsResult, progressResult, productivityResult] = await Promise.allSettled([
       ensureStats(session.user.id),
       supabase.from("daily_quests").select("id, completed, quests(id, title, category, difficulty, xp_reward)").eq("user_id", session.user.id).eq("assigned_date", localDate),
       loadRoadmapProgress(),
+      loadProductivity(session.user.id),
     ]);
     if (signal?.aborted) return;
     if (statsResult.status === "fulfilled") applyStats(statsResult.value);
+
     const quests = questsResult.status === "fulfilled" && !questsResult.value.error ? (questsResult.value.data ?? []) as QuestRow[] : [];
     const mapped = quests.map((row) => {
       const q = Array.isArray(row.quests) ? row.quests[0] : row.quests;
       if (!q || q.category === "Outstand") return null;
       return { id: row.id, title: q.title, category: q.category, difficulty: q.difficulty, xpReward: Number(q.xp_reward) || 0, completed: Boolean(row.completed), mutating: false };
     }).filter(Boolean) as DashboardMission[];
+
     const progress = progressResult.status === "fulfilled" ? progressResult.value : null;
-    setSnapshot((prev) => ({ ...prev, missions: mapped, roadmapProgress: progress }));
-  }, [applyStats, ensureStats, loadRoadmapProgress]);
+    const productivity = productivityResult.status === "fulfilled" ? productivityResult.value : null;
+    setSnapshot((prev) => ({ ...prev, missions: mapped, roadmapProgress: progress, productivity }));
+  }, [applyStats, ensureStats, loadProductivity, loadRoadmapProgress]);
 
   useEffect(() => {
     const controller = new AbortController();
