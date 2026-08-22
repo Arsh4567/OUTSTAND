@@ -39,7 +39,7 @@ export function useFocusTimer(onSuccessSync?: () => void) {
   }, []);
 
   const setDuration = useCallback((minutes: number) => {
-    if ((state !== "idle" && state !== "paused") || !Number.isFinite(minutes) || minutes <= 0 || minutes > 240) return;
+    if ((state !== "idle" && state !== "paused" && state !== "completed") || !Number.isFinite(minutes) || minutes <= 0 || minutes > 240) return;
     const ms = Math.round(minutes * 60 * 1000);
     setDurationMs(ms); setRemainingMs(ms); setEndTime(null); setState("idle"); setSaveError(null); completionHandledRef.current = false;
     window.localStorage.removeItem(STORAGE_END); window.localStorage.setItem(STORAGE_DURATION, String(ms));
