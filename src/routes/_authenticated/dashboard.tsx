@@ -3,7 +3,6 @@ import { motion, MotionConfig } from "framer-motion";
 import { Loader2, RefreshCw } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useAuth, displayNameOf } from "@/hooks/use-auth";
-import { useAppState } from "@/hooks/use-app-state";
 import { useDailyLog } from "@/hooks/use-dopamine";
 import { DashboardWelcome, DashboardHabits, DashboardActivity } from "@/components/dashboard/DashboardSections";
 import { DashboardAISection } from "@/components/dashboard/DashboardAISection";
@@ -14,7 +13,6 @@ export const Route = createFileRoute("/_authenticated/dashboard")({ component: D
 function DashboardPage() {
   const { snapshot, isLoading, loadError, completeMission } = useDashboard();
   const { user, profile } = useAuth();
-  const { habits, sessions, outstand, toggleToday, bestStreak, xp } = useAppState();
   const { log } = useDailyLog();
 
   if (isLoading) {
@@ -46,8 +44,10 @@ function DashboardPage() {
 
   const name = displayNameOf(user, profile) || snapshot.userName || "there";
   const today = todayISO();
-  const completedHabits = habits.filter((habit) => habit.history?.includes(today)).length;
-  const focusMinutes = sessions.filter((session) => session.completed).reduce((sum, session) => sum + Math.max(0, session.durationMin || 0), 0);
+  const productivity = snapshot.productivity;
+  const completedHabits = productivity?.habits.filter((habit) => habit.history?.includes(today)).length ?? 0;
+  const habitCount = productivity?.habits.length ?? 0;
+  const focusMinutes = productivity?.sessions.filter((session) => session.completed).reduce((sum, session) => sum + Math.max(0, session.durationMin || 0), 0) ?? 0;
   const remaining = snapshot.missions.length - snapshot.completedCount;
 
   return (
@@ -75,30 +75,30 @@ function DashboardPage() {
               </div>
             </div>
             <div className="mt-5 grid gap-2.5 sm:grid-cols-3">
-              <QuickStat label="Habits" value={`${completedHabits}/${habits.length}`} detail="done today" />
-              <QuickStat label="Focus" value={`${focusMinutes}m`} detail="completed" />
+              <QuickStat label="Habits" value={productivity ? `${completedHabits}/${habitCount}` : "—"} detail="done today" />
+              <QuickStat label="Focus" value={productivity ? `${focusMinutes}m` : "—"} detail="completed" />
               <QuickStat label="Score" value={log?.score != null ? String(log.score) : "—"} detail="latest check-in" />
             </div>
           </section>
 
           <DashboardAISection
-            habits={habits}
-            sessions={sessions}
+            habits={productivity?.habits ?? []}
+            sessions={productivity?.sessions ?? []}
             completedHabits={completedHabits}
             focusMinutes={focusMinutes}
-            bestStreak={bestStreak}
+            bestStreak={snapshot.streak}
             nextMission={snapshot.missions[0]}
             name={name}
-            level={profile?.current_level ?? 1}
-            xp={xp}
+            level={profile?.current_level ?? snapshot.level}
+            xp={snapshot.totalXp}
             roadmapProgress={snapshot.roadmapProgress}
             missions={snapshot.missions}
             onCompleteMission={completeMission}
           />
 
           <div className="grid gap-5 lg:grid-cols-2">
-            <DashboardHabits habits={habits} onToggle={toggleToday} />
-            <DashboardActivity sessions={sessions} outstand={outstand} dailyScore={log?.score ?? null} />
+            <DashboardHabits habits={productivity?.habits ?? []} onToggle={() => {}} />
+            <DashboardActivity sessions={productivity?.sessions ?? []} outstand={productivity?.outstand ?? []} dailyScore={log?.score ?? null} />
           </div>
         </main>
       </div>
