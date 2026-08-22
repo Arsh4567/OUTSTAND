@@ -43,8 +43,9 @@ async function callGemini(prompt: string) {
 async function callGroq(prompt: string) {
   const groq = env("GROQ_API_KEY");
   if (!groq) throw Object.assign(new Error("Groq API key is not configured."), { status: 503 });
-  // llama-3.3-70b-versatile was shut down by Groq on Aug 16, 2026. Keep Groq primary, but use an active production model.
-  const model = env("GROQ_MODEL") || "openai/gpt-oss-120b";
+  // Groq primary. Keep the model configurable so it can be changed without code changes.
+  // Do not use an OpenAI-owned model. Default to Meta Llama 3.3 70B.
+  const model = env("GROQ_MODEL") || "llama-3.3-70b-versatile";
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${groq}`, "Content-Type": "application/json" }, body: JSON.stringify({ model, temperature: 0.15, max_tokens: 5000, response_format: { type: "json_object" }, messages: [{ role: "system", content: rules }, { role: "user", content: prompt }] }) });
   const raw = await response.text();
   if (!response.ok) throw Object.assign(new Error(`Groq request failed (${response.status}).`), { status: response.status });
@@ -53,7 +54,6 @@ async function callGroq(prompt: string) {
 
 async function callAI(prompt: string) {
   const failures: string[] = [];
-  // Groq is intentionally the primary provider. Gemini is fallback only.
   if (env("GROQ_API_KEY")) {
     try { return await callGroq(prompt); }
     catch (error) { failures.push(error instanceof Error ? error.message : "Groq failed"); console.error("[OUTSTAND] Groq provider failed; trying Gemini fallback", error); }
@@ -77,7 +77,7 @@ function normalizePlan(plan: any) { plan.milestones = plan.milestones.slice(0, 6
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "OPTIONS") { res.status(204).end(); return; }
-  if (req.method === "GET") return json(res, 200, { ok: Boolean(env("GROQ_API_KEY") || env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")), groq: Boolean(env("GROQ_API_KEY")), gemini: Boolean(env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")), service: "outstand-roadmap-ai", primary: "groq", fallback: "gemini", groqModel: env("GROQ_MODEL") || "openai/gpt-oss-120b" });
+  if (req.method === "GET") return json(res, 200, { ok: Boolean(env("GROQ_API_KEY") || env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")), groq: Boolean(env("GROQ_API_KEY")), gemini: Boolean(env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")), service: "outstand-roadmap-ai", primary: "groq", fallback: "gemini", groqModel: env("GROQ_MODEL") || "llama-3.3-70b-versatile" });
   if (req.method !== "POST") return json(res, 405, { error: "Method not allowed." });
   try {
     const { client, userId } = await auth(req); const input = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
