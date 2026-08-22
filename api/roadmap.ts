@@ -36,7 +36,7 @@ async function callAI(prompt: string) {
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${groq}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "openai/gpt-oss-20b", temperature: 0.15, max_tokens: 5000, response_format: { type: "json_object" }, messages: [{ role: "system", content: rules }, { role: "user", content: prompt }] }),
+      body: JSON.stringify({ model: "llama-3.3-70b-versatile", temperature: 0.15, max_tokens: 5000, response_format: { type: "json_object" }, messages: [{ role: "system", content: rules }, { role: "user", content: prompt }] }),
     });
     const raw = await response.text();
     if (response.ok) {
@@ -50,7 +50,7 @@ async function callAI(prompt: string) {
 
   const google = env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY");
   if (!google) throw Object.assign(new Error("AI service configuration is missing."), { status: 503 });
-  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent", {
+  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": google },
     body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: `${rules}\n\n${prompt}` }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.15 } }),
