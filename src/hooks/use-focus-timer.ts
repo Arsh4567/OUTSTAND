@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { supabase } from "../integrations/supabase/client";
 
 type TimerState = "idle" | "running" | "paused" | "completed";
 const DEFAULT_DURATION_MS = 25 * 60 * 1000;
@@ -14,7 +13,7 @@ function readNumber(key: string): number | null {
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
-export function useFocusTimer(onSuccessSync?: () => void) {
+export function useFocusTimer(onSuccessSync?: (durationMinutes: number) => void) {
   const [state, setState] = useState<TimerState>("idle");
   const [durationMs, setDurationMs] = useState(DEFAULT_DURATION_MS);
   const [endTime, setEndTime] = useState<number | null>(null);
@@ -23,11 +22,17 @@ export function useFocusTimer(onSuccessSync?: () => void) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const completionHandledRef = useRef(false);
   const mountedRef = useRef(true);
+  const durationRef = useRef(DEFAULT_DURATION_MS);
 
   useEffect(() => {
     mountedRef.current = true;
     const savedEnd = readNumber(STORAGE_END);
     const savedDuration = readNumber(STORAGE_DURATION);
+    if (savedDuration) {
+      durationRef.current = savedDuration;
+      setDurationMs(savedDuration);
+      setRemainingMs(savedDuration);
+    }
     if (!savedEnd || !savedDuration) return () => { mountedRef.current = false; };
     const remaining = savedEnd - Date.now();
     if (remaining > 0) {
@@ -41,16 +46,19 @@ export function useFocusTimer(onSuccessSync?: () => void) {
   const setDuration = useCallback((minutes: number) => {
     if ((state !== "idle" && state !== "paused" && state !== "completed") || !Number.isFinite(minutes) || minutes <= 0 || minutes > 240) return;
     const ms = Math.round(minutes * 60 * 1000);
+    durationRef.current = ms;
     setDurationMs(ms); setRemainingMs(ms); setEndTime(null); setState("idle"); setSaveError(null); completionHandledRef.current = false;
     window.localStorage.removeItem(STORAGE_END); window.localStorage.setItem(STORAGE_DURATION, String(ms));
   }, [state]);
 
   const start = useCallback(() => {
     if ((state !== "idle" && state !== "paused") || remainingMs <= 0) return;
+    const activeDuration = durationRef.current;
     const end = Date.now() + remainingMs;
     completionHandledRef.current = false; setSaveError(null); setEndTime(end); setState("running");
-    window.localStorage.setItem(STORAGE_END, String(end)); window.localStorage.setItem(STORAGE_DURATION, String(durationMs));
-  }, [durationMs, remainingMs, state]);
+    setDurationMs(activeDuration);
+    window.localStorage.setItem(STORAGE_END, String(end)); window.localStorage.setItem(STORAGE_DURATION, String(activeDuration));
+  }, [remainingMs, state]);
 
   const pause = useCallback(() => {
     if (state !== "running") return;
@@ -59,25 +67,18 @@ export function useFocusTimer(onSuccessSync?: () => void) {
   }, [endTime, remainingMs, state]);
 
   const reset = useCallback(() => {
-    setState("idle"); setRemainingMs(durationMs); setEndTime(null); setIsSaving(false); setSaveError(null); completionHandledRef.current = false;
-    window.localStorage.removeItem(STORAGE_END); window.localStorage.setItem(STORAGE_DURATION, String(durationMs));
-  }, [durationMs]);
+    setState("idle"); setRemainingMs(durationRef.current); setEndTime(null); setIsSaving(false); setSaveError(null); completionHandledRef.current = false;
+    window.localStorage.removeItem(STORAGE_END); window.localStorage.setItem(STORAGE_DURATION, String(durationRef.current));
+  }, []);
 
   useEffect(() => {
     if (state !== "running" || endTime == null) return;
     const complete = async () => {
       if (completionHandledRef.current) return;
       completionHandledRef.current = true;
-      window.localStorage.removeItem(STORAGE_END); setState("completed"); setEndTime(null); setRemainingMs(0); setIsSaving(true); setSaveError(null);
-      try {
-        const { error } = await supabase.rpc("log_focus_session", { p_duration_minutes: Math.max(1, Math.round(durationMs / 60000)) });
-        if (error) {
-          console.error("Failed to persist focus session:", error);
-          if (mountedRef.current) { setSaveError("Your focus session could not be saved. Please retry sync."); setIsSaving(false); }
-          return;
-        }
-        onSuccessSync?.();
-      } finally { if (mountedRef.current) setIsSaving(false); }
+      const completedMinutes = Math.max(1, Math.round(durationMs / 60000));
+      window.localStorage.removeItem(STORAGE_END); setState("completed"); setEndTime(null); setRemainingMs(0); setIsSaving(false); setSaveError(null);
+      if (mountedRef.current) onSuccessSync?.(completedMinutes);
     };
     const tick = () => {
       const nextRemaining = Math.max(0, endTime - Date.now());
