@@ -1,10 +1,11 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, Check, ChevronRight, Edit3, LogOut, Moon, Send, Settings, Smartphone, Sparkles, Sun, Trash2, X, MessageSquare } from "lucide-react";
+import { Bell, ChevronRight, Edit3, LogOut, Moon, Send, Settings, Smartphone, Sparkles, Sun, Trash2, X, MessageSquare } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { requestPushPermission, disablePushNotifications, getNotificationPreferences, saveNotificationPreferences, type NotificationPreferences } from "@/lib/notification-engine";
+import { getUsageBridge, openUsageAccessSettings } from "@/lib/digital-friction";
 
 interface AppSettingsSheetProps {
   isOpen?: boolean;
@@ -30,6 +31,7 @@ export function AppSettingsSheet(props: AppSettingsSheetProps) {
   const [theme, setTheme] = useState<"dark" | "light">(props.theme ?? "dark");
   const [haptics, setHaptics] = useState(props.haptics ?? true);
   const [notificationsGranted, setNotificationsGranted] = useState(props.isNotificationsGranted ?? false);
+  const [usageAccessGranted, setUsageAccessGranted] = useState(false);
   const [testing, setTesting] = useState(false);
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
   const [feedback, setFeedback] = useState("");
@@ -45,29 +47,21 @@ export function AppSettingsSheet(props: AppSettingsSheetProps) {
     if (!isOpen) return;
     void getNotificationPreferences().then(setPreferences).catch(() => undefined);
     if (typeof window !== "undefined" && "Notification" in window) setNotificationsGranted(Notification.permission === "granted");
+    const bridge = getUsageBridge();
+    if (bridge?.hasUsageAccess) void Promise.resolve(bridge.hasUsageAccess()).then(setUsageAccessGranted).catch(() => setUsageAccessGranted(false));
   }, [isOpen]);
 
-  const changeTheme = (next: "dark" | "light") => {
-    setTheme(next); props.onThemeChange?.(next); localStorage.setItem("outstand-theme", next);
-  };
-
-  const changeHaptics = (next: boolean) => {
-    setHaptics(next); props.onHapticsChange?.(next); localStorage.setItem("outstand-haptics", String(next));
-  };
+  const changeTheme = (next: "dark" | "light") => { setTheme(next); props.onThemeChange?.(next); localStorage.setItem("outstand-theme", next); };
+  const changeHaptics = (next: boolean) => { setHaptics(next); props.onHapticsChange?.(next); localStorage.setItem("outstand-haptics", String(next)); };
 
   const enableNotifications = async () => {
     try {
-      if (props.onNotificationToggle) {
-        await props.onNotificationToggle();
-      } else {
-        await requestPushPermission();
-      }
+      if (props.onNotificationToggle) await props.onNotificationToggle();
+      else await requestPushPermission();
       setNotificationsGranted(true);
       setPreferences(await getNotificationPreferences());
       toast.success("Notifications enabled 🔔");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not enable notifications.");
-    }
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not enable notifications."); }
   };
 
   const disableNotifications = async () => {
@@ -76,50 +70,33 @@ export function AppSettingsSheet(props: AppSettingsSheetProps) {
       setNotificationsGranted(false);
       setPreferences(await getNotificationPreferences());
       toast.success("Notifications paused.");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not disable notifications.");
-    }
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not disable notifications."); }
+  };
+
+  const enableUsageAccess = async () => {
+    try {
+      await openUsageAccessSettings();
+      toast.success("Choose OUTSTAND and allow Usage access, then return here.");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not open Usage access settings."); }
   };
 
   const testPush = async () => {
     setTesting(true);
     try {
-      if (props.onTestPush) {
-        await props.onTestPush();
-        return;
-      }
+      if (props.onTestPush) { await props.onTestPush(); return; }
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Please sign in first.");
-
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
-      if (!subscription) {
-        throw new Error("No active push subscription on this device. Enable notifications first.");
-      }
-
+      if (!subscription) throw new Error("No active push subscription on this device. Enable notifications first.");
       const json = subscription.toJSON();
-      if (!json.endpoint || !json.keys?.auth || !json.keys?.p256dh) {
-        throw new Error("This device returned an invalid push subscription. Please disable and re-enable notifications.");
-      }
-
-      const response = await fetch("/api/send-test-push", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({
-          subscription: {
-            endpoint: json.endpoint,
-            keys: { auth: json.keys.auth, p256dh: json.keys.p256dh },
-          },
-        }),
-      });
+      if (!json.endpoint || !json.keys?.auth || !json.keys?.p256dh) throw new Error("This device returned an invalid push subscription. Please disable and re-enable notifications.");
+      const response = await fetch("/api/send-test-push", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ subscription: { endpoint: json.endpoint, keys: { auth: json.keys.auth, p256dh: json.keys.p256dh } } }) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Test notification failed.");
       toast.success("Test notification sent! 🚀");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not send test notification.");
-    } finally {
-      setTesting(false);
-    }
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not send notification."); }
+    finally { setTesting(false); }
   };
 
   const updatePreference = async (patch: Partial<NotificationPreferences>) => {
@@ -173,6 +150,11 @@ export function AppSettingsSheet(props: AppSettingsSheetProps) {
                     <button disabled={!notificationsGranted || testing} onClick={() => void testPush()} className="flex items-center justify-center gap-2 rounded-2xl border border-cyan-300/15 bg-cyan-400/10 px-4 py-3 text-sm font-bold text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40"><Send className="h-4 w-4" />{testing ? "Sending…" : "Send test notification"}</button>
                     <button onClick={() => { close(); window.location.assign("/notifications"); }} className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-bold text-slate-200"><Sparkles className="h-4 w-4" />Open notification center</button>
                   </div>
+                </section>
+
+                <section className="rounded-3xl border border-violet-300/10 bg-violet-400/[0.035] p-4">
+                  <div className="mb-4 flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-400/10 text-violet-200"><Smartphone className="h-5 w-5" /></div><div><h3 className="font-bold text-white">Usage access</h3><p className="text-xs text-slate-500">Connect device usage so OUTSTAND can find attention leaks.</p></div></div>
+                  <div className="flex items-center justify-between rounded-2xl bg-black/20 p-4"><div><p className="font-semibold text-slate-200">{usageAccessGranted ? "Usage access connected" : "Allow usage access"}</p><p className="text-xs text-slate-500">You can turn this off anytime in Android Settings.</p></div><button onClick={() => void enableUsageAccess()} className={cn("rounded-xl px-4 py-2 text-xs font-black transition", usageAccessGranted ? "bg-emerald-500/15 text-emerald-200" : "bg-violet-500 text-white hover:bg-violet-400")}>{usageAccessGranted ? "Manage" : "Connect"}</button></div>
                 </section>
 
                 {preferences && <section className="rounded-3xl border border-white/8 bg-white/[0.025] p-4"><div className="mb-4 flex items-center gap-2"><Sparkles className="h-4 w-4 text-cyan-300" /><h3 className="font-bold text-white">Set notifications</h3></div><div className="space-y-2">
