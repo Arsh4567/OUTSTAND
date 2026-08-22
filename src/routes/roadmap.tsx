@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, ChevronRight, Moon, Sparkles } from "lucide-react";
+import { CalendarDays, ChevronRight, Moon, Pencil, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { RoadmapOnboarding } from "@/components/roadmap/RoadmapOnboarding";
 import { RoadmapVisualizer } from "@/components/roadmap/RoadmapVisualizer";
 import { DailyFocusCard } from "@/components/roadmap/DailyFocusCard";
 import { NightlyReviewModal } from "@/components/roadmap/NightlyReviewModal";
+import { RoadmapEditDialog, type RoadmapEditPatch } from "@/components/roadmap/RoadmapEditDialog";
 import { InteractiveLearningRoadmap, type LearningMilestone } from "@/components/roadmap/InteractiveLearningRoadmap";
 import { supabase } from "@/integrations/supabase/client";
 import { useRoadmap } from "@/hooks/use-roadmap";
@@ -18,6 +19,9 @@ function RoadmapPage() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [nightlyOpen, setNightlyOpen] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [askingAI, setAskingAI] = useState(false);
 
   useEffect(() => { if (!roadmap.loading && !roadmap.roadmap) setShowOnboarding(true); }, [roadmap.loading, roadmap.roadmap]);
 
@@ -43,6 +47,31 @@ function RoadmapPage() {
     try { const result = await roadmap.saveNightlyReview(reflection, energy, difficulty); toast.success(result?.reason || result?.analysis?.summary || "Tomorrow's schedule has been adapted."); setNightlyOpen(false); }
     catch (error) { toast.error(error instanceof Error ? error.message : "Could not save nightly review."); }
     finally { setReviewing(false); }
+  };
+
+  const saveEdit = async (patch: RoadmapEditPatch) => {
+    if (!roadmap.roadmap) return;
+    setSavingEdit(true);
+    try {
+      const { error } = await supabase.from("roadmaps").update({ title: patch.title, goal: patch.goal }).eq("id", roadmap.roadmap.id).eq("user_id", roadmap.roadmap.user_id);
+      if (error) throw error;
+      await roadmap.load(roadmap.roadmap.id); setEditOpen(false); toast.success("Roadmap updated.");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not update roadmap."); }
+    finally { setSavingEdit(false); }
+  };
+
+  const askAIToEdit = async (request: string) => {
+    if (!roadmap.roadmap) return;
+    setAskingAI(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Please sign in first.");
+      const response = await fetch("/api/roadmap", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ mode: "edit", roadmapId: roadmap.roadmap.id, request, current: { title: roadmap.roadmap.title, goal: roadmap.roadmap.goal, category: roadmap.roadmap.category, durationDays: roadmap.roadmap.duration_days, questionnaire: roadmap.roadmap.questionnaire } }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not apply AI changes.");
+      await roadmap.load(roadmap.roadmap.id); setEditOpen(false); toast.success("AI changes applied to your roadmap.");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not apply AI changes."); }
+    finally { setAskingAI(false); }
   };
 
   const completedCount = useMemo(() => roadmap.tasks.filter((task) => task.progress === "completed").length, [roadmap.tasks]);
@@ -71,7 +100,7 @@ function RoadmapPage() {
       <header className="overflow-hidden rounded-[2.25rem] border border-white/[0.08] bg-white/[0.035] p-5 shadow-[0_40px_120px_-80px_rgba(34,211,238,.45)] sm:p-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl"><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[.22em] text-cyan-300/80"><CalendarDays className="h-4 w-4" />Day {roadmap.todayIndex} of {roadmap.roadmap.duration_days} · AI execution mode</div><h1 className="mt-3 text-3xl font-black tracking-[-.035em] text-white sm:text-5xl">{roadmap.roadmap.title}</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">{roadmap.roadmap.goal}</p></div>
-          <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setNightlyOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-violet-300/15 bg-violet-300/[0.07] px-4 py-2.5 text-xs font-black text-violet-100"><Moon className="h-4 w-4" />Nightly review</button><button type="button" onClick={() => { roadmap.setAnswers({}); setShowOnboarding(true); }} className="rounded-xl border border-white/10 px-4 py-2.5 text-xs font-black text-slate-300">New roadmap</button></div>
+          <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setEditOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.06] px-4 py-2.5 text-xs font-black text-cyan-100"><Pencil className="h-4 w-4" />Edit roadmap</button><button type="button" onClick={() => setNightlyOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-violet-300/15 bg-violet-300/[0.07] px-4 py-2.5 text-xs font-black text-violet-100"><Moon className="h-4 w-4" />Nightly review</button><button type="button" onClick={() => { roadmap.setAnswers({}); setShowOnboarding(true); }} className="rounded-xl border border-white/10 px-4 py-2.5 text-xs font-black text-slate-300">New roadmap</button></div>
         </div>
         {nextTask && <div className="mt-7 rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.055] p-4 sm:p-5"><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[9px] font-black uppercase tracking-[.2em] text-cyan-200/70">Next up</p><h2 className="mt-1 text-lg font-black text-white">{nextTask.title}</h2><p className="mt-1 text-xs text-cyan-100/50">{nextTask.start_time || "Flexible"} — {nextTask.end_time || ""} · {nextTask.estimated_minutes || 30} min</p></div><ChevronRight className="hidden h-5 w-5 text-cyan-300/50 sm:block" /></div></div>}
         {completedCount > 0 && <div className="mt-6"><div className="flex items-center justify-between text-[10px] font-black uppercase tracking-[.15em] text-slate-600"><span>Execution progress</span><span className="tabular-nums">{overallProgress}%</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.06]"><div className="h-full origin-left rounded-full bg-cyan-300 transition-transform duration-700 ease-out will-change-transform" style={{ transform: `scaleX(${overallProgress / 100})` }} /></div></div>}
@@ -83,5 +112,6 @@ function RoadmapPage() {
       <div className="grid gap-5 lg:grid-cols-[1.08fr_.92fr]"><RoadmapVisualizer milestones={roadmap.milestones} todayIndex={roadmap.todayIndex} /><section className="rounded-[2rem] border border-white/[0.08] bg-white/[0.025] p-5 sm:p-7"><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[.2em] text-violet-300/80"><Sparkles className="h-4 w-4" />How your roadmap works</div><h2 className="mt-2 text-2xl font-black text-white">One day at a time.</h2><div className="mt-6 space-y-4"><div className="rounded-2xl border border-white/[0.06] p-4"><p className="text-sm font-black text-white">01 · Follow the clock</p><p className="mt-1 text-xs leading-5 text-slate-500">Each block has a start time, end time, instructions, and a clear definition of done.</p></div><div className="rounded-2xl border border-white/[0.06] p-4"><p className="text-sm font-black text-white">02 · Finish the block</p><p className="mt-1 text-xs leading-5 text-slate-500">Mark it complete only when the success criteria are actually met.</p></div><div className="rounded-2xl border border-white/[0.06] p-4"><p className="text-sm font-black text-white">03 · Reflect tonight</p><p className="mt-1 text-xs leading-5 text-slate-500">The AI uses completion, difficulty, energy and reflection to build tomorrow's schedule.</p></div></div></section></div>
     </div>
     <NightlyReviewModal open={nightlyOpen} onClose={() => setNightlyOpen(false)} onSubmit={handleReview} submitting={reviewing} />
+    <RoadmapEditDialog open={editOpen} initial={{ title: roadmap.roadmap.title, goal: roadmap.roadmap.goal }} onClose={() => setEditOpen(false)} onSave={saveEdit} onAskAI={askAIToEdit} saving={savingEdit} askingAI={askingAI} />
   </main>;
 }
