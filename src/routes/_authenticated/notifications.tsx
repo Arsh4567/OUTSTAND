@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Bell, BellOff, Check, Clock3, Megaphone, Sparkles, Target, Zap, BrainCircuit } from "lucide-react";
+import { Bell, BellOff, Check, Clock3, Megaphone, Sparkles, Target, Zap, BrainCircuit, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -14,21 +14,70 @@ const categories = [
   { key: "coaching_enabled", title: "Contextual AI coaching", description: "Personalized nudges based on your actual focus trends and habits.", icon: BrainCircuit },
   { key: "habits_enabled", title: "Habit reminders", description: "Gentle reminders when today's habits still need attention.", icon: Check },
   { key: "goals_enabled", title: "Goal reminders", description: "Keep important goals visible without constant nudges.", icon: Target },
-  { key: "motivational_enabled", title: "Momentum messages", description: "Occasional quotes and small encouragement when it helps.", icon: Sparkles },
+  { key: "motivational_enabled", title: "Momentum messages", description: "Occasional encouragement when it helps.", icon: Sparkles },
   { key: "updates_enabled", title: "OUTSTAND updates", description: "New features, improvements and important app news.", icon: Megaphone },
 ] as const;
 
+type NotificationEvent = { id: string; title: string; body: string; category: string };
+
 function NotificationsPage() {
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
-  const [history, setHistory] = useState<any[]>([]); const [busy, setBusy] = useState(false);
-  useEffect(() => { void Promise.all([getNotificationPreferences(), getNotificationHistory()]).then(([prefs, events]) => { setPreferences(prefs); setHistory(events); }); }, []);
-  const update = async (patch: Partial<NotificationPreferences>) => { try { setPreferences(await saveNotificationPreferences(patch)); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not save notification settings."); } };
-  const enable = async () => { setBusy(true); try { await requestPushPermission(); setPreferences(await getNotificationPreferences()); toast.success("Notifications are on 🔔"); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not enable notifications."); } finally { setBusy(false); } };
-  const disable = async () => { setBusy(true); try { await disablePushNotifications(); setPreferences((current) => current ? { ...current, push_enabled: false } : current); toast.success("Notifications paused."); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not disable notifications."); } finally { setBusy(false); } };
-  if (!preferences) return <div className="mx-auto flex min-h-[70vh] max-w-4xl items-center justify-center text-muted-foreground">Loading notification controls…</div>;
+  const [history, setHistory] = useState<NotificationEvent[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoadError(null);
+    try {
+      const [prefs, events] = await Promise.all([getNotificationPreferences(), getNotificationHistory()]);
+      setPreferences(prefs);
+      setHistory(events as NotificationEvent[]);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Could not load notification settings.");
+    }
+  };
+
+  useEffect(() => { void load(); }, []);
+
+  const update = async (patch: Partial<NotificationPreferences>) => {
+    try {
+      setPreferences(await saveNotificationPreferences(patch));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save notification settings.");
+    }
+  };
+
+  const enable = async () => {
+    setBusy(true);
+    try {
+      await requestPushPermission();
+      setPreferences(await getNotificationPreferences());
+      toast.success("Notifications are on 🔔");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not enable notifications.");
+    } finally { setBusy(false); }
+  };
+
+  const disable = async () => {
+    setBusy(true);
+    try {
+      await disablePushNotifications();
+      setPreferences((current) => current ? { ...current, push_enabled: false } : current);
+      toast.success("Notifications paused.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not disable notifications.");
+    } finally { setBusy(false); }
+  };
+
+  if (loadError) {
+    return <main className="mx-auto flex min-h-[70vh] max-w-4xl items-center justify-center px-4"><div className="w-full max-w-md rounded-3xl border border-red-400/15 bg-white/[0.03] p-7 text-center"><p className="text-xs font-black uppercase tracking-[0.2em] text-red-300">Couldn’t load settings</p><p className="mt-3 text-sm leading-6 text-white/55">{loadError}</p><Button className="mt-5" onClick={() => void load()}><RefreshCw className="mr-2 size-4" />Try again</Button></div></main>;
+  }
+
+  if (!preferences) return <div className="mx-auto flex min-h-[70vh] max-w-4xl items-center justify-center text-sm text-muted-foreground">Loading notification controls…</div>;
+
   return <main className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8 md:px-8">
-    <section className="relative overflow-hidden rounded-3xl border border-blue-400/15 bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,.24),transparent_42%),linear-gradient(135deg,#07101f,#050812)] p-6 md:p-8"><div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-center md:justify-between"><div><div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-300/15 bg-blue-400/10 px-3 py-1 text-xs font-medium text-blue-200"><Bell className="size-3.5" /> OUTSTAND notifications</div><h1 className="text-3xl font-semibold tracking-tight text-white md:text-4xl">Stay in the loop. Stay in motion.</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-white/55">OUTSTAND can learn from your productivity patterns and send useful nudges without turning your phone into a notification machine.</p></div><Button size="lg" disabled={busy} onClick={() => void (preferences.push_enabled ? disable() : enable())} className="shrink-0">{preferences.push_enabled ? <><BellOff className="mr-2 size-4" />Pause notifications</> : <><Bell className="mr-2 size-4" />Enable notifications</>}</Button></div></section>
-    <Card className="border-white/[0.08] bg-white/[0.025]"><CardHeader><CardTitle className="flex items-center gap-2"><Zap className="size-4 text-blue-300" />What OUTSTAND can send</CardTitle></CardHeader><CardContent className="space-y-1">{categories.map(({ key, title, description, icon: Icon }) => <div key={key} className="flex items-center justify-between gap-4 rounded-2xl px-3 py-4 transition-colors hover:bg-white/[0.03]"><div className="flex items-start gap-3"><div className="mt-0.5 rounded-xl bg-blue-400/10 p-2 text-blue-300"><Icon className="size-4" /></div><div><p className="font-medium text-white">{title}</p><p className="mt-1 text-xs leading-5 text-white/45">{description}</p></div></div><Switch checked={preferences[key]} disabled={!preferences.push_enabled} onCheckedChange={(checked) => void update({ [key]: checked })} /></div>)}</CardContent></Card>
+    <section className="relative overflow-hidden rounded-3xl border border-blue-400/15 bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,.24),transparent_42%),linear-gradient(135deg,#07101f,#050812)] p-6 md:p-8"><div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-center md:justify-between"><div><div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-300/15 bg-blue-400/10 px-3 py-1 text-xs font-medium text-blue-200"><Bell className="size-3.5" /> OUTSTAND notifications</div><h1 className="text-3xl font-semibold tracking-tight text-white md:text-4xl">Stay in the loop. Stay in motion.</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-white/55">Choose what OUTSTAND should remind you about. Your preferences can be configured before you turn push notifications on.</p></div><Button size="lg" disabled={busy} onClick={() => void (preferences.push_enabled ? disable() : enable())} className="shrink-0">{preferences.push_enabled ? <><BellOff className="mr-2 size-4" />Pause notifications</> : <><Bell className="mr-2 size-4" />Enable notifications</>}</Button></div></section>
+    <Card className="border-white/[0.08] bg-white/[0.025]"><CardHeader><CardTitle className="flex items-center gap-2"><Zap className="size-4 text-blue-300" />What OUTSTAND can send</CardTitle></CardHeader><CardContent className="space-y-1">{categories.map(({ key, title, description, icon: Icon }) => <div key={key} className="flex items-center justify-between gap-4 rounded-2xl px-3 py-4 transition-colors hover:bg-white/[0.03]"><div className="flex items-start gap-3"><div className="mt-0.5 rounded-xl bg-blue-400/10 p-2 text-blue-300"><Icon className="size-4" /></div><div><p className="font-medium text-white">{title}</p><p className="mt-1 text-xs leading-5 text-white/45">{description}</p></div></div><Switch checked={preferences[key]} onCheckedChange={(checked) => void update({ [key]: checked })} /></div>)}</CardContent></Card>
     <Card className="border-white/[0.08] bg-white/[0.025]"><CardHeader><CardTitle className="flex items-center gap-2"><Clock3 className="size-4 text-blue-300" />Quiet hours & frequency</CardTitle></CardHeader><CardContent className="space-y-4"><div className="flex items-center justify-between gap-4"><div><p className="font-medium text-white">Quiet hours</p><p className="text-xs text-white/45">No push reminders during your chosen rest window.</p></div><Switch checked={preferences.quiet_hours_enabled} onCheckedChange={(checked) => void update({ quiet_hours_enabled: checked })} /></div><Separator className="bg-white/[0.06]" /><div className="grid gap-3 sm:grid-cols-2"><label className="text-xs text-white/45">Start<input type="time" value={preferences.quiet_start} onChange={(e) => void update({ quiet_start: e.target.value })} className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white" /></label><label className="text-xs text-white/45">End<input type="time" value={preferences.quiet_end} onChange={(e) => void update({ quiet_end: e.target.value })} className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white" /></label></div><p className="text-xs text-white/35">Maximum {preferences.max_daily} push notifications per day. OUTSTAND prioritizes useful reminders over noise.</p></CardContent></Card>
     <Card className="border-white/[0.08] bg-white/[0.025]"><CardHeader><CardTitle>Recent notification activity</CardTitle></CardHeader><CardContent>{history.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-white/35">No notifications yet. Your notification history will appear here.</div> : <div className="space-y-3">{history.map((item) => <div key={item.id} className={cn("rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4")}><div className="flex items-center justify-between gap-3"><p className="font-medium text-white">{item.title}</p><span className="text-[11px] uppercase tracking-wider text-white/30">{item.category}</span></div><p className="mt-1 text-sm text-white/50">{item.body}</p></div>)}</div>}</CardContent></Card>
   </main>;
