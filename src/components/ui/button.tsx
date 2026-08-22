@@ -5,32 +5,22 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  // PERFORMANCE: Buttons are ubiquitous, so their idle state must stay cheap.
-  // Only transform/opacity are animated; hover shadows/borders remain static to
-  // avoid repeated paint work across every interactive control in the app.
-  "group relative inline-flex items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-xl text-sm font-bold tracking-wide transition-[transform,opacity] duration-[240ms] ease-[cubic-bezier(.16,1,.3,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:transition-transform [&_svg]:duration-200 [&_svg]:ease-[cubic-bezier(.16,1,.3,1)] hover:[&_svg]:scale-105",
+  "group relative inline-flex items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-xl text-sm font-bold tracking-wide transition-[transform,background-color,border-color,color,opacity] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60 disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:transition-transform [&_svg]:duration-200 [&_svg]:ease-out hover:[&_svg]:scale-105",
   {
     variants: {
       variant: {
-        // DEFAULT: Keep the visual depth, but remove the continuously animated shimmer.
-        // A static layered shadow preserves polish without an always-running paint effect.
         default:
-          "bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-500 text-white shadow-[0_12px_30px_rgba(0,0,0,.22),0_0_20px_rgba(99,102,241,.28),inset_0_1px_1px_rgba(255,255,255,.18)] border border-white/10 hover:border-white/20 hover:-translate-y-0.5 hover:brightness-110",
-
+          "bg-cyan-300 text-slate-950 border border-cyan-200/30 shadow-[0_8px_24px_rgba(34,211,238,.12)] hover:-translate-y-0.5 hover:bg-cyan-200",
         destructive:
-          "bg-gradient-to-br from-rose-500 to-red-600 text-white shadow-[0_12px_30px_rgba(0,0,0,.24),0_0_20px_rgba(244,63,94,.22),inset_0_1px_1px_rgba(255,255,255,.16)] border border-rose-400/30 hover:border-rose-400/50 hover:-translate-y-0.5",
-
+          "bg-rose-500 text-white border border-rose-400/30 hover:-translate-y-0.5 hover:bg-rose-400",
         outline:
-          "bg-zinc-950/40 text-slate-200 border border-white/10 shadow-[0_10px_28px_rgba(0,0,0,.18),inset_0_1px_1px_rgba(255,255,255,.10)] backdrop-blur-md hover:bg-white/5 hover:text-white hover:border-indigo-400/50 hover:-translate-y-0.5",
-
+          "bg-white/[0.02] text-slate-200 border border-white/10 hover:bg-white/[0.06] hover:text-white hover:border-white/20 hover:-translate-y-0.5",
         secondary:
-          "bg-white/5 text-white border border-white/10 shadow-[0_10px_28px_rgba(0,0,0,.16),inset_0_1px_1px_rgba(255,255,255,.10)] backdrop-blur-xl hover:bg-white/10 hover:border-white/20 hover:-translate-y-0.5",
-
+          "bg-white/[0.05] text-white border border-white/10 hover:bg-white/[0.09] hover:border-white/20 hover:-translate-y-0.5",
         ghost:
-          "text-slate-400 hover:text-white hover:bg-white/10",
-
+          "text-slate-400 hover:text-white hover:bg-white/[0.05]",
         link:
-          "text-indigo-400 underline-offset-4 hover:underline hover:text-indigo-300",
+          "text-cyan-300 underline-offset-4 hover:underline hover:text-cyan-200",
       },
       size: {
         default: "h-11 px-6 py-2",
