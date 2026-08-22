@@ -3,6 +3,7 @@ import { motion, MotionConfig } from "framer-motion";
 import { Loader2, RefreshCw } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useAuth, displayNameOf } from "@/hooks/use-auth";
+import { useAppState } from "@/hooks/use-app-state";
 import { useDailyLog } from "@/hooks/use-dopamine";
 import { DashboardWelcome, DashboardHabits, DashboardActivity } from "@/components/dashboard/DashboardSections";
 import { DashboardAISection } from "@/components/dashboard/DashboardAISection";
@@ -13,6 +14,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({ component: D
 function DashboardPage() {
   const { snapshot, isLoading, loadError, completeMission } = useDashboard();
   const { user, profile } = useAuth();
+  const { toggleToday } = useAppState();
   const { log } = useDailyLog();
 
   if (isLoading) {
@@ -97,7 +99,7 @@ function DashboardPage() {
           />
 
           <div className="grid gap-5 lg:grid-cols-2">
-            <DashboardHabits habits={productivity?.habits ?? []} onToggle={() => {}} />
+            <DashboardHabits habits={productivity?.habits ?? []} onToggle={toggleToday} />
             <DashboardActivity sessions={productivity?.sessions ?? []} outstand={productivity?.outstand ?? []} dailyScore={log?.score ?? null} />
           </div>
         </main>
