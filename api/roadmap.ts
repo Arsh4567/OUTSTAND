@@ -30,30 +30,17 @@ function parseJson(text: string) {
 
 const rules = `You are OUTSTAND Intelligence. Your job is execution, not motivational writing. Never invent user facts. Ask for missing information. Prefer a tiny number of high-leverage actions over exhaustive lists. Every task must be concrete, measurable, and finishable in one session. Never schedule over sleep, school, work, meals, or fixed commitments. Do not create generic filler such as stay motivated, research more, keep learning, or work hard. Use active recall, deliberate practice, spaced repetition, error correction, or reflection only when they fit. A user should be able to open OUTSTAND and know exactly what to do next. Return JSON only.`;
 
-async function callAI(prompt: string) {
-  const groq = env("GROQ_API_KEY");
-  if (groq) {
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${groq}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "llama-3.3-70b-versatile", temperature: 0.15, max_tokens: 5000, response_format: { type: "json_object" }, messages: [{ role: "system", content: rules }, { role: "user", content: prompt }] }),
-    });
-    const raw = await response.text();
-    if (response.ok) {
-      try {
-        const parsed = JSON.parse(raw); const content = parsed?.choices?.[0]?.message?.content;
-        if (typeof content === "string" && content.trim()) return parseJson(content);
-      } catch (error) { console.error("[OUTSTAND] Groq response parsing failed", error); }
-    }
-    if (response.status !== 429 && response.status < 500) throw Object.assign(new Error(`Groq request failed (${response.status}).`), { status: response.status });
-  }
-
+async function callGemini(prompt: string) {
   const google = env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY");
-  if (!google) throw Object.assign(new Error("AI service configuration is missing."), { status: 503 });
-  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
+  if (!google) throw Object.assign(new Error("Gemini API key is not configured."), { status: 503 });
+  const model = env("GEMINI_MODEL") || "gemini-2.5-flash";
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": google },
-    body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: `${rules}\n\n${prompt}` }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.15 } }),
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: `${rules}\n\n${prompt}` }] }],
+      generationConfig: { responseMimeType: "application/json", temperature: 0.15 },
+    }),
   });
   const raw = await response.text();
   if (!response.ok) throw Object.assign(new Error(`Gemini request failed (${response.status}).`), { status: response.status });
@@ -62,6 +49,36 @@ async function callAI(prompt: string) {
     if (!content?.trim()) throw new Error("The AI returned an empty response.");
     return parseJson(content);
   } catch (error) { throw error instanceof Error ? error : new Error("The AI returned invalid structured data."); }
+}
+
+async function callGroq(prompt: string) {
+  const groq = env("GROQ_API_KEY");
+  if (!groq) throw Object.assign(new Error("Groq API key is not configured."), { status: 503 });
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${groq}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "llama-3.3-70b-versatile", temperature: 0.15, max_tokens: 5000, response_format: { type: "json_object" }, messages: [{ role: "system", content: rules }, { role: "user", content: prompt }] }),
+  });
+  const raw = await response.text();
+  if (!response.ok) throw Object.assign(new Error(`Groq request failed (${response.status}).`), { status: response.status });
+  try {
+    const parsed = JSON.parse(raw); const content = parsed?.choices?.[0]?.message?.content;
+    if (typeof content !== "string" || !content.trim()) throw new Error("The AI returned an empty response.");
+    return parseJson(content);
+  } catch (error) { throw error instanceof Error ? error : new Error("The AI returned invalid structured data."); }
+}
+
+async function callAI(prompt: string) {
+  const failures: string[] = [];
+  if (env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")) {
+    try { return await callGemini(prompt); }
+    catch (error) { failures.push(error instanceof Error ? error.message : "Gemini failed"); console.error("[OUTSTAND] Gemini provider failed; trying fallback", error); }
+  }
+  if (env("GROQ_API_KEY")) {
+    try { return await callGroq(prompt); }
+    catch (error) { failures.push(error instanceof Error ? error.message : "Groq failed"); console.error("[OUTSTAND] Groq provider failed", error); }
+  }
+  throw Object.assign(new Error("AI service is temporarily unavailable. Please try again."), { status: 503, cause: failures });
 }
 
 const validTime = (value: unknown) => typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
@@ -76,7 +93,7 @@ function normalizePlan(plan: any) { plan.milestones = plan.milestones.slice(0, 6
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "OPTIONS") { res.status(204).end(); return; }
-  if (req.method === "GET") return json(res, 200, { ok: Boolean(env("GROQ_API_KEY") || env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")), groq: Boolean(env("GROQ_API_KEY")), gemini: Boolean(env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")), service: "outstand-roadmap-ai" });
+  if (req.method === "GET") return json(res, 200, { ok: Boolean(env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY") || env("GROQ_API_KEY")), gemini: Boolean(env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")), groq: Boolean(env("GROQ_API_KEY")), service: "outstand-roadmap-ai" });
   if (req.method !== "POST") return json(res, 405, { error: "Method not allowed." });
   try {
     const { client, userId } = await auth(req); const input = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
