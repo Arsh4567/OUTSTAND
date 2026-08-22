@@ -10,10 +10,6 @@ export type DashboardSnapshot = { userName: string; totalXp: number; level: numb
 type Stats = { total_xp?: number; level?: number; streak_days?: number };
 type Quest = { id: string; title: string; category: string; difficulty: string; xp_reward: number };
 type QuestRow = { id: string; completed: boolean | null; quests: Quest | Quest[] | null };
-const genericFallbackMissions: Omit<DashboardMission, "completed" | "mutating">[] = [
-  { id: "fallback-focus", title: "Start a 25-minute focus session", category: "Focus", difficulty: "medium", xpReward: 0 },
-  { id: "fallback-plan", title: "Plan your top 3 priorities", category: "Planning", difficulty: "medium", xpReward: 0 },
-];
 
 function quoteOfTheDay() {
   const fallback = { quote: "Small actions, repeated daily, create extraordinary change.", author: "Outstand" };
@@ -29,7 +25,6 @@ export function useDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const [fallbackCompleted, setFallbackCompleted] = useState<Set<string>>(new Set());
 
   const applyStats = useCallback((data: Stats | null) => {
     const xp = Math.max(0, Number(data?.total_xp ?? 0));
@@ -93,9 +88,8 @@ export function useDashboard() {
       return { id: row.id, title: q.title, category: q.category, difficulty: q.difficulty, xpReward: Number(q.xp_reward) || 0, completed: Boolean(row.completed), mutating: false };
     }).filter(Boolean) as DashboardMission[];
     const progress = progressResult.status === "fulfilled" ? progressResult.value : null;
-    const missions = mapped.length ? mapped : progress ? [] : genericFallbackMissions.map((m) => ({ ...m, completed: fallbackCompleted.has(m.id), mutating: false }));
-    setSnapshot((prev) => ({ ...prev, missions, roadmapProgress: progress }));
-  }, [applyStats, ensureStats, fallbackCompleted, loadRoadmapProgress]);
+    setSnapshot((prev) => ({ ...prev, missions: mapped, roadmapProgress: progress }));
+  }, [applyStats, ensureStats, loadRoadmapProgress]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -125,12 +119,6 @@ export function useDashboard() {
   const completeMission = useCallback(async (missionId: string) => {
     const mission = snapshot.missions.find((item) => item.id === missionId);
     if (!mission || mission.completed || mission.mutating) return;
-
-    if (missionId.startsWith("fallback-")) {
-      setFallbackCompleted((prev) => new Set(prev).add(missionId));
-      toast.success("Mission complete", { description: "Nice work — this fallback mission does not award XP." });
-      return;
-    }
 
     setSnapshot((prev) => ({ ...prev, missions: prev.missions.map((item) => item.id === missionId ? { ...item, completed: true, mutating: true } : item) }));
     const { error } = await supabase.rpc("complete_daily_quest", { p_daily_quest_id: missionId });
