@@ -36,7 +36,7 @@ async function callAI(prompt: string) {
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${groq}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "llama-3.1-8b-instant", temperature: 0.15, max_tokens: 5000, response_format: { type: "json_object" }, messages: [{ role: "system", content: rules }, { role: "user", content: prompt }] }),
+      body: JSON.stringify({ model: "openai/gpt-oss-20b", temperature: 0.15, max_tokens: 5000, response_format: { type: "json_object" }, messages: [{ role: "system", content: rules }, { role: "user", content: prompt }] }),
     });
     const raw = await response.text();
     if (response.ok) {
@@ -50,7 +50,7 @@ async function callAI(prompt: string) {
 
   const google = env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY");
   if (!google) throw Object.assign(new Error("AI service configuration is missing."), { status: 503 });
-  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
+  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": google },
     body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: `${rules}\n\n${prompt}` }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.15 } }),
@@ -76,6 +76,7 @@ function normalizePlan(plan: any) { plan.milestones = plan.milestones.slice(0, 6
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "OPTIONS") { res.status(204).end(); return; }
+  if (req.method === "GET") return json(res, 200, { ok: Boolean(env("GROQ_API_KEY") || env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")), groq: Boolean(env("GROQ_API_KEY")), gemini: Boolean(env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")), service: "outstand-roadmap-ai" });
   if (req.method !== "POST") return json(res, 405, { error: "Method not allowed." });
   try {
     const { client, userId } = await auth(req); const input = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
