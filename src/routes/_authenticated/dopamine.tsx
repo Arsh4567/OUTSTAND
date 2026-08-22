@@ -14,6 +14,8 @@ import { TriggerMapCard } from "@/components/dopamine/TriggerMapCard";
 import { AdaptiveChallengeCard } from "@/components/dopamine/AdaptiveChallengeCard";
 import { ThirtyDayIntelligenceCard } from "@/components/dopamine/ThirtyDayIntelligenceCard";
 import { ExecutionSystemsCard } from "@/components/dopamine/ExecutionSystemsCard";
+import { DopamineSectionBoundary } from "@/components/dopamine/DopamineSectionBoundary";
+import { CoreReactor } from "@/components/dopamine/CoreReactor";
 
 export const Route = createFileRoute("/_authenticated/dopamine")({ component: MomentumPage });
 const smoothEase = [0.16, 1, 0.3, 1] as const;
@@ -58,7 +60,6 @@ function MomentumPage() {
     <div className="relative min-h-screen overflow-hidden bg-[#02040a] pb-24 font-sans text-white selection:bg-indigo-500/30">
       <motion.div className="fixed inset-0 -z-20 opacity-30 blur-[150px]" animate={{ background: `radial-gradient(circle 800px at 50% -20%, ${color.hex}40, transparent 80%)` }} transition={{ duration: 2, ease: smoothEase }} />
       <div className="fixed inset-0 -z-10 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.12] mix-blend-overlay" />
-
       <div className="mx-auto w-full max-w-[1600px] px-4 pt-8 sm:px-6 sm:pt-10 md:px-8 lg:px-10 xl:px-12 2xl:px-16">
         <header className="mb-7 flex flex-col gap-5 md:flex-row md:items-end md:justify-between lg:mb-9 xl:mb-10">
           <div className="min-w-0">
@@ -71,34 +72,31 @@ function MomentumPage() {
 
         <div className="space-y-5 sm:space-y-6 xl:space-y-7">
           <BrainStateCard state={brainState} />
-          <WeeklyAnalysisCard onAnalyze={analyzeWeek} />
+          <DopamineSectionBoundary label="Weekly intelligence"><WeeklyAnalysisCard onAnalyze={analyzeWeek} /></DopamineSectionBoundary>
 
           <section className="grid gap-5 lg:grid-cols-12 xl:gap-7">
-            <div className="lg:col-span-8 xl:col-span-9"><ExecutionSystemsCard logs={monthlyLogs} /></div>
-            <div className="lg:col-span-4 xl:col-span-3"><AdaptiveChallengeCard logs={monthlyLogs} /></div>
+            <div className="lg:col-span-8 xl:col-span-9"><DopamineSectionBoundary label="Execution center"><ExecutionSystemsCard logs={monthlyLogs} /></DopamineSectionBoundary></div>
+            <div className="lg:col-span-4 xl:col-span-3"><DopamineSectionBoundary label="Adaptive challenge"><AdaptiveChallengeCard logs={monthlyLogs} /></DopamineSectionBoundary></div>
           </section>
 
           <section className="grid gap-5 md:grid-cols-2 xl:gap-7">
-            <TriggerMapCard logs={monthlyLogs} />
-            <ThirtyDayIntelligenceCard logs={monthlyLogs} />
+            <DopamineSectionBoundary label="Trigger map"><TriggerMapCard logs={monthlyLogs} /></DopamineSectionBoundary>
+            <DopamineSectionBoundary label="30-day intelligence"><ThirtyDayIntelligenceCard logs={monthlyLogs} /></DopamineSectionBoundary>
           </section>
 
           <section className="grid gap-5 lg:grid-cols-12 xl:gap-7">
             <section className="relative flex min-h-[320px] flex-col items-center justify-center overflow-hidden rounded-[2rem] border border-white/7 bg-[#0a0f1a]/70 p-6 shadow-2xl lg:col-span-4 lg:min-h-[380px] xl:col-span-4 xl:min-h-[430px] xl:p-8">
               <div className="mb-5 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.25em] text-indigo-300"><Sparkles className="h-4 w-4" /> Current momentum</div>
-              <CoreReactor score={score} color={color.hex} label={color.label} />
+              <DopamineSectionBoundary label="Momentum reactor"><CoreReactor score={score} color={color.hex} label={color.label} /></DopamineSectionBoundary>
             </section>
             <section className="rounded-[2rem] border border-white/7 bg-[#0a0f1a]/70 p-5 shadow-2xl sm:p-7 lg:col-span-8 xl:col-span-8 xl:p-8">
               <div className="mb-5 flex items-center gap-3"><div className="rounded-xl border border-indigo-400/20 bg-indigo-500/10 p-2.5"><TrendingUp className="h-4 w-4 text-indigo-300" /></div><div><h2 className="text-lg font-black xl:text-xl">Trajectory & signals</h2><p className="text-sm text-slate-500">Your recent behavior signals</p></div></div>
-              <div className="grid gap-5 lg:grid-cols-2"><div className="rounded-2xl border border-white/7 bg-black/20 p-5"><div className="mb-4 flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-500"><Brain className="h-3.5 w-3.5" /> What stands out</div><div className="space-y-3">{insights.slice(0, 4).map((insight, index) => <div key={index} className="flex gap-3 text-sm leading-6 text-slate-300"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" />{insight}</div>)}</div></div><div className="min-h-[210px] rounded-2xl border border-white/7 bg-black/20 p-5"><h4 className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-500">Past 7 days</h4><NeuralChart color={color.hex} /></div></div>
+              <div className="grid gap-5 lg:grid-cols-2"><div className="rounded-2xl border border-white/7 bg-black/20 p-5"><div className="mb-4 flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-500"><Brain className="h-3.5 w-3.5" /> What stands out</div><div className="space-y-3">{insights.slice(0, 4).map((insight, index) => <div key={index} className="flex gap-3 text-sm leading-6 text-slate-300"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" />{insight}</div>)}</div></div><div className="min-h-[210px] rounded-2xl border border-white/7 bg-black/20 p-5"><h4 className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-500">Past 7 days</h4><DopamineSectionBoundary label="Trajectory chart"><NeuralChart color={color.hex} /></DopamineSectionBoundary></div></div>
             </section>
           </section>
 
           <details className="group overflow-hidden rounded-[2rem] border border-white/10 bg-[#0a0f1a]/70 shadow-2xl">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 sm:p-7 [&::-webkit-details-marker]:hidden">
-              <div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.25em] text-cyan-300"><Sparkles className="h-3.5 w-3.5" /> Daily check-in</div><h2 className="mt-1 text-xl font-black">What helped or hurt today?</h2><p className="mt-1 text-sm text-slate-500">Tap only what actually happened. Your signals stay under your control.</p></div>
-              <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 group-open:text-cyan-300">Open</span>
-            </summary>
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 sm:p-7 [&::-webkit-details-marker]:hidden"><div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.25em] text-cyan-300"><Sparkles className="h-3.5 w-3.5" /> Daily check-in</div><h2 className="mt-1 text-xl font-black">What helped or hurt today?</h2><p className="mt-1 text-sm text-slate-500">Tap only what actually happened. Your signals stay under your control.</p></div><span className="shrink-0 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 group-open:text-cyan-300">Open</span></summary>
             <div className="grid gap-5 border-t border-white/7 p-5 sm:p-7 lg:grid-cols-2">
               <section className="rounded-2xl border border-emerald-500/15 bg-emerald-950/10 p-5"><h3 className="mb-4 text-xs font-black uppercase tracking-[0.2em] text-emerald-300">Accelerators</h3><div className="grid gap-2.5 sm:grid-cols-2">{POSITIVES.slice(0, 8).map((item) => <ActionCard key={item.key} active={positives.includes(item.key)} emoji={item.emoji} label={item.label} description={item.description} points={item.points} tone="good" onClick={() => togglePositive(item.key)} />)}</div></section>
               <section className="rounded-2xl border border-rose-500/15 bg-rose-950/10 p-5"><h3 className="mb-4 text-xs font-black uppercase tracking-[0.2em] text-rose-300">Friction signals</h3><div className="grid gap-2.5 sm:grid-cols-2">{NEGATIVES.map((item) => <ActionCard key={item.key} active={negatives.includes(item.key)} emoji={item.emoji} label={item.label} description={item.description} points={item.points} tone="bad" onClick={() => toggleNegative(item.key)} />)}</div></section>
