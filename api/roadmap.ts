@@ -40,15 +40,39 @@ async function callGemini(prompt: string) {
   try { const parsed = JSON.parse(raw); const content = parsed?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text || "").join(""); if (!content?.trim()) throw new Error("The AI returned an empty response."); return parseJson(content); } catch (error) { throw error instanceof Error ? error : new Error("The AI returned invalid structured data."); }
 }
 
+const GROQ_DEFAULT_MODEL = "llama-3.3-70b-versatile";
+const GROQ_SAFE_MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"];
+
+async function resolveGroqModel(groq: string) {
+  const configured = env("GROQ_MODEL");
+  // Never allow a stale/removed model setting to keep production broken.
+  if (configured && GROQ_SAFE_MODELS.includes(configured)) return configured;
+  try {
+    const response = await fetch("https://api.groq.com/openai/v1/models", { headers: { Authorization: `Bearer ${groq}` } });
+    if (response.ok) {
+      const data = await response.json() as { data?: Array<{ id?: string; active?: boolean }> };
+      const available = new Set((data.data || []).filter((model) => model.active !== false).map((model) => model.id).filter(Boolean));
+      if (available.has(GROQ_DEFAULT_MODEL)) return GROQ_DEFAULT_MODEL;
+      if (available.has("llama-3.1-8b-instant")) return "llama-3.1-8b-instant";
+    }
+  } catch (error) {
+    console.warn("[OUTSTAND] Could not resolve Groq model list; using default", error);
+  }
+  return GROQ_DEFAULT_MODEL;
+}
+
 async function callGroq(prompt: string) {
   const groq = env("GROQ_API_KEY");
   if (!groq) throw Object.assign(new Error("Groq API key is not configured."), { status: 503 });
-  // Groq primary. Keep the model configurable so it can be changed without code changes.
-  // Do not use an OpenAI-owned model. Default to Meta Llama 3.3 70B.
-  const model = env("GROQ_MODEL") || "llama-3.3-70b-versatile";
+  // Groq is the primary provider. Only Meta Llama models are selected here; Gemini is the fallback provider.
+  const model = await resolveGroqModel(groq);
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${groq}`, "Content-Type": "application/json" }, body: JSON.stringify({ model, temperature: 0.15, max_tokens: 5000, response_format: { type: "json_object" }, messages: [{ role: "system", content: rules }, { role: "user", content: prompt }] }) });
   const raw = await response.text();
-  if (!response.ok) throw Object.assign(new Error(`Groq request failed (${response.status}).`), { status: response.status });
+  if (!response.ok) {
+    let detail = "";
+    try { const parsed = JSON.parse(raw); detail = typeof parsed?.error?.message === "string" ? `: ${parsed.error.message}` : ""; } catch { /* ignore malformed provider error */ }
+    throw Object.assign(new Error(`Groq request failed (${response.status})${detail}`), { status: response.status });
+  }
   try { const parsed = JSON.parse(raw); const content = parsed?.choices?.[0]?.message?.content; if (typeof content !== "string" || !content.trim()) throw new Error("The AI returned an empty response."); return parseJson(content); } catch (error) { throw error instanceof Error ? error : new Error("The AI returned invalid structured data."); }
 }
 
@@ -77,7 +101,7 @@ function normalizePlan(plan: any) { plan.milestones = plan.milestones.slice(0, 6
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "OPTIONS") { res.status(204).end(); return; }
-  if (req.method === "GET") return json(res, 200, { ok: Boolean(env("GROQ_API_KEY") || env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")), groq: Boolean(env("GROQ_API_KEY")), gemini: Boolean(env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")), service: "outstand-roadmap-ai", primary: "groq", fallback: "gemini", groqModel: env("GROQ_MODEL") || "llama-3.3-70b-versatile" });
+  if (req.method === "GET") return json(res, 200, { ok: Boolean(env("GROQ_API_KEY") || env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")), groq: Boolean(env("GROQ_API_KEY")), gemini: Boolean(env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")), service: "outstand-roadmap-ai", primary: "groq", fallback: "gemini", groqModel: env("GROQ_MODEL") || GROQ_DEFAULT_MODEL });
   if (req.method !== "POST") return json(res, 405, { error: "Method not allowed." });
   try {
     const { client, userId } = await auth(req); const input = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
