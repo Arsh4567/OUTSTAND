@@ -5,30 +5,39 @@ import { Activity, ArrowRight, Brain, Share, Sparkles, TrendingUp } from "lucide
 
 import { supabase } from "@/integrations/supabase/client";
 import { useDailyLog, useWeeklyLogs } from "@/hooks/use-dopamine";
-import { useDigitalFriction } from "@/hooks/use-digital-friction";
-import { computeBrainState } from "@/lib/digital-friction";
 import { POSITIVES, NEGATIVES, scoreColor, generateInsights } from "@/lib/dopamine";
 import { Button } from "@/components/ui/button";
 import { ActionCard } from "@/components/dopamine/ActionCard";
 import { CoreReactor } from "@/components/dopamine/CoreReactor";
 import { NeuralChart } from "@/components/dopamine/NeuralChart";
-import { BrainStateCard } from "@/components/dopamine/BrainStateCard";
-import { DigitalFrictionCard } from "@/components/dopamine/DigitalFrictionCard";
+import { BrainStateCard, type BrainState } from "@/components/dopamine/BrainStateCard";
 import { WeeklyAnalysisCard } from "@/components/dopamine/WeeklyAnalysisCard";
+import { TriggerMapCard } from "@/components/dopamine/TriggerMapCard";
+import { AdaptiveChallengeCard } from "@/components/dopamine/AdaptiveChallengeCard";
+import { ThirtyDayIntelligenceCard } from "@/components/dopamine/ThirtyDayIntelligenceCard";
 
 export const Route = createFileRoute("/_authenticated/dopamine")({ component: MomentumPage });
 
 const smoothEase = [0.16, 1, 0.3, 1] as const;
 
+function buildBrainState(score: number, positives: string[], negatives: string[]): BrainState {
+  const focus = Math.max(0, Math.min(100, 50 + (positives.includes("pomodoro") ? 25 : 0) - (negatives.includes("broke_focus") ? 25 : 0)));
+  const recovery = Math.max(0, Math.min(100, 55 + (positives.includes("sleep_on_time") ? 25 : 0) + (positives.includes("sunlight") ? 10 : 0) - (negatives.includes("slept_late") ? 25 : 0)));
+  const execution = Math.max(0, Math.min(100, 45 + (positives.includes("outstand") ? 20 : 0) + (positives.includes("all_habits") ? 20 : 0) - (negatives.includes("skipped_habits") ? 25 : 0)));
+  const overall = Math.round((score + focus + recovery + execution) / 4);
+  const label = overall >= 80 ? "Peak momentum" : overall >= 65 ? "Building momentum" : overall >= 45 ? "Finding momentum" : "Needs a reset";
+  return { overall, label, focus, digital: null, recovery, execution };
+}
+
 function MomentumPage() {
   const { log, loading, togglePositive, toggleNegative } = useDailyLog();
-  const { logs } = useWeeklyLogs(7);
-  const { snapshot, connected, loading: frictionLoading, refresh, saveManual } = useDigitalFriction();
-  const score = log?.score ?? 50;
+  const { logs: weeklyLogs } = useWeeklyLogs(7);
+  const { logs: monthlyLogs } = useWeeklyLogs(30);
+  const score = log?.score ?? 0;
   const color = scoreColor(score);
   const positives = log?.positives ?? [];
   const negatives = log?.negatives ?? [];
-  const brainState = useMemo(() => computeBrainState(score, snapshot), [score, snapshot]);
+  const brainState = useMemo(() => log ? buildBrainState(score, positives, negatives) : null, [log, score, positives, negatives]);
   const insights = useMemo(() => generateInsights(positives, negatives, score), [positives, negatives, score]);
 
   const analyzeWeek = async () => {
@@ -40,8 +49,7 @@ function MomentumPage() {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({
-        logs: logs.map((item) => ({ log_date: item.log_date, score: item.score, positives: item.positives, negatives: item.negatives })),
-        friction: snapshot ? { screenMinutes: snapshot.screenMinutes, distractionMinutes: snapshot.distractionMinutes, topApp: snapshot.topApp?.appName } : null,
+        logs: weeklyLogs.filter((item) => item.recorded).map((item) => ({ log_date: item.log_date, score: item.score, positives: item.positives, negatives: item.negatives })),
       }),
     });
     const payload = await response.json().catch(() => ({}));
@@ -49,9 +57,7 @@ function MomentumPage() {
     return payload.analysis as string;
   };
 
-  if (loading) {
-    return <div className="flex min-h-screen items-center justify-center bg-[#02040a] text-xs font-black uppercase tracking-[0.3em] text-cyan-300">Calibrating your momentum state...</div>;
-  }
+  if (loading) return <div className="flex min-h-screen items-center justify-center bg-[#02040a] text-xs font-black uppercase tracking-[0.3em] text-cyan-300">Calibrating your momentum state...</div>;
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#02040a] pb-24 font-sans text-white selection:bg-indigo-500/30">
@@ -62,19 +68,21 @@ function MomentumPage() {
         <header className="mb-8 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-[10px] font-black uppercase tracking-[0.25em] text-slate-400"><Activity className="h-3.5 w-3.5 text-cyan-400" /> Attention & recovery OS</div>
-            <h1 className="text-5xl font-black tracking-tighter md:text-7xl">Momentum <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-cyan-300 to-indigo-400">Matrix.</span></h1>
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-400">OUTSTAND now connects your daily actions, digital friction, and execution patterns instead of treating this as a simple habit checklist.</p>
+            <h1 className="text-5xl font-black tracking-tighter md:text-7xl">Momentum <span className="bg-gradient-to-r from-indigo-400 via-cyan-300 to-indigo-400 bg-clip-text text-transparent">Matrix.</span></h1>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-400">Understand the patterns behind your execution, then turn them into one clear action.</p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" onClick={() => navigator.clipboard.writeText(`My OUTSTAND momentum state is ${brainState.overall}/100.`)} className="h-11 rounded-xl border-white/10 bg-white/5"><Share className="mr-2 h-4 w-4" /> Share state</Button>
+            <Button variant="outline" disabled={!brainState} onClick={() => brainState && navigator.clipboard.writeText(`My OUTSTAND momentum state is ${brainState.overall}/100.`)} className="h-11 rounded-xl border-white/10 bg-white/5"><Share className="mr-2 h-4 w-4" /> Share state</Button>
             <Button asChild variant="outline" className="h-11 rounded-xl border-white/10 bg-white/5"><Link to="/profile">Timeline <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
           </div>
         </header>
 
         <div className="space-y-6">
           <BrainStateCard state={brainState} />
-          <DigitalFrictionCard snapshot={snapshot} connected={connected} loading={frictionLoading} onRefresh={refresh} onSaveManual={saveManual} />
           <WeeklyAnalysisCard onAnalyze={analyzeWeek} />
+          <AdaptiveChallengeCard logs={monthlyLogs} />
+          <TriggerMapCard logs={monthlyLogs} />
+          <ThirtyDayIntelligenceCard logs={monthlyLogs} />
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
             <section className="relative flex flex-col items-center justify-center overflow-hidden rounded-[2rem] border border-white/7 bg-[#0a0f1a]/70 p-7 shadow-2xl lg:col-span-4">
