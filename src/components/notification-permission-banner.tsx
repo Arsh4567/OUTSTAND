@@ -3,10 +3,13 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { requestPushPermission } from "@/lib/notification-engine";
+import { useAuth } from "@/hooks/use-auth";
 
 const DISMISSED_PREFIX = "outstand-notification-banner-dismissed:";
 
-export function NotificationPermissionBanner({ userId }: { userId?: string }) {
+export function NotificationPermissionBanner() {
+  const { user } = useAuth();
+  const userId = user?.id;
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
 
