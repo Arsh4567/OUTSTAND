@@ -88,6 +88,6 @@ export function useProfileState() {
   };
 
   const getAuraColor = (prod: number) => prod >= 90 ? "from-violet-500 via-fuchsia-500 to-cyan-500" : prod >= 70 ? "from-emerald-400 via-cyan-500 to-blue-500" : prod >= 40 ? "from-amber-400 via-orange-500 to-rose-500" : "from-slate-500 via-slate-600 to-zinc-700";
-  const getRankTitle = (lvl: number) => lvl >= 50 ? "Grandmaster" : lvl >= 30 ? "Ascended" : lvl >= 15 ? "Disciplined" : lvl >= 5 ? "Initiate" : "Novice";
+  const getRankTitle = (_lvl: number) => "";
   return { user, profile, name, level, into, need, pct, xp, bestStreak, habits, streaks, logs, outstand, stats, isEditing, setIsEditing, draftName, setDraftName, draftBio, setDraftBio, draftUsername, setDraftUsername, isUploading, copiedId, fileInputRef, beginEdit, saveProfile, handleAvatarUpload, signOut, handleCopyId, getAuraColor, getRankTitle };
 }
