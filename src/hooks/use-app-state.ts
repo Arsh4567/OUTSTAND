@@ -12,6 +12,7 @@ function safeUuid() {
 }
 function normalizeHabitName(name: string) { return name.trim().replace(/\s+/g, " ").toLocaleLowerCase(); }
 function isAbortError(error: unknown) { return error instanceof DOMException && error.name === "AbortError"; }
+function isoDateOffset(days: number) { const date = new Date(); date.setDate(date.getDate() + days); return date.toISOString().slice(0, 10); }
 
 export function useAppState() {
   const [rawHabits, setHabits] = useLocalStorage<Habit[]>("ht.habits.v1", seedHabits);
@@ -42,7 +43,12 @@ export function useAppState() {
         }
       }
       const { data } = await supabase.from("profiles").select("current_streak,best_streak,last_streak_date").eq("id", user.id).maybeSingle();
-      setCurrentStreak(Number(data?.current_streak) || 0); setCloudBestStreak(Number(data?.best_streak) || 0);
+      const current = Number(data?.current_streak) || 0;
+      const best = Number(data?.best_streak) || 0;
+      const lastDate = data?.last_streak_date ? String(data.last_streak_date).slice(0, 10) : "";
+      const hasRecentActivity = lastDate === isoDateOffset(0) || lastDate === isoDateOffset(-1);
+      setCurrentStreak(current > 0 ? current : hasRecentActivity ? 1 : 0);
+      setCloudBestStreak(best > 0 ? best : hasRecentActivity ? 1 : 0);
     } catch { setCurrentStreak(0); setCloudBestStreak(0); }
   }, []);
 
