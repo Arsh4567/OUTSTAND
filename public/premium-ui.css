@@ -14,59 +14,115 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible, input:focu
 .outstand-interactive:active { transform: translateY(0) scale(.99); }
 .outstand-page-bg { background: radial-gradient(circle at 12% 0%, rgba(34,211,238,.07), transparent 30%), radial-gradient(circle at 88% 8%, rgba(168,85,247,.065), transparent 28%), #050816; }
 
-/* Light mode: preserve premium depth while keeping text, borders and controls readable. */
+/* Light mode: a deliberately separate white/neutral product language. */
 html:not(.dark) {
-  --outstand-shadow-soft: 0 14px 40px rgba(35,55,90,.09);
-  --outstand-shadow-card: 0 20px 55px rgba(35,55,90,.12);
-  --outstand-border: rgba(35,55,90,.11);
+  --outstand-shadow-soft: 0 12px 32px rgba(15,23,42,.07);
+  --outstand-shadow-card: 0 20px 48px rgba(15,23,42,.09);
+  --outstand-border: rgba(15,23,42,.10);
+  --background: oklch(0.985 0 0);
+  --foreground: oklch(0.16 0.01 258);
+  --surface-1: oklch(1 0 0);
+  --surface-2: oklch(0.975 0 0);
+  --surface-3: oklch(0.945 0 0);
+  --surface-4: oklch(0.91 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.16 0.01 258);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.16 0.01 258);
+  --primary: oklch(0.19 0.015 258);
+  --primary-foreground: oklch(0.99 0 0);
+  --primary-glow: oklch(0.25 0.02 258 / 0.10);
+  --secondary: oklch(0.95 0 0);
+  --secondary-foreground: oklch(0.20 0.01 258);
+  --muted: oklch(0.95 0 0);
+  --muted-foreground: oklch(0.46 0.015 258);
+  --accent: oklch(0.94 0 0);
+  --accent-foreground: oklch(0.16 0.01 258);
+  --border: oklch(0.88 0.005 258);
+  --input: oklch(0.88 0.005 258);
+  --ring: oklch(0.25 0.02 258);
+  --gradient-primary: linear-gradient(135deg, oklch(0.16 0.01 258), oklch(0.30 0.015 258));
+  --gradient-hero: linear-gradient(180deg, #ffffff 0%, #fafafa 52%, #f4f4f5 100%);
+  --gradient-card: linear-gradient(160deg, #ffffff 0%, #fafafa 100%);
+  --gradient-mesh: radial-gradient(at 15% 10%, rgba(15,23,42,.035) 0, transparent 48%), radial-gradient(at 85% 85%, rgba(15,23,42,.025) 0, transparent 48%);
+  --shadow-elegant: 0 20px 50px -20px rgba(15,23,42,.12);
+  --shadow-glow: 0 12px 32px rgba(15,23,42,.10);
+  --shadow-soft: 0 8px 24px -10px rgba(15,23,42,.08);
 }
-html:not(.dark) .outstand-surface { border-color: rgba(35,55,90,.10); background: linear-gradient(145deg, rgba(255,255,255,.96), rgba(245,248,255,.88)); box-shadow: var(--outstand-shadow-soft); backdrop-filter: blur(16px); }
-html:not(.dark) .outstand-surface-strong { border-color: rgba(35,55,90,.13); background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(241,246,255,.92)); box-shadow: var(--outstand-shadow-card); }
-html:not(.dark) .outstand-interactive:hover { border-color: color-mix(in oklab, var(--primary) 32%, var(--border)); box-shadow: 0 18px 48px rgba(35,55,90,.12), 0 0 26px color-mix(in oklab, var(--primary) 10%, transparent); }
-html:not(.dark) .outstand-page-bg { background: radial-gradient(circle at 12% 0%, color-mix(in oklab, var(--primary) 9%, transparent), transparent 30%), radial-gradient(circle at 88% 8%, rgba(139,92,246,.07), transparent 28%), var(--background); }
+html:not(.dark) .outstand-surface { border-color: rgba(15,23,42,.09); background: #fff; box-shadow: var(--outstand-shadow-soft); backdrop-filter: blur(12px); }
+html:not(.dark) .outstand-surface-strong { border-color: rgba(15,23,42,.11); background: #fff; box-shadow: var(--outstand-shadow-card); }
+html:not(.dark) .outstand-interactive:hover { border-color: rgba(15,23,42,.18); box-shadow: 0 18px 42px rgba(15,23,42,.10); }
+html:not(.dark) .outstand-page-bg { background: linear-gradient(180deg, #fff 0%, #fafafa 55%, #f4f4f5 100%); }
 
-/* Dashboard: remove the last hard-coded dark surfaces in light mode. */
+/* Blue/cyan/violet are reserved for dark mode. Light mode uses neutral ink, white and gray. */
+html:not(.dark) [class*="text-cyan-"],
+html:not(.dark) [class*="text-blue-"],
+html:not(.dark) [class*="text-indigo-"],
+html:not(.dark) [class*="text-violet-"] { color: var(--foreground) !important; }
+html:not(.dark) [class*="bg-cyan-"],
+html:not(.dark) [class*="bg-blue-"],
+html:not(.dark) [class*="bg-indigo-"],
+html:not(.dark) [class*="bg-violet-"] { background-color: rgba(15,23,42,.045) !important; background-image: none !important; }
+html:not(.dark) [class*="border-cyan-"],
+html:not(.dark) [class*="border-blue-"],
+html:not(.dark) [class*="border-indigo-"],
+html:not(.dark) [class*="border-violet-"] { border-color: rgba(15,23,42,.12) !important; }
+html:not(.dark) [class*="hover:bg-cyan-"]:hover,
+html:not(.dark) [class*="hover:bg-blue-"]:hover,
+html:not(.dark) [class*="hover:bg-indigo-"]:hover,
+html:not(.dark) [class*="hover:bg-violet-"]:hover { background-color: rgba(15,23,42,.08) !important; }
+html:not(.dark) [class*="hover:text-cyan-"]:hover,
+html:not(.dark) [class*="hover:text-blue-"]:hover,
+html:not(.dark) [class*="hover:text-indigo-"]:hover,
+html:not(.dark) [class*="hover:text-violet-"]:hover { color: var(--foreground) !important; }
+html:not(.dark) [class*="from-cyan-"],
+html:not(.dark) [class*="from-blue-"],
+html:not(.dark) [class*="from-indigo-"],
+html:not(.dark) [class*="from-violet-"],
+html:not(.dark) [class*="via-cyan-"],
+html:not(.dark) [class*="via-blue-"],
+html:not(.dark) [class*="via-indigo-"],
+html:not(.dark) [class*="via-violet-"],
+html:not(.dark) [class*="to-cyan-"],
+html:not(.dark) [class*="to-blue-"],
+html:not(.dark) [class*="to-indigo-"],
+html:not(.dark) [class*="to-violet-"] { --tw-gradient-from: #18181b !important; --tw-gradient-via: #52525b !important; --tw-gradient-to: #d4d4d8 !important; }
+
+/* Dashboard: clean white canvas with clear neutral hierarchy. */
 html:not(.dark) .outstand-dashboard { background: var(--gradient-hero) !important; color: var(--foreground) !important; }
 html:not(.dark) .outstand-dashboard .text-white { color: var(--foreground) !important; }
 html:not(.dark) .outstand-dashboard .text-slate-100 { color: var(--foreground) !important; }
-html:not(.dark) .outstand-dashboard .text-slate-200 { color: oklch(0.22 0.03 258) !important; }
-html:not(.dark) .outstand-dashboard .text-slate-300 { color: oklch(0.30 0.03 258) !important; }
+html:not(.dark) .outstand-dashboard .text-slate-200 { color: oklch(0.22 0.01 258) !important; }
+html:not(.dark) .outstand-dashboard .text-slate-300 { color: oklch(0.30 0.01 258) !important; }
 html:not(.dark) .outstand-dashboard .text-slate-400 { color: var(--muted-foreground) !important; }
 html:not(.dark) .outstand-dashboard .text-slate-500,
 html:not(.dark) .outstand-dashboard .text-slate-600,
 html:not(.dark) .outstand-dashboard .text-slate-700 { color: var(--muted-foreground) !important; }
 html:not(.dark) .outstand-dashboard [class*="border-white/"] { border-color: var(--border) !important; }
-html:not(.dark) .outstand-dashboard [class*="bg-white/[0."] { background-color: rgba(30,55,90,.035) !important; }
+html:not(.dark) .outstand-dashboard [class*="bg-white/[0."] { background-color: rgba(15,23,42,.035) !important; }
 html:not(.dark) .outstand-dashboard [class*="bg-slate-800"],
 html:not(.dark) .outstand-dashboard [class*="bg-slate-900"] { background-color: var(--surface-2) !important; background-image: none !important; }
 
-/* Habit cards use the glass-card utility heavily; give it a real light-mode surface. */
-html:not(.dark) .glass-card {
-  border-color: rgba(35,55,90,.11) !important;
-  background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(245,248,255,.90)) !important;
-  box-shadow: var(--outstand-shadow-soft) !important;
-  color: var(--foreground);
-}
-html:not(.dark) .glass-card [class*="bg-white/"] { background-color: rgba(30,55,90,.04) !important; }
-html:not(.dark) .glass-card [class*="border-white/"] { border-color: rgba(35,55,90,.10) !important; }
+/* Habit cards: true white surfaces, no blue glass tint. */
+html:not(.dark) .glass-card { border-color: rgba(15,23,42,.10) !important; background: #fff !important; box-shadow: var(--outstand-shadow-soft) !important; color: var(--foreground); }
+html:not(.dark) .glass-card [class*="bg-white/"] { background-color: rgba(15,23,42,.035) !important; }
+html:not(.dark) .glass-card [class*="border-white/"] { border-color: rgba(15,23,42,.09) !important; }
 html:not(.dark) .glass-card [class*="bg-slate-800"],
 html:not(.dark) .glass-card [class*="bg-slate-900"] { background-color: var(--surface-2) !important; background-image: none !important; }
 html:not(.dark) .glass-card [class*="hover:bg-slate-800"]:hover,
 html:not(.dark) .glass-card [class*="hover:bg-slate-900"]:hover { background-color: var(--surface-3) !important; }
 html:not(.dark) .glass-card [class*="text-white"] { color: var(--foreground) !important; }
 
-/* Make hover-only controls keyboard reachable. */
-.group:focus-within > .flex.opacity-0 { opacity: 1; }
-
-/* Generic hard-coded dark surfaces outside explicitly dark contexts. */
+/* Inputs, navigation and generic dark utilities need the same neutral treatment. */
 html:not(.dark) [class*="bg-[#05070d]"], html:not(.dark) [class*="bg-[#020617]"], html:not(.dark) [class*="bg-[#07101f]"], html:not(.dark) [class*="bg-slate-950"], html:not(.dark) [class*="bg-slate-900"] { background-color: var(--surface-1) !important; background-image: none !important; }
-html:not(.dark) [class*="bg-black/"] { background-color: oklch(0.18 0.03 258 / .055) !important; }
+html:not(.dark) [class*="bg-black/"] { background-color: rgba(15,23,42,.045) !important; }
 html:not(.dark) [class*="border-white/"] { border-color: var(--border) !important; }
 html:not(.dark) [class*="hover:text-white"]:hover { color: var(--foreground) !important; }
-html:not(.dark) [class*="hover:bg-white"]:hover { background-color: oklch(0.96 0.015 250) !important; }
+html:not(.dark) [class*="hover:bg-white"]:hover { background-color: #f4f4f5 !important; }
+html:not(.dark) .group:focus-within > .flex.opacity-0 { opacity: 1; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   .outstand-interactive:hover { transform: none; }
 }
-@media (max-width: 640px) { .outstand-surface, .outstand-surface-strong { backdrop-filter: blur(12px); } }
+@media (max-width: 640px) { .outstand-surface, .outstand-surface-strong { backdrop-filter: blur(10px); } }
