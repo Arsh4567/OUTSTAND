@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { requestPushPermission } from "@/lib/notification-engine";
 
 export type Profile = {
   id: string;
@@ -24,19 +23,6 @@ const fallbackProfile = (id: string): Profile => ({
   has_completed_onboarding: false,
 });
 
-let notificationPromptedForUser: string | null = null;
-
-function promptForNotifications(currentUser: User) {
-  if (notificationPromptedForUser === currentUser.id) return;
-  notificationPromptedForUser = currentUser.id;
-
-  void requestPushPermission().catch((error) => {
-    // Permission denial, unsupported browsers, and missing push configuration
-    // should never block authentication or the rest of the app.
-    console.info("Push notification setup skipped:", error instanceof Error ? error.message : error);
-  });
-}
-
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -51,7 +37,6 @@ export function useAuth() {
     }
 
     setUser(currentUser);
-    promptForNotifications(currentUser);
     try {
       const { data, error } = await supabase
         .from("profiles")
