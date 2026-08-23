@@ -1,7 +1,7 @@
 {
-  "name": "Outstand",
-  "short_name": "Outstand",
-  "description": "Premium AI-powered habit and focus tracker.",
+  "name": "OUTSTAND — Your goals. Your system. Your momentum.",
+  "short_name": "OUTSTAND",
+  "description": "AI guidance, goals, habits, focus sessions, roadmaps, progress tracking and friends in one connected personal growth system.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#050508",
