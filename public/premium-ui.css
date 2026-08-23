@@ -122,7 +122,7 @@ html:not(.dark) [class*="hover:bg-white"]:hover { background-color: #f4f4f5 !imp
 html:not(.dark) .group:focus-within > .flex.opacity-0 { opacity: 1; }
 
 /* Remove the redundant rank/"Novice" badge from the primary profile header. */
-main > section:first-child div.mt-4.flex.flex-wrap.gap-2 > span:nth-child(2) { display: none !important; }
+main > section:first-child span:has(svg.lucide-settings-2) { display: none !important; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
