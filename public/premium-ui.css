@@ -121,8 +121,8 @@ html:not(.dark) [class*="hover:text-white"]:hover { color: var(--foreground) !im
 html:not(.dark) [class*="hover:bg-white"]:hover { background-color: #f4f4f5 !important; }
 html:not(.dark) .group:focus-within > .flex.opacity-0 { opacity: 1; }
 
-/* Profile: the primary header is the only identity/rank card. */
-.profile-primary > section:first-child { }
+/* Remove the redundant rank/"Novice" badge from the primary profile header. */
+main > section:first-child div.mt-4.flex.flex-wrap.gap-2 > span:nth-child(2) { display: none !important; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
