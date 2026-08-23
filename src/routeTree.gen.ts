@@ -26,6 +26,7 @@ import { Route as AuthenticatedIntelligenceRouteImport } from './routes/_authent
 import { Route as AuthenticatedLeagueRouteImport } from './routes/_authenticated/league'
 import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedHabitsRouteImport } from './routes/_authenticated/habits'
 import { Route as AuthenticatedUserProfileRouteImport } from './routes/_authenticated/user-profile'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({ id: '/sitemap.xml', path: '/sitemap.xml', getParentRoute: () => rootRouteImport } as any)
@@ -47,6 +48,7 @@ const AuthenticatedIntelligenceRoute = AuthenticatedIntelligenceRouteImport.upda
 const AuthenticatedLeagueRoute = AuthenticatedLeagueRouteImport.update({ id: '/league', path: '/league', getParentRoute: () => AuthenticatedRouteRoute } as any)
 const AuthenticatedNotificationsRoute = AuthenticatedNotificationsRouteImport.update({ id: '/notifications', path: '/notifications', getParentRoute: () => AuthenticatedRouteRoute } as any)
 const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({ id: '/onboarding', path: '/onboarding', getParentRoute: () => AuthenticatedRouteRoute } as any)
+const AuthenticatedHabitsRoute = AuthenticatedHabitsRouteImport.update({ id: '/habits', path: '/habits', getParentRoute: () => AuthenticatedRouteRoute } as any)
 const AuthenticatedUserProfileRoute = AuthenticatedUserProfileRouteImport.update({ id: '/user-profile', path: '/user-profile', getParentRoute: () => AuthenticatedRouteRoute } as any)
 
 export interface FileRoutesByFullPath {
@@ -62,6 +64,7 @@ export interface FileRoutesByFullPath {
   '/dopamine': typeof AuthenticatedDopamineRoute
   '/focus': typeof AuthenticatedFocusRoute
   '/friends': typeof AuthenticatedFriendsRoute
+  '/habits': typeof AuthenticatedHabitsRoute
   '/intelligence': typeof AuthenticatedIntelligenceRoute
   '/league': typeof AuthenticatedLeagueRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
@@ -86,6 +89,7 @@ export interface FileRoutesById {
   '/_authenticated/dopamine': typeof AuthenticatedDopamineRoute
   '/_authenticated/focus': typeof AuthenticatedFocusRoute
   '/_authenticated/friends': typeof AuthenticatedFriendsRoute
+  '/_authenticated/habits': typeof AuthenticatedHabitsRoute
   '/_authenticated/intelligence': typeof AuthenticatedIntelligenceRoute
   '/_authenticated/league': typeof AuthenticatedLeagueRoute
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
@@ -118,6 +122,7 @@ declare module '@tanstack/react-router' {
     '/_authenticated/dopamine': { id: '/_authenticated/dopamine'; path: '/dopamine'; fullPath: '/dopamine'; preLoaderRoute: typeof AuthenticatedDopamineRouteImport; parentRoute: typeof AuthenticatedRouteRoute }
     '/_authenticated/focus': { id: '/_authenticated/focus'; path: '/focus'; fullPath: '/focus'; preLoaderRoute: typeof AuthenticatedFocusRouteImport; parentRoute: typeof AuthenticatedRouteRoute }
     '/_authenticated/friends': { id: '/_authenticated/friends'; path: '/friends'; fullPath: '/friends'; preLoaderRoute: typeof AuthenticatedFriendsRouteImport; parentRoute: typeof AuthenticatedRouteRoute }
+    '/_authenticated/habits': { id: '/_authenticated/habits'; path: '/habits'; fullPath: '/habits'; preLoaderRoute: typeof AuthenticatedHabitsRouteImport; parentRoute: typeof AuthenticatedRouteRoute }
     '/_authenticated/intelligence': { id: '/_authenticated/intelligence'; path: '/intelligence'; fullPath: '/intelligence'; preLoaderRoute: typeof AuthenticatedIntelligenceRouteImport; parentRoute: typeof AuthenticatedRouteRoute }
     '/_authenticated/league': { id: '/_authenticated/league'; path: '/league'; fullPath: '/league'; preLoaderRoute: typeof AuthenticatedLeagueRouteImport; parentRoute: typeof AuthenticatedRouteRoute }
     '/_authenticated/notifications': { id: '/_authenticated/notifications'; path: '/notifications'; fullPath: '/notifications'; preLoaderRoute: typeof AuthenticatedNotificationsRouteImport; parentRoute: typeof AuthenticatedRouteRoute }
@@ -138,6 +143,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDopamineRoute: typeof AuthenticatedDopamineRoute
   AuthenticatedFocusRoute: typeof AuthenticatedFocusRoute
   AuthenticatedFriendsRoute: typeof AuthenticatedFriendsRoute
+  AuthenticatedHabitsRoute: typeof AuthenticatedHabitsRoute
   AuthenticatedIntelligenceRoute: typeof AuthenticatedIntelligenceRoute
   AuthenticatedLeagueRoute: typeof AuthenticatedLeagueRoute
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
@@ -152,6 +158,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDopamineRoute,
   AuthenticatedFocusRoute,
   AuthenticatedFriendsRoute,
+  AuthenticatedHabitsRoute,
   AuthenticatedIntelligenceRoute,
   AuthenticatedLeagueRoute,
   AuthenticatedNotificationsRoute,
