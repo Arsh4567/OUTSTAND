@@ -6,7 +6,7 @@ import { NotificationPermissionBanner } from "@/components/notification-permissi
 function AuthenticatedLayout() {
   return (
     <>
-      <NotificationPermissionBanner userId={undefined} />
+      <NotificationPermissionBanner />
       <Outlet />
       <OutstandChatShell />
     </>
