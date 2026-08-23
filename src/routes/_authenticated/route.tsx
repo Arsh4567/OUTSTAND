@@ -1,10 +1,12 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { OutstandChatShell } from "@/components/ai/OutstandChatShell";
+import { NotificationPermissionBanner } from "@/components/notification-permission-banner";
 
 function AuthenticatedLayout() {
   return (
     <>
+      <NotificationPermissionBanner userId={undefined} />
       <Outlet />
       <OutstandChatShell />
     </>
