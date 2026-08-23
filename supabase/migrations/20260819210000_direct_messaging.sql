@@ -24,13 +24,13 @@ create index if not exists direct_messages_conversation_idx on public.direct_mes
 alter table public.direct_conversations enable row level security;
 alter table public.direct_messages enable row level security;
 
-create policy "participants can view direct conversations" on public.direct_conversations for select to authenticated using (auth.uid() = user_a or auth.uid() = user_b);
-create policy "participants can create direct conversations" on public.direct_conversations for insert to authenticated with check (auth.uid() = user_a or auth.uid() = user_b);
-create policy "participants can update direct conversations" on public.direct_conversations for update to authenticated using (auth.uid() = user_a or auth.uid() = user_b) with check (auth.uid() = user_a or auth.uid() = user_b);
+create policy if not exists "participants can view direct conversations" on public.direct_conversations for select to authenticated using (auth.uid() = user_a or auth.uid() = user_b);
+create policy if not exists "participants can create direct conversations" on public.direct_conversations for insert to authenticated with check (auth.uid() = user_a or auth.uid() = user_b);
+create policy if not exists "participants can update direct conversations" on public.direct_conversations for update to authenticated using (auth.uid() = user_a or auth.uid() = user_b) with check (auth.uid() = user_a or auth.uid() = user_b);
 
-create policy "participants can view direct messages" on public.direct_messages for select to authenticated using (exists (select 1 from public.direct_conversations c where c.id = conversation_id and (auth.uid() = c.user_a or auth.uid() = c.user_b)));
-create policy "participants can send direct messages" on public.direct_messages for insert to authenticated with check (auth.uid() = sender_id and exists (select 1 from public.direct_conversations c where c.id = conversation_id and (auth.uid() = c.user_a or auth.uid() = c.user_b)));
-create policy "participants can mark direct messages read" on public.direct_messages for update to authenticated using (exists (select 1 from public.direct_conversations c where c.id = conversation_id and (auth.uid() = c.user_a or auth.uid() = c.user_b))) with check (exists (select 1 from public.direct_conversations c where c.id = conversation_id and (auth.uid() = c.user_a or auth.uid() = c.user_b)));
+create policy if not exists "participants can view direct messages" on public.direct_messages for select to authenticated using (exists (select 1 from public.direct_conversations c where c.id = conversation_id and (auth.uid() = c.user_a or auth.uid() = c.user_b)));
+create policy if not exists "participants can send direct messages" on public.direct_messages for insert to authenticated with check (auth.uid() = sender_id and exists (select 1 from public.direct_conversations c where c.id = conversation_id and (auth.uid() = c.user_a or auth.uid() = c.user_b)));
+create policy if not exists "participants can mark direct messages read" on public.direct_messages for update to authenticated using (exists (select 1 from public.direct_conversations c where c.id = conversation_id and (auth.uid() = c.user_a or auth.uid() = c.user_b))) with check (exists (select 1 from public.direct_conversations c where c.id = conversation_id and (auth.uid() = c.user_a or auth.uid() = c.user_b)));
 
 create or replace function public.get_or_create_direct_conversation(target_user uuid)
 returns uuid language plpgsql security definer set search_path = public as $$
@@ -56,6 +56,7 @@ $$;
 
 revoke all on function public.get_or_create_direct_conversation(uuid) from public;
 grant execute on function public.get_or_create_direct_conversation(uuid) to authenticated;
+grant usage on schema public to authenticated;
 
 create or replace function public.touch_direct_conversation()
 returns trigger language plpgsql security definer set search_path = public as $$
