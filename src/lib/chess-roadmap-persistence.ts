@@ -28,7 +28,12 @@ export async function saveChessComProfile(data: ChessComRoadmapData) {
     .upsert({
       user_id: session.user.id,
       chess_com_username: data.profile.username,
-      profile: data.profile,
+      chess_com_avatar: data.profile.avatar,
+      chess_com_title: data.profile.title,
+      rapid_rating: data.ratings.rapid,
+      blitz_rating: data.ratings.blitz,
+      bullet_rating: data.ratings.bullet,
+      tactics_rating: data.ratings.tactics,
       ratings: data.ratings,
       updated_at: new Date().toISOString(),
     }, { onConflict: "user_id" })
@@ -52,7 +57,12 @@ export async function saveGeneratedChessRoadmap(roadmap: unknown, chessCom?: Che
 
   if (chessCom) {
     patch.chess_com_username = chessCom.profile.username;
-    patch.profile = chessCom.profile;
+    patch.chess_com_avatar = chessCom.profile.avatar;
+    patch.chess_com_title = chessCom.profile.title;
+    patch.rapid_rating = chessCom.ratings.rapid;
+    patch.blitz_rating = chessCom.ratings.blitz;
+    patch.bullet_rating = chessCom.ratings.bullet;
+    patch.tactics_rating = chessCom.ratings.tactics;
     patch.ratings = chessCom.ratings;
   }
 
