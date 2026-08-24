@@ -11,7 +11,7 @@ import SidebarLayout from "@/components/layout/SidebarLayout";
 import { QuickActions } from "@/components/global/QuickActions";
 
 function NotFoundComponent() {
-  return <div className="flex min-h-screen bg-background px-4 text-foreground"><div className="relative z-10 m-auto max-w-md rounded-[24px] border border-border bg-card p-8 text-center backdrop-blur-xl"><div className="mx-auto mb-5 grid h-12 w-12 place-items-center rounded-xl border border-cyan-300/15 bg-cyan-300/[0.05] text-cyan-300"><Bot className="h-6 w-6" /></div><h1 className="text-5xl font-black tracking-[-0.05em]">404</h1><h2 className="mt-3 text-base font-bold">Page not found</h2><p className="mt-2 text-xs leading-5 text-muted-foreground">This page doesn't exist or has moved.</p><Link to="/" className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-300 px-4 py-2.5 text-xs font-black text-slate-950 transition hover:bg-cyan-200"><Home className="h-4 w-4" /> Return home</Link></div></div>;
+  return <div className="flex min-h-screen bg-background px-4 text-foreground"><div className="relative z-10 m-auto max-w-md rounded-[24px] border border-border bg-card p-8 text-center backdrop-blur-xl"><div className="mx-auto mb-5 grid h-12 w-12 place-items-center rounded-xl border border-border bg-muted text-primary"><Bot className="h-6 w-6" /></div><h1 className="text-5xl font-black tracking-[-0.05em]">404</h1><h2 className="mt-3 text-base font-bold">Page not found</h2><p className="mt-2 text-xs leading-5 text-muted-foreground">This page doesn't exist or has moved.</p><Link to="/" className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-black text-primary-foreground transition hover:opacity-90"><Home className="h-4 w-4" /> Return home</Link></div></div>;
 }
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
@@ -33,24 +33,25 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     { name: "application-name", content: "OUTSTAND" },
     { name: "format-detection", content: "telephone=no" },
     { title: "OUTSTAND — Your goals. Your system. Your momentum." },
-    { name: "description", content: "OUTSTAND is a personal growth system that combines AI guidance, goals, habits, focus sessions, roadmaps, progress tracking and friends in one place." },
+    { name: "description", content: "OUTSTAND is a personal growth system for goals, habits, focus sessions, roadmaps, progress tracking and friends in one place." },
     { name: "author", content: "OUTSTAND" },
     { property: "og:site_name", content: "OUTSTAND" },
     { property: "og:type", content: "website" },
     { property: "og:url", content: "https://outstand-by-arsh.vercel.app" },
     { property: "og:title", content: "OUTSTAND — Your goals. Your system. Your momentum." },
-    { property: "og:description", content: "AI guidance, goals, habits, focus sessions, roadmaps and social progress — built into one connected personal growth system." },
+    { property: "og:description", content: "Goals, habits, focus sessions, roadmaps and social progress — built into one connected personal growth system." },
     { property: "og:image", content: "https://outstand-by-arsh.vercel.app/outstand-logo.png" },
     { property: "og:image:alt", content: "OUTSTAND logo" },
     { name: "twitter:card", content: "summary_large_image" },
     { name: "twitter:title", content: "OUTSTAND — Your goals. Your system. Your momentum." },
-    { name: "twitter:description", content: "AI guidance, goals, habits, focus sessions, roadmaps and social progress in one connected personal growth system." },
+    { name: "twitter:description", content: "Goals, habits, focus sessions, roadmaps and social progress in one connected personal growth system." },
     { name: "twitter:image", content: "https://outstand-by-arsh.vercel.app/outstand-logo.png" },
     { name: "twitter:image:alt", content: "OUTSTAND logo" },
   ], links: [
     { rel: "stylesheet", href: appCss },
     { rel: "stylesheet", href: "/premium-ui.css" },
     { rel: "stylesheet", href: "/performance.css" },
+    { rel: "stylesheet", href: "/editorial-ui.css" },
     { rel: "manifest", href: "/manifest.json" },
     { rel: "apple-touch-icon", href: "/outstand-logo.png" },
     { rel: "icon", type: "image/png", href: "/outstand-logo.png" },
@@ -61,7 +62,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   shellComponent: RootShell, component: RootComponent, notFoundComponent: NotFoundComponent, errorComponent: ErrorComponent,
 });
 
-function RootShell({ children }: { children: ReactNode }) { return <html lang="en" className="bg-background text-foreground antialiased"><head><HeadContent /></head><body className="min-h-screen bg-background text-foreground selection:bg-cyan-300/20">{children}<Scripts /></body></html>; }
+function RootShell({ children }: { children: ReactNode }) { return <html lang="en" className="bg-background text-foreground antialiased"><head><HeadContent /></head><body className="min-h-screen bg-background text-foreground selection:bg-blue-400/20">{children}<Scripts /></body></html>; }
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
