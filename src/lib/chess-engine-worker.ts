@@ -15,12 +15,28 @@ let sequence = 0;
 const pending = new Map<number, Pending>();
 
 function createWorker() {
+  // The worker itself is created from a Blob URL. Relative importScripts()
+  // URLs are not reliably resolved from Blob workers (and some browsers reject
+  // a leading slash there), so resolve the public Stockfish loader URL in the
+  // page context before embedding it in the worker source.
+  const stockfishScriptUrl = new URL(
+    '/stockfish/stockfish-18-lite-single.js',
+    window.location.href,
+  ).href;
+  const stockfishWasmUrl = new URL(
+    '/stockfish/stockfish-18-lite-single.wasm',
+    window.location.href,
+  ).href;
+
   const source = `
     let engine = null;
     let activeRequestId = null;
     let latestScore = null;
     let latestMate = null;
     let latestPvMove = null;
+
+    const STOCKFISH_SCRIPT_URL = ${JSON.stringify(stockfishScriptUrl)};
+    const STOCKFISH_WASM_URL = ${JSON.stringify(stockfishWasmUrl)};
 
     const send = (data) => self.postMessage(data);
 
@@ -62,12 +78,12 @@ function createWorker() {
     }
 
     try {
-      importScripts('/stockfish/stockfish-18-lite-single.js');
+      importScripts(STOCKFISH_SCRIPT_URL);
       if (!self.Stockfish) throw new Error('Stockfish runtime was not found.');
       engine = self.Stockfish({
         locateFile: (file) => file === 'stockfish.wasm'
-          ? '/stockfish/stockfish-18-lite-single.wasm'
-          : '/stockfish/' + file,
+          ? STOCKFISH_WASM_URL
+          : new URL(file, STOCKFISH_SCRIPT_URL).href,
       });
       if (!engine) throw new Error('Stockfish runtime was not created.');
       if (engine.addMessageListener) engine.addMessageListener(handleLine);
