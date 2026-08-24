@@ -26,11 +26,11 @@ function parseJson(text: string) {
 
 const rules = `You are OUTSTAND Intelligence. Your job is execution, not motivational writing. Never invent user facts. Ask for missing information. Prefer a tiny number of high-leverage actions over exhaustive lists. Every task must be concrete, measurable, and finishable in one session. Never schedule over sleep, school, work, meals, or fixed commitments. Do not create generic filler such as stay motivated, research more, keep learning, or work hard. Use active recall, deliberate practice, spaced repetition, error correction, or reflection only when they fit. A user should be able to open OUTSTAND and know exactly what to do next. For exam/academic goals, syllabusScope and educationContext are hard constraints: never invent or schedule content outside the declared scope. Return JSON only.`;
 
-async function callGemini(prompt: string) {
+async function callGemini(prompt: string, options?: { maxOutputTokens?: number }) {
   const google = env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY");
   if (!google) throw Object.assign(new Error("Gemini API key is not configured."), { status: 503 });
   const model = env("GEMINI_MODEL") || "gemini-2.5-flash";
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": google }, body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: `${rules}\n\n${prompt}` }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.15 } }) });
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": google }, body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: `${rules}\n\n${prompt}` }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.15, ...(options?.maxOutputTokens ? { maxOutputTokens: options.maxOutputTokens } : {}) } }) });
   const raw = await response.text(); if (!response.ok) throw Object.assign(new Error(`Gemini request failed (${response.status}).`), { status: response.status });
   const parsed = JSON.parse(raw); const content = parsed?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text || "").join(""); if (!content?.trim()) throw new Error("The AI returned an empty response."); return parseJson(content);
 }
@@ -43,17 +43,17 @@ async function resolveGroqModel(groq: string) {
   try { const response = await fetch("https://api.groq.com/openai/v1/models", { headers: { Authorization: `Bearer ${groq}` } }); if (response.ok) { const data = await response.json() as { data?: Array<{ id?: string; active?: boolean }> }; const available = new Set((data.data || []).filter((model) => model.active !== false).map((model) => model.id).filter(Boolean)); if (available.has(GROQ_DEFAULT_MODEL)) return GROQ_DEFAULT_MODEL; if (available.has(GROQ_FALLBACK_MODEL)) return GROQ_FALLBACK_MODEL; } } catch (error) { console.warn("[OUTSTAND] Could not resolve Groq model list", error); }
   return GROQ_DEFAULT_MODEL;
 }
-async function callGroq(prompt: string) {
+async function callGroq(prompt: string, options?: { maxTokens?: number }) {
   const groq = env("GROQ_API_KEY"); if (!groq) throw Object.assign(new Error("Groq API key is not configured."), { status: 503 });
   const model = await resolveGroqModel(groq);
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${groq}`, "Content-Type": "application/json" }, body: JSON.stringify({ model, temperature: 0.15, max_tokens: 5000, reasoning_effort: "medium", response_format: { type: "json_object" }, messages: [{ role: "system", content: rules }, { role: "user", content: prompt }] }) });
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${groq}`, "Content-Type": "application/json" }, body: JSON.stringify({ model, temperature: 0.15, max_tokens: options?.maxTokens || 5000, reasoning_effort: "medium", response_format: { type: "json_object" }, messages: [{ role: "system", content: rules }, { role: "user", content: prompt }] }) });
   const raw = await response.text(); if (!response.ok) { let detail = ""; try { const parsed = JSON.parse(raw); detail = typeof parsed?.error?.message === "string" ? `: ${parsed.error.message}` : ""; } catch {} throw Object.assign(new Error(`Groq request failed (${response.status})${detail}`), { status: response.status }); }
   const parsed = JSON.parse(raw); const content = parsed?.choices?.[0]?.message?.content; if (typeof content !== "string" || !content.trim()) throw new Error("The AI returned an empty response."); return parseJson(content);
 }
-async function callAI(prompt: string) {
+async function callAI(prompt: string, options?: { maxTokens?: number; maxOutputTokens?: number }) {
   const failures: string[] = [];
-  if (env("GROQ_API_KEY")) { try { return await callGroq(prompt); } catch (error) { failures.push(error instanceof Error ? error.message : "Groq failed"); } }
-  if (env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")) { try { return await callGemini(prompt); } catch (error) { failures.push(error instanceof Error ? error.message : "Gemini failed"); } }
+  if (env("GROQ_API_KEY")) { try { return await callGroq(prompt, { maxTokens: options?.maxTokens }); } catch (error) { failures.push(error instanceof Error ? error.message : "Groq failed"); } }
+  if (env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY")) { try { return await callGemini(prompt, { maxOutputTokens: options?.maxOutputTokens }); } catch (error) { failures.push(error instanceof Error ? error.message : "Gemini failed"); } }
   throw Object.assign(new Error(`AI service is temporarily unavailable. ${failures.join(" | ")}`), { status: 503 });
 }
 
@@ -94,7 +94,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (mode === "questions") {
       const answered = Object.entries(answers).map(([key, value]) => `${key}: ${String(value)}`).join("\n") || "None yet";
       const examMode = ["exam_preparation", "academics"].includes(category);
-      return json(res, 200, await callAI(`Create only the next 3-5 highest-value questions for a ${category} goal. Never repeat answered information. Collect only what is needed to build an executable plan. ${examMode ? "This is an academic/exam goal. Ask for class/grade, board or exam name, exam date/deadline, and how much syllabus is included. Do NOT ask for the entire syllabus." : "Collect exact outcome and measurable target, current baseline, deadline, normal weekday availability/fixed commitments, preferred session length, and important constraints."} Return {"questions":[{"id":"string","question":"string","type":"text|number|choice|multiline","required":true,"options":[],"placeholder":""}]}\nAnswered:\n${answered}\nContext:\n${JSON.stringify(context)}`));
+      return json(res, 200, await callAI(`Create only the next 3-5 highest-value questions for a ${category} goal. Never repeat answered information. Collect only what is needed to build an executable plan. ${examMode ? "This is an academic/exam goal. Ask for class/grade, board or exam name, exam date/deadline, and how much syllabus is included. Do NOT ask for the entire syllabus." : "Collect exact outcome and measurable target, current baseline, deadline, normal weekday availability/fixed commitments, preferred session length, and important constraints."} Return {"questions":[{"id":"string","question":"string","type":"text|number|choice|multiline","required":true,"options":[],"placeholder":""}]}\nAnswered:\n${answered}\nContext:\n${JSON.stringify(context)}`, { maxTokens: 1200, maxOutputTokens: 1200 }));
     }
 
     if (mode === "plan") {
@@ -106,22 +106,64 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (mode === "edit") {
-      const roadmapId = typeof input.roadmapId === "string" ? input.roadmapId : ""; const request = typeof input.request === "string" ? input.request.trim().slice(0, 500) : "";
+      const roadmapId = typeof input.roadmapId === "string" ? input.roadmapId : "";
+      const request = typeof input.request === "string" ? input.request.trim().slice(0, 300) : "";
       if (!roadmapId || request.length < 5) return json(res, 400, { error: "A roadmap and a meaningful change request are required." });
       const { data: roadmap, error: roadmapError } = await client.from("roadmaps").select("id,title,goal,category,duration_days,questionnaire,user_id").eq("id", roadmapId).eq("user_id", userId).maybeSingle();
       if (roadmapError || !roadmap) return json(res, 404, { error: "Roadmap not found." });
-      const edited = validatePlan(await callAI(`A user wants to change their existing OUTSTAND roadmap. Preserve the goal unless the request explicitly changes it. Do not erase completed work. Make the smallest useful changes that satisfy the request. Existing roadmap: ${JSON.stringify(roadmap)}. User request: ${request}. Return a complete valid plan in the same schema and duration as the existing roadmap.`));
-      const startDate = new Date(); const targetDate = new Date(startDate); targetDate.setDate(startDate.getDate() + Math.max(1, roadmap.duration_days) - 1);
-      const { error: deactivateError } = await client.from("roadmaps").update({ status: "paused" }).eq("id", roadmap.id).eq("user_id", userId); if (deactivateError) throw deactivateError;
-      const { data: created, error: createError } = await client.from("roadmaps").insert({ user_id: userId, title: edited.title || roadmap.title, goal: roadmap.goal, category: roadmap.category, questionnaire: roadmap.questionnaire || {}, generation_metadata: { editedFrom: roadmap.id, editRequest: request, generated_plan: edited }, duration_days: roadmap.duration_days, start_date: startDate.toISOString().slice(0,10), target_date: targetDate.toISOString().slice(0,10), status: "active" }).select().single();
-      if (createError || !created) throw createError || new Error("Edited roadmap could not be saved.");
-      try {
-        const milestoneRows: Array<{ id: string; dayStart: number; dayEnd: number }> = [];
-        for (let index = 0; index < edited.milestones.length; index += 1) { const milestone = edited.milestones[index]; const dayStart = Math.max(1, Number(milestone.day) || 1); const nextDay = Number(edited.milestones[index + 1]?.day || roadmap.duration_days + 1); const { data: row, error } = await client.from("roadmap_milestones").insert({ roadmap_id: created.id, user_id: userId, milestone_order: index + 1, day_start: dayStart, day_end: Math.max(dayStart, nextDay - 1), title: String(milestone.title), outcome: milestone.outcome || null, description: null, methodology_tags: ["ai_edit"] }).select().single(); if (error || !row) throw error || new Error("Milestone could not be saved."); milestoneRows.push({ id: row.id, dayStart, dayEnd: Math.max(dayStart, nextDay - 1) }); }
-        const grouped = new Map<number, any[]>(); for (const block of edited.dailySchedule) { const day = Math.max(1, Number(block.day) || 1); const list = grouped.get(day) || []; list.push(block); grouped.set(day, list); }
-        for (const [day, blocks] of grouped.entries()) { const milestone = milestoneRows.find((item) => day >= item.dayStart && day <= item.dayEnd) || milestoneRows[0]; if (!milestone) continue; for (let index = 0; index < blocks.length; index += 1) { const block = blocks[index]; const { error } = await client.from("roadmap_tasks").insert({ roadmap_id: created.id, milestone_id: milestone.id, user_id: userId, day_number: day, task_order: index + 1, title: String(block.title), instructions: String(block.instructions || block.title), estimated_minutes: Number(block.estimatedMinutes) || 30, task_type: String(block.taskType || "practice"), methodology_tags: Array.isArray(block.methodologyTags) ? block.methodologyTags : ["ai_edit"], resources: Array.isArray(block.resources) ? block.resources : [], spaced_repetition_day: null, difficulty: null, success_criteria: String(block.successCriteria || "Complete this block."), is_required: block.taskType !== "break", start_time: String(block.startTime), end_time: String(block.endTime), guidance: { aiEdited: true } }); if (error) throw error; } }
-      } catch (error) { await client.from("roadmaps").delete().eq("id", created.id).eq("user_id", userId); await client.from("roadmaps").update({ status: "active" }).eq("id", roadmap.id).eq("user_id", userId); throw error; }
-      return json(res, 200, { roadmapId: created.id, changed: true });
+
+      const lower = request.toLowerCase();
+      const current = { title: String(roadmap.title || ""), goal: String(roadmap.goal || ""), durationDays: Number(roadmap.duration_days) || 30 };
+      const titleMatch = request.match(/^(?:rename|change|set)\s+(?:the\s+)?(?:roadmap\s+)?(?:title|name)\s+(?:to|as)\s+(.+)$/i);
+      const goalMatch = request.match(/^(?:change|update|set)\s+(?:the\s+)?goal\s+(?:to|as)\s+(.+)$/i);
+      const daysMatch = request.match(/\b(?:to|for|in)\s+(\d{1,3})\s*days?\b/i) || request.match(/\b(\d{1,3})\s*days?\b/i);
+
+      if (titleMatch?.[1]) {
+        const title = titleMatch[1].trim().replace(/[.!?]+$/, "").slice(0, 120);
+        const { error } = await client.from("roadmaps").update({ title }).eq("id", roadmapId).eq("user_id", userId);
+        if (error) throw error;
+        return json(res, 200, { changed: true, message: "Roadmap title updated." });
+      }
+      if (goalMatch?.[1]) {
+        const goal = goalMatch[1].trim().replace(/[.!?]+$/, "").slice(0, 2000);
+        const { error } = await client.from("roadmaps").update({ goal }).eq("id", roadmapId).eq("user_id", userId);
+        if (error) throw error;
+        return json(res, 200, { changed: true, message: "Roadmap goal updated." });
+      }
+      if (daysMatch && /\b(?:day|days|duration|shorten|extend|longer|shorter)\b/i.test(request)) {
+        const durationDays = Math.max(1, Math.min(730, Number(daysMatch[1])));
+        const startDate = new Date();
+        const targetDate = new Date(startDate);
+        targetDate.setDate(startDate.getDate() + durationDays - 1);
+        const { error } = await client.from("roadmaps").update({ duration_days: durationDays, target_date: targetDate.toISOString().slice(0, 10) }).eq("id", roadmapId).eq("user_id", userId);
+        if (error) throw error;
+        if (durationDays < current.durationDays) await client.from("roadmap_tasks").update({ is_required: false }).eq("roadmap_id", roadmapId).eq("user_id", userId).gt("day_number", durationDays);
+        return json(res, 200, { changed: true, message: `Roadmap duration changed to ${durationDays} days.` });
+      }
+
+      if (/\b(?:after|from|at)\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?\b/i.test(lower) && /\b(?:study|session|sessions|schedule|tasks|blocks|move|shift|evening)\b/i.test(lower)) {
+        const time = request.match(/\b(?:after|from|at)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
+        if (time) {
+          let hour = Number(time[1]); const minute = Number(time[2] || 0); const meridiem = time[3]?.toLowerCase(); if (meridiem === "pm" && hour < 12) hour += 12; if (meridiem === "am" && hour === 12) hour = 0; const start = hour * 60 + minute;
+          const { data: tasks, error: taskError } = await client.from("roadmap_tasks").select("id,start_time,end_time").eq("roadmap_id", roadmapId).eq("user_id", userId).order("day_number").order("task_order");
+          if (taskError) throw taskError;
+          let cursor = start;
+          for (const task of tasks || []) { const s = task.start_time && /^\d{2}:\d{2}$/.test(task.start_time) ? minutesOf(task.start_time) : null; const e = task.end_time && /^\d{2}:\d{2}$/.test(task.end_time) ? minutesOf(task.end_time) : null; if (s === null || e === null || e <= s) continue; const blockMinutes = Math.max(10, e - s); await client.from("roadmap_tasks").update({ start_time: timeString(cursor), end_time: timeString(cursor + blockMinutes) }).eq("id", task.id).eq("user_id", userId); cursor += blockMinutes + 15; if (cursor >= 23 * 60 + 30) break; }
+          return json(res, 200, { changed: true, message: `Schedule moved to start after ${timeString(start)}.` });
+        }
+      }
+
+      const compact = await callAI(`Return the smallest possible structured patch for this roadmap edit. Do not regenerate the roadmap. Do not return milestones, tasks, schedules, or long prose unless absolutely required. Allowed patch fields: title, goal, durationDays, startTime, endTime. Existing: ${JSON.stringify(current)}. User request: ${request}. If the request cannot be applied with those fields alone, return {"changed":false,"reason":"needs_full_plan"}. Otherwise return only changed fields, e.g. {"changed":true,"patch":{"goal":"new goal"},"message":"..."}.`, { maxTokens: 500, maxOutputTokens: 500 });
+      if (!compact?.changed || !compact.patch || typeof compact.patch !== "object") return json(res, 200, { changed: false, message: compact?.reason === "needs_full_plan" ? "That change needs a larger roadmap rewrite, so it was not applied." : "No roadmap changes were needed." });
+      const patch: Record<string, unknown> = {};
+      if (typeof compact.patch.title === "string") patch.title = compact.patch.title.slice(0, 120);
+      if (typeof compact.patch.goal === "string") patch.goal = compact.patch.goal.slice(0, 2000);
+      if (Number.isFinite(Number(compact.patch.durationDays))) patch.duration_days = Math.max(1, Math.min(730, Number(compact.patch.durationDays)));
+      if (!Object.keys(patch).length) return json(res, 200, { changed: false, message: "No safe roadmap fields were changed." });
+      if (patch.duration_days) { const startDate = new Date(); const targetDate = new Date(startDate); targetDate.setDate(startDate.getDate() + Number(patch.duration_days) - 1); patch.target_date = targetDate.toISOString().slice(0, 10); }
+      const { error: updateError } = await client.from("roadmaps").update(patch).eq("id", roadmapId).eq("user_id", userId);
+      if (updateError) throw updateError;
+      return json(res, 200, { changed: true, message: typeof compact.message === "string" ? compact.message : "Roadmap updated." });
     }
 
     const { data: saved, error: loadError } = await client.from("ai_roadmaps").select("id,plan").eq("user_id", userId).eq("is_active", true).order("updated_at", { ascending: false }).limit(1).maybeSingle();
