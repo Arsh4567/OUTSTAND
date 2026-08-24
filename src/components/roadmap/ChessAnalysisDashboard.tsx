@@ -1,10 +1,43 @@
 import { useEffect, useMemo, useState } from "react";
 import { BarChart3, Brain, Crown, Loader2, RefreshCw, Target, TrendingUp } from "lucide-react";
+import { Chess } from "chess.js";
+import { ChessBoard } from "@/components/roadmap/ChessBoard";
+import { analyzePosition } from "@/lib/chess-engine-worker";
 import { aggregateChessComGames, type ChessComGame, type ChessGameAnalysis, parseAnnotatedMoves } from "@/lib/chess-game-analysis";
 
 type Props = { username: string };
 
+type TrainerPosition = { fen: string; san: string; moveNumber: number; side: "w" | "b" };
+
 function pct(value: number) { return `${value}%`; }
+
+function buildPositions(game: ChessComGame, username: string): TrainerPosition[] {
+  if (!game.pgn) return [];
+  try {
+    const chess = new Chess();
+    const history = chess.loadPgn(game.pgn, { sloppy: false });
+    void history;
+    const replay = new Chess();
+    const positions: TrainerPosition[] = [];
+    const isUserWhite = (game.white?.username || "").toLowerCase() === username.toLowerCase();
+    const headerMoves = replay.history();
+    void headerMoves;
+    const temp = new Chess();
+    const moves = new Chess();
+    moves.loadPgn(game.pgn);
+    const verbose = moves.history({ verbose: true });
+    temp.reset();
+    verbose.forEach((move: any, index: number) => {
+      if ((move.color === "w") === isUserWhite) {
+        positions.push({ fen: temp.fen(), san: move.san, moveNumber: Math.floor(index / 2) + 1, side: move.color });
+      }
+      temp.move(move.san, { strict: false });
+    });
+    return positions;
+  } catch {
+    return [];
+  }
+}
 
 export function ChessAnalysisDashboard({ username }: Props) {
   const [games, setGames] = useState<ChessComGame[]>([]);
@@ -47,9 +80,42 @@ export function ChessAnalysisDashboard({ username }: Props) {
 
 function Metric({ icon, label, value, detail }: any) { return <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4"><div className="flex items-center gap-2 text-cyan-300/65">{icon}<span className="text-[10px] font-black uppercase tracking-[.15em] text-slate-600">{label}</span></div><div className="mt-2 text-2xl font-black tabular-nums text-white">{value}</div><div className="mt-1 text-[11px] text-slate-600">{detail}</div></div>; }
 function Panel({ title, eyebrow, children }: any) { return <div className="rounded-[2rem] border border-white/[0.08] bg-white/[0.025] p-5 sm:p-7"><div className="text-[10px] font-black uppercase tracking-[.2em] text-slate-600">{eyebrow}</div><h3 className="mt-2 text-xl font-black text-white">{title}</h3><div className="mt-5">{children}</div></div>; }
+
 function ChessGameTrainer({ game, username, onClose }: { game: ChessComGame; username: string; onClose: () => void }) {
+  const [positions, setPositions] = useState<TrainerPosition[]>([]);
+  const [index, setIndex] = useState(0);
+  const [result, setResult] = useState<{ bestMove: string | null; score: number | null; mate: number | null } | null>(null);
   const [busy, setBusy] = useState(true);
   const userIsWhite = (game.white?.username || "").toLowerCase() === username.toLowerCase();
-  useEffect(() => { const timer = window.setTimeout(() => setBusy(false), 250); return () => window.clearTimeout(timer); }, []);
-  return <div className="rounded-[2rem] border border-cyan-300/15 bg-cyan-300/[0.03] p-5 sm:p-7"><div className="flex items-start justify-between gap-4"><div><div className="text-[10px] font-black uppercase tracking-[.2em] text-cyan-200/70">Trainer</div><h3 className="mt-2 text-2xl font-black text-white">Find the better move.</h3><p className="mt-2 text-sm text-slate-500">{game.white?.username || "White"} vs {game.black?.username || "Black"}</p></div><button type="button" onClick={onClose} className="rounded-xl border border-white/10 px-3 py-2 text-xs font-black text-slate-400">Close</button></div>{busy ? <div className="mt-6 text-sm text-slate-500">Preparing the position…</div> : <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,420px)_1fr]"><div className="grid aspect-square place-items-center rounded-2xl border border-white/[0.08] bg-slate-900 text-center text-slate-600"><div><div className="text-xs font-black uppercase tracking-[.18em]">Board</div><div className="mt-2 text-sm">Connect the Stockfish board to train this position.</div><div className="mt-1 text-xs">You are playing {userIsWhite ? "White" : "Black"}.</div></div></div><div className="rounded-2xl border border-white/[0.06] bg-black/10 p-5"><div className="text-[10px] font-black uppercase tracking-[.16em] text-slate-600">Next step</div><h4 className="mt-2 text-lg font-black text-white">What would you play?</h4><p className="mt-2 text-sm leading-6 text-slate-500">The full Stockfish move-by-move evaluation layer can now be attached to this trainer without changing the dashboard data model.</p></div></div>}</div>;
+
+  useEffect(() => {
+    const next = buildPositions(game, username);
+    setPositions(next.slice(0, 30));
+    setIndex(0);
+  }, [game, username]);
+
+  const position = positions[index];
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!position) { setBusy(false); return; }
+    setBusy(true); setResult(null);
+    void analyzePosition(position.fen, 14).then((engine) => { if (!cancelled) setResult(engine); }).catch(() => { if (!cancelled) setResult(null); }).finally(() => { if (!cancelled) setBusy(false); });
+    return () => { cancelled = true; };
+  }, [position]);
+
+  const onTrainerMove = (from: string, to: string) => {
+    if (!position || busy) return;
+    const chess = new Chess(position.fen);
+    try {
+      chess.move({ from, to, promotion: "q" });
+      if (result?.bestMove && result.bestMove.slice(0, 4).toLowerCase() === `${from}${to}`.toLowerCase()) {
+        setIndex((value) => Math.min(value + 1, Math.max(0, positions.length - 1)));
+      } else {
+        setResult((current) => current ? { ...current, score: current.score, mate: current.mate } : current);
+      }
+    } catch { /* invalid board move */ }
+  };
+
+  return <div className="rounded-[2rem] border border-cyan-300/15 bg-cyan-300/[0.03] p-5 sm:p-7"><div className="flex items-start justify-between gap-4"><div><div className="text-[10px] font-black uppercase tracking-[.2em] text-cyan-200/70">Trainer</div><h3 className="mt-2 text-2xl font-black text-white">Find the better move.</h3><p className="mt-2 text-sm text-slate-500">You are playing {userIsWhite ? "White" : "Black"}. Play the engine move before seeing the next position.</p></div><button type="button" onClick={onClose} className="rounded-xl border border-white/10 px-3 py-2 text-xs font-black text-slate-400">Close</button></div>{!position ? <div className="mt-6 text-sm text-slate-500">This PGN could not be replayed into user-to-move positions.</div> : <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,520px)_1fr]"><ChessBoard fen={position.fen} orientation={userIsWhite ? "white" : "black"} onMove={onTrainerMove} disabled={busy} /><div className="rounded-2xl border border-white/[0.06] bg-black/10 p-5"><div className="text-[10px] font-black uppercase tracking-[.16em] text-slate-600">Position {index + 1} / {positions.length}</div><div className="mt-2 text-lg font-black text-white">Before {position.moveNumber}{position.side === "w" ? "." : "..."}{position.san}</div>{busy ? <div className="mt-4 flex items-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />Stockfish is calculating…</div> : <div className="mt-4 space-y-2 text-sm text-slate-400"><div>Engine move: <span className="font-black text-white">{result?.bestMove || "—"}</span></div><div>Score: <span className="font-black text-white">{result?.mate != null ? `Mate ${result.mate}` : result?.score != null ? `${(result.score / 100).toFixed(2)}` : "—"}</span></div><p className="pt-2 text-xs leading-5 text-slate-600">The historical move was <span className="text-slate-400">{position.san}</span>. Try to find a stronger move from the same position.</p></div>}</div></div>}</div>;
 }
