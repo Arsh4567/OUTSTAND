@@ -27,8 +27,42 @@ function RoadmapPage() {
   const startOnboarding = async () => { try { await roadmap.askQuestions(category, {}); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not start roadmap intake."); } };
   const generate = async () => { try { const result = await roadmap.generate(category, roadmap.answers); if (result?.needsMoreInfo) { setShowOnboarding(true); return; } if (!result?.roadmapId) throw new Error("Roadmap was generated but no saved roadmap ID was returned."); if (result?.structuredContent) { const { error } = await (supabase.from("roadmaps") as any).update({ structured_content: result.structuredContent }).eq("id", result.roadmapId); if (error) throw error; } setShowOnboarding(false); toast.success("Your learning roadmap is ready."); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not generate roadmap."); } };
   const handleReview = async (reflection: string, energy: number, difficulty: number) => { setReviewing(true); try { const result = await roadmap.saveNightlyReview(reflection, energy, difficulty); toast.success(result?.reason || result?.analysis?.summary || "Tomorrow's schedule has been adapted."); setNightlyOpen(false); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not save nightly review."); } finally { setReviewing(false); } };
-  const saveEdit = async (patch: RoadmapEditPatch) => { if (!roadmap.roadmap) return; setSavingEdit(true); try { const { error } = await supabase.from("roadmaps").update({ title: patch.title, goal: patch.goal }).eq("id", roadmap.roadmap.id).eq("user_id", roadmap.roadmap.user_id); if (error) throw error; await roadmap.load(roadmap.roadmap.id); setEditOpen(false); toast.success("Roadmap updated."); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not update roadmap."); } finally { setSavingEdit(false); } };
-  const askAIToEdit = async (request: string) => { if (!roadmap.roadmap) return; setAskingAI(true); try { const { data: { session } } = await supabase.auth.getSession(); if (!session) throw new Error("Please sign in first."); const response = await fetch("/api/roadmap", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ mode: "edit", roadmapId: roadmap.roadmap.id, request, current: { title: roadmap.roadmap.title, goal: roadmap.roadmap.goal, category: roadmap.roadmap.category, durationDays: roadmap.roadmap.duration_days, questionnaire: roadmap.roadmap.questionnaire } }) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || "Could not apply suggested changes."); await roadmap.load(roadmap.roadmap.id); setEditOpen(false); toast.success("Suggested roadmap changes applied."); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not apply suggested changes."); } finally { setAskingAI(false); } };
+  const saveEdit = async (patch: RoadmapEditPatch) => {
+    const current = roadmap.roadmap;
+    if (!current) return;
+    setSavingEdit(true);
+    try {
+      const { error } = await supabase.from("roadmaps").update({ title: patch.title, goal: patch.goal }).eq("id", current.id).eq("user_id", current.user_id);
+      if (error) throw error;
+      await roadmap.load(current.id);
+      setEditOpen(false);
+      toast.success("Roadmap updated.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update roadmap.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+  const askAIToEdit = async (request: string) => {
+    const current = roadmap.roadmap;
+    if (!current) return;
+    setAskingAI(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Please sign in first.");
+      const response = await fetch("/api/roadmap", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ mode: "edit", roadmapId: current.id, request }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not apply suggested changes.");
+      if (result.changed === false) { toast.success("No roadmap changes were needed."); return; }
+      await roadmap.load(current.id);
+      setEditOpen(false);
+      toast.success(result.message || "Suggested roadmap changes applied.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not apply suggested changes.");
+    } finally {
+      setAskingAI(false);
+    }
+  };
 
   const completedCount = useMemo(() => roadmap.tasks.filter((task) => task.progress === "completed").length, [roadmap.tasks]);
   const totalRequired = useMemo(() => roadmap.tasks.filter((task) => task.is_required).length, [roadmap.tasks]);
