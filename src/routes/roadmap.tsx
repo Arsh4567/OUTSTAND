@@ -30,6 +30,7 @@ function RoadmapPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [askingAI, setAskingAI] = useState(false);
+  const [chessUsername, setChessUsername] = useState<string | null>(null);
 
   useEffect(() => { if (!roadmap.loading && !roadmap.roadmap) setShowOnboarding(true); }, [roadmap.loading, roadmap.roadmap]);
 
@@ -38,26 +39,18 @@ function RoadmapPage() {
     void loadSavedChessRoadmap().then((saved) => {
       if (cancelled || !saved) return;
       const savedRoadmap = saved.generated_roadmap;
-      const username = saved.chess_com_username;
-      if (savedRoadmap && typeof savedRoadmap === "object") {
-        roadmap.setAnswers((current) => ({
-          ...current,
+      const username = typeof saved.chess_com_username === "string" ? saved.chess_com_username.trim() : "";
+      if (username) setChessUsername(username);
+      roadmap.setAnswers((current) => ({
+        ...current,
+        ...(username ? {
           chesscom: {
-            profile: {
-              username,
-              avatar: saved.profile?.avatar ?? null,
-              title: saved.profile?.title ?? null,
-            },
-            ratings: saved.ratings || {
-              rapid: null,
-              blitz: null,
-              bullet: null,
-              tactics: null,
-            },
+            profile: { username, avatar: saved.profile?.avatar ?? null, title: saved.profile?.title ?? null },
+            ratings: saved.ratings || { rapid: null, blitz: null, bullet: null, tactics: null },
           },
-          chessRoadmapSaved: savedRoadmap,
-        }));
-      }
+        } : {}),
+        ...(savedRoadmap && typeof savedRoadmap === "object" ? { chessRoadmapSaved: savedRoadmap } : {}),
+      }));
     }).catch(() => undefined);
     return () => { cancelled = true; };
   }, [roadmap]);
@@ -69,8 +62,7 @@ function RoadmapPage() {
       if (result?.needsMoreInfo) { setShowOnboarding(true); return; }
       if (!result?.roadmapId) throw new Error("Roadmap was generated but no saved roadmap ID was returned.");
       if (result?.structuredContent) { const { error } = await (supabase.from("roadmaps") as any).update({ structured_content: result.structuredContent }).eq("id", result.roadmapId); if (error) throw error; }
-      setShowOnboarding(false);
-      toast.success("Your roadmap is ready.");
+      setShowOnboarding(false); toast.success("Your roadmap is ready.");
     } catch (error) { toast.error(error instanceof Error ? error.message : "Could not generate roadmap."); }
   };
   const handleReview = async (reflection: string, energy: number, difficulty: number) => { setReviewing(true); try { const result = await roadmap.saveNightlyReview(reflection, energy, difficulty); toast.success(result?.reason || result?.analysis?.summary || "Tomorrow's priorities were adjusted."); setNightlyOpen(false); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not save nightly review."); } finally { setReviewing(false); } };
@@ -89,7 +81,6 @@ function RoadmapPage() {
   const daysLeft = roadmap.roadmap?.target_date && roadmap.roadmap?.start_date ? daysBetween(new Date().toISOString().slice(0, 10), roadmap.roadmap.target_date) : roadmap.roadmap?.duration_days || 0;
   const plannedProgress = roadmap.roadmap?.duration_days ? Math.round((Math.max(0, roadmap.todayIndex - 1) / roadmap.roadmap.duration_days) * 100) : 0;
   const onTrack = overallProgress >= plannedProgress - 10;
-  const chessUsername = typeof (roadmap.answers as any)?.chesscom?.profile?.username === "string" ? (roadmap.answers as any).chesscom.profile.username : null;
 
   if (roadmap.loading) return <main className="min-h-screen bg-slate-950 px-4 py-16 text-center text-sm text-slate-500">Preparing your roadmap…</main>;
   if (showOnboarding || !roadmap.roadmap) return <main className="min-h-screen bg-[#020617] px-4 py-8 sm:px-6 lg:px-8"><div className="mx-auto max-w-5xl py-8 sm:py-16"><div className="mx-auto mb-8 max-w-2xl text-center"><div className="text-[9px] font-black uppercase tracking-[.22em] text-cyan-300/80">OUTSTAND / ROADMAP</div><h1 className="mt-4 text-4xl font-black tracking-[-.045em] text-white sm:text-6xl">Understand the goal.<br /><span className="text-cyan-200">Then make every day count.</span></h1><p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-slate-500">Tell OUTSTAND what success means, where you are starting, how much time you really have, and what cannot move. The planner turns that into measurable outcomes and a practical daily path.</p></div>{roadmap.questions.length === 0 ? <section className="mx-auto max-w-2xl rounded-[2rem] border border-white/10 bg-white/[0.035] p-6 shadow-2xl backdrop-blur-2xl sm:p-8"><label className="text-xs font-black uppercase tracking-[.16em] text-slate-500">What are you trying to achieve?</label><select value={category} onChange={(e) => setCategory(e.target.value)} className="mt-3 w-full rounded-2xl border border-white/[0.08] bg-slate-900 px-4 py-3 text-sm font-bold text-white"><option value="skill_learning">Learn a skill</option><option value="academics">Academic goal</option><option value="exam_preparation">Exam preparation</option><option value="chess">Chess improvement</option><option value="fitness">Fitness goal</option><option value="content_creation">Content creation</option><option value="business">Business goal</option><option value="productivity">Productivity system</option></select><button type="button" onClick={() => void startOnboarding()} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-cyan-200">Start with the important questions <ChevronRight className="h-4 w-4" /></button></section> : <RoadmapOnboarding questions={roadmap.questions} answers={roadmap.answers} onChange={roadmap.setAnswers} onNext={generate} generating={roadmap.generating} />}</div></main>;
@@ -112,5 +103,5 @@ function SummaryCard({ icon, label, value, detail, tone = "default" }: { icon: R
 }
 
 function InfoSection({ title, eyebrow, children }: { title: string; eyebrow: string; children: ReactNode }) {
-  return <section className="rounded-[2rem] border border-white/[0.08] bg-white/[0.025] p-5 sm:p-7"><div className="text-[9px] font-black uppercase tracking-[.18em] text-slate-600">{eyebrow}</div><h3 className="mt-2 text-xl font-black tracking-tight text-white">{title}</h3><p className="mt-2 text-sm leading-6 text-slate-500">{children}</p></section>;
+  return <section className="rounded-[2rem] border border-white/[0.08] bg-white/[0.025] p-5 sm:p-7"><div className="text-[10px] font-black uppercase tracking-[.2em] text-slate-600">{eyebrow}</div><h2 className="mt-2 text-xl font-black text-white">{title}</h2><div className="mt-3 text-sm leading-6 text-slate-500">{children}</div></section>;
 }
