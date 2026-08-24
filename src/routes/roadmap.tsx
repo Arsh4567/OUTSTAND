@@ -10,6 +10,7 @@ import { RoadmapEditDialog, type RoadmapEditPatch } from "@/components/roadmap/R
 import { InteractiveLearningRoadmap, type LearningMilestone } from "@/components/roadmap/InteractiveLearningRoadmap";
 import { supabase } from "@/integrations/supabase/client";
 import { useRoadmap } from "@/hooks/use-roadmap";
+import { loadSavedChessRoadmap } from "@/lib/chess-roadmap-persistence";
 
 export const Route = createFileRoute("/roadmap")({ component: RoadmapPage });
 
@@ -30,8 +31,47 @@ function RoadmapPage() {
   const [askingAI, setAskingAI] = useState(false);
 
   useEffect(() => { if (!roadmap.loading && !roadmap.roadmap) setShowOnboarding(true); }, [roadmap.loading, roadmap.roadmap]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadSavedChessRoadmap().then((saved) => {
+      if (cancelled || !saved) return;
+      const savedRoadmap = saved.generated_roadmap;
+      const username = saved.chess_com_username;
+      if (savedRoadmap && typeof savedRoadmap === "object") {
+        roadmap.setAnswers((current) => ({
+          ...current,
+          chesscom: {
+            profile: {
+              username,
+              avatar: saved.profile?.avatar ?? null,
+              title: saved.profile?.title ?? null,
+            },
+            ratings: saved.ratings || {
+              rapid: null,
+              blitz: null,
+              bullet: null,
+              tactics: null,
+            },
+          },
+          chessRoadmapSaved: savedRoadmap,
+        }));
+      }
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [roadmap]);
+
   const startOnboarding = async () => { try { await roadmap.askQuestions(category, {}); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not start roadmap intake."); } };
-  const generate = async () => { try { const result = await roadmap.generate(category, roadmap.answers); if (result?.needsMoreInfo) { setShowOnboarding(true); return; } if (!result?.roadmapId) throw new Error("Roadmap was generated but no saved roadmap ID was returned."); if (result?.structuredContent) { const { error } = await (supabase.from("roadmaps") as any).update({ structured_content: result.structuredContent }).eq("id", result.roadmapId); if (error) throw error; } setShowOnboarding(false); toast.success("Your roadmap is ready."); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not generate roadmap."); } };
+  const generate = async () => {
+    try {
+      const result = await roadmap.generate(category, roadmap.answers);
+      if (result?.needsMoreInfo) { setShowOnboarding(true); return; }
+      if (!result?.roadmapId) throw new Error("Roadmap was generated but no saved roadmap ID was returned.");
+      if (result?.structuredContent) { const { error } = await (supabase.from("roadmaps") as any).update({ structured_content: result.structuredContent }).eq("id", result.roadmapId); if (error) throw error; }
+      setShowOnboarding(false);
+      toast.success("Your roadmap is ready.");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not generate roadmap."); }
+  };
   const handleReview = async (reflection: string, energy: number, difficulty: number) => { setReviewing(true); try { const result = await roadmap.saveNightlyReview(reflection, energy, difficulty); toast.success(result?.reason || result?.analysis?.summary || "Tomorrow's priorities were adjusted."); setNightlyOpen(false); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not save nightly review."); } finally { setReviewing(false); } };
   const saveEdit = async (patch: RoadmapEditPatch) => { const current = roadmap.roadmap; if (!current) return; setSavingEdit(true); try { const { error } = await supabase.from("roadmaps").update({ title: patch.title, goal: patch.goal }).eq("id", current.id).eq("user_id", current.user_id); if (error) throw error; await roadmap.load(current.id); setEditOpen(false); toast.success("Roadmap updated."); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not update roadmap."); } finally { setSavingEdit(false); } };
   const askAIToEdit = async (request: string) => { const current = roadmap.roadmap; if (!current) return; setAskingAI(true); try { const { data: { session } } = await supabase.auth.getSession(); if (!session) throw new Error("Please sign in first."); const response = await fetch("/api/roadmap", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ mode: "edit", roadmapId: current.id, request }) }); const result = await response.json(); if (!response.ok) throw new Error(result.error || "Could not apply suggested changes."); if (result.changed === false) { toast.success("No roadmap changes were needed."); return; } await roadmap.load(current.id); setEditOpen(false); toast.success(result.message || "Roadmap updated."); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not apply suggested changes."); } finally { setAskingAI(false); } };
@@ -58,10 +98,16 @@ function RoadmapPage() {
     <DailyFocusCard tasks={roadmap.todayTasks} onToggle={roadmap.toggleTask} loading={roadmap.generating} />
     <section className="grid gap-5 lg:grid-cols-[1.15fr_.85fr]"><RoadmapVisualizer milestones={roadmap.milestones} todayIndex={roadmap.todayIndex} /><div className="space-y-5"><InfoSection title="Every action has a reason." eyebrow="WHY"><span>Today's work should repair a weakness, build a capability, or move you toward the target. The roadmap should always answer “why this today?”</span></InfoSection><InfoSection title="Learn → Practice → Test → Repair → Retest." eyebrow="MASTERY LOOP"><span>When the goal involves learning, new evidence should change the next action instead of merely marking another task complete.</span></InfoSection><InfoSection title="Protect the deadline, not the checklist." eyebrow="IF YOU FALL BEHIND"><span>Missed work should trigger priority recalculation: keep outcome-critical work, compress volume, drop low-value work, then retest before advancing.</span></InfoSection></div></section>
     {learningMilestones.length > 0 && <InteractiveLearningRoadmap milestones={learningMilestones} />}
-    <section className="rounded-[2rem] border border-white/[0.08] bg-white/[0.025] p-5 sm:p-7"><div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><div className="text-[10px] font-black uppercase tracking-[.2em] text-slate-600">Evidence</div><h2 className="mt-2 text-2xl font-black text-white">Completion is not the whole story.</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">The roadmap should explain progress through results: accuracy, attempts, consistency, confidence, time spent, and checkpoint performance.</p></div><button type="button" onClick={() => setNightlyOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-2.5 text-xs font-black text-slate-200"><Clock3 className="h-4 w-4" />Log today</button></div><div className="mt-6 grid gap-2 sm:grid-cols-2 lg:grid-cols-5"><EvidenceStat label="Accuracy" value="—" /><EvidenceStat label="Attempts" value="—" /><EvidenceStat label="Consistency" value={`${todayPercent}%`} /><EvidenceStat label="Confidence" value="—" /><EvidenceStat label="Time" value={`${roadmap.todayTasks.reduce((sum, task) => sum + (task.progress === "completed" ? task.estimated_minutes || 0 : 0), 0)}m`} /></div></section>
-  </div><NightlyReviewModal open={nightlyOpen} onClose={() => setNightlyOpen(false)} onSubmit={handleReview} submitting={reviewing} /><RoadmapEditDialog open={editOpen} initial={{ title: roadmap.roadmap.title, goal: roadmap.roadmap.goal }} onClose={() => setEditOpen(false)} onSave={saveEdit} onAskAI={askAIToEdit} saving={savingEdit} askingAI={askingAI} /></main>;
+    <section className="rounded-[2rem] border border-white/[0.08] bg-white/[0.025] p-5 sm:p-7"><div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><div className="text-[10px] font-black uppercase tracking-[.2em] text-slate-600">Evidence</div><h2 className="mt-2 text-2xl font-black text-white">Completion is not the whole story.</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">The roadmap should explain progress through results: accuracy, attempts, consistency, confidence, time spent.</p></div><div className="text-right"><div className="text-3xl font-black tabular-nums text-white">{overallProgress}%</div><div className="text-[10px] font-bold uppercase tracking-[.16em] text-slate-600">proven</div></div></div></section>
+    {editOpen && <RoadmapEditDialog open={editOpen} roadmap={{ title: roadmap.roadmap.title, goal: roadmap.roadmap.goal }} saving={savingEdit} askingAI={askingAI} onClose={() => setEditOpen(false)} onSave={saveEdit} onAskAI={askAIToEdit} />}
+    <NightlyReviewModal open={nightlyOpen} saving={reviewing} onClose={() => setNightlyOpen(false)} onSubmit={handleReview} />
+  </div></main>;
 }
 
-function SummaryCard({ icon, label, value, detail, tone = "neutral" }: { icon: ReactNode; label: string; value: string; detail: string; tone?: "neutral" | "success" | "warning" }) { const border = tone === "success" ? "border-emerald-300/10 bg-emerald-300/[0.025]" : tone === "warning" ? "border-amber-300/15 bg-amber-300/[0.025]" : "border-white/[0.07] bg-black/10"; return <div className={`rounded-2xl border p-4 ${border}`}>{icon}<p className="mt-4 text-[9px] font-black uppercase tracking-[.16em] text-slate-600">{label}</p><p className="mt-1 text-sm font-black text-white">{value}</p><p className="mt-1 text-[11px] leading-4 text-slate-600">{detail}</p></div>; }
-function InfoSection({ title, eyebrow, children }: { title: string; eyebrow: string; children: ReactNode }) { return <section className="rounded-[2rem] border border-white/[0.08] bg-white/[0.025] p-5 sm:p-7"><div className="text-[10px] font-black uppercase tracking-[.2em] text-cyan-300/70">{eyebrow}</div><h2 className="mt-2 text-2xl font-black text-white">{title}</h2><p className="mt-2 text-sm leading-6 text-slate-500">{children}</p></section>; }
-function EvidenceStat({ label, value }: { label: string; value: string }) { return <div className="rounded-2xl border border-white/[0.06] bg-black/10 p-4"><p className="text-[9px] font-black uppercase tracking-[.14em] text-slate-600">{label}</p><p className="mt-2 text-xl font-black text-white tabular-nums">{value}</p></div>; }
+function SummaryCard({ icon, label, value, detail, tone = "default" }: { icon: ReactNode; label: string; value: string; detail: string; tone?: "default" | "success" | "warning" }) {
+  return <div className={`rounded-2xl border p-4 ${tone === "success" ? "border-emerald-300/10 bg-emerald-300/[0.025]" : tone === "warning" ? "border-amber-300/10 bg-amber-300/[0.025]" : "border-white/[0.06] bg-white/[0.02]"}`}><div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[.16em] text-slate-600">{icon}{label}</div><div className="mt-2 text-sm font-black text-white">{value}</div><div className="mt-1 text-[11px] leading-5 text-slate-600">{detail}</div></div>;
+}
+
+function InfoSection({ title, eyebrow, children }: { title: string; eyebrow: string; children: ReactNode }) {
+  return <section className="rounded-[2rem] border border-white/[0.08] bg-white/[0.025] p-5 sm:p-7"><div className="text-[9px] font-black uppercase tracking-[.18em] text-slate-600">{eyebrow}</div><h3 className="mt-2 text-xl font-black tracking-tight text-white">{title}</h3><p className="mt-2 text-sm leading-6 text-slate-500">{children}</p></section>;
+}
