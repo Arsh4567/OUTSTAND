@@ -130,9 +130,13 @@ export function useRoadmap() {
       if (response.ok) { const result = await response.json(); await supabase.from("nightly_reviews").upsert({ roadmap_id: roadmap.id, daily_log_id: dailyLog.id, user_id: roadmap.user_id, review_date: today, ai_summary: result.analysis?.summary || null, ai_feedback: result.analysis?.recommendation || null, adaptation: result, strengths: result.analysis?.strengths || [], blockers: result.analysis?.blockers || [] }, { onConflict: "roadmap_id,review_date" }); await insertNextDaySchedule(roadmap.id, roadmap.user_id, nextDay, result.nextDaySchedule); await load(roadmap.id); return result; }
     }
     return { completion: percent, reason: "Your day has been logged. Tomorrow's schedule will be generated when the planner is available." };
-  }, [roadmap, tasks, insertNextDaySchedule, load]);
+  }, [insertNextDaySchedule, load, roadmap, tasks]);
 
-  const todayIndex = useMemo(() => roadmap ? Math.max(1, Math.floor((Date.now() - new Date(roadmap.start_date).getTime()) / 86400000) + 1) : 1, [roadmap]);
-  const todayTasks = useMemo(() => tasks.filter((task) => task.day_number === todayIndex).sort((a, b) => (a.start_time || "99:99").localeCompare(b.start_time || "99:99") || a.task_order - b.task_order), [tasks, todayIndex]);
-  return { roadmap, milestones, tasks, todayTasks, todayIndex, questions, answers, setAnswers, loading, generating, askQuestions, generate, toggleTask, saveNightlyReview, reload: load };
+  const todayIndex = useMemo(() => {
+    if (!roadmap?.start_date) return 1;
+    return Math.max(1, Math.floor((Date.now() - new Date(`${roadmap.start_date}T00:00:00`).getTime()) / 86400000) + 1);
+  }, [roadmap?.start_date]);
+  const todayTasks = useMemo(() => tasks.filter((task) => task.day_number === todayIndex), [tasks, todayIndex]);
+
+  return { roadmap, milestones, tasks, questions, answers, loading, generating, setAnswers, load, askQuestions, generate, toggleTask, saveNightlyReview, todayIndex, todayTasks };
 }
