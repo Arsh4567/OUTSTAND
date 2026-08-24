@@ -52,10 +52,15 @@ function createSupabaseClient() {
       fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY),
     },
     auth: {
-      storage: typeof window !== 'undefined' ? localStorage : undefined,
+      // Keep the Supabase session in browser storage so returning users do not
+      // need to authenticate again after closing the site or coming back weeks later.
+      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+      storageKey: 'outstand-auth-session',
       persistSession: true,
       autoRefreshToken: true,
-    }
+      detectSessionInUrl: true,
+      flowType: 'pkce',
+    },
   });
 }
 
