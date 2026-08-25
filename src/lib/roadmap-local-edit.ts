@@ -26,17 +26,6 @@ function parseTime(text: string) {
   return hour * 60 + minute;
 }
 
-const toMinutes = (value: string | null) => {
-  if (!value || !/^\d{2}:\d{2}$/.test(value)) return null;
-  const [h, m] = value.split(":").map(Number);
-  return h * 60 + m;
-};
-
-const timeString = (total: number) => {
-  const normalized = ((total % 1440) + 1440) % 1440;
-  return `${String(Math.floor(normalized / 60)).padStart(2, "0")}:${String(normalized % 60).padStart(2, "0")}`;
-};
-
 export async function tryLocalRoadmapEdit(roadmapId: string, request: string): Promise<LocalRoadmapEditResult> {
   const text = request.trim();
   if (!text) return { handled: false };
@@ -90,32 +79,12 @@ export async function tryLocalRoadmapEdit(roadmapId: string, request: string): P
 
   const eveningStart = parseTime(text);
   if (eveningStart && /\b(?:evening|sessions?|study|blocks?|tasks?)\b/i.test(text) && /\b(?:after|from|move|shift)\b/i.test(text)) {
-    const { data: tasks, error: taskError } = await supabase
-      .from("roadmap_tasks")
-      .select("id,start_time,end_time")
-      .eq("roadmap_id", roadmapId)
-      .eq("user_id", session.user.id)
-      .order("day_number")
-      .order("task_order");
-    if (taskError) throw taskError;
-
-    let cursor = eveningStart;
-    for (const task of tasks || []) {
-      const start = toMinutes(task.start_time);
-      const end = toMinutes(task.end_time);
-      if (start === null || end === null || end <= start) continue;
-      const durationMinutes = Math.max(10, end - start);
-      const { error: updateError } = await supabase
-        .from("roadmap_tasks")
-        .update({ start_time: timeString(cursor), end_time: timeString(cursor + durationMinutes) })
-        .eq("id", task.id)
-        .eq("roadmap_id", roadmapId)
-        .eq("user_id", session.user.id);
-      if (updateError) throw updateError;
-      cursor += durationMinutes + 15;
-      if (cursor >= 23 * 60 + 30) break;
-    }
-    return { handled: true, message: `Schedule moved to start after ${timeString(eveningStart)} without using AI.` };
+    const { error: rpcError } = await supabase.rpc("relocate_roadmap_tasks" as never, {
+      p_roadmap_id: roadmapId,
+      p_start_minute: eveningStart,
+    } as never);
+    if (rpcError) throw rpcError;
+    return { handled: true, message: `Schedule moved to start after ${new Date(0).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true }).replace(/12:00/, "12:00") /* formatted below */}`.replace("12:00", `${Math.floor(eveningStart / 60)}:${String(eveningStart % 60).padStart(2, "0")}`) };
   }
 
   return { handled: false };
