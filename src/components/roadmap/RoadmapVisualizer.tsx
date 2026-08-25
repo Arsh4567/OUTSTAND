@@ -1,4 +1,5 @@
-import { CheckCircle2, Circle, LockKeyhole, Target } from "lucide-react";
+import { motion } from "framer-motion";
+import { CheckCircle2, Circle, LockKeyhole, Target, ArrowUpRight } from "lucide-react";
 import type { RoadmapMilestone } from "@/hooks/use-roadmap";
 
 function milestoneState(todayIndex: number, milestone: RoadmapMilestone) {
@@ -8,46 +9,66 @@ function milestoneState(todayIndex: number, milestone: RoadmapMilestone) {
 }
 
 export function RoadmapVisualizer({ milestones, todayIndex }: { milestones: RoadmapMilestone[]; todayIndex: number }) {
-  const current = milestones.find((milestone) => milestoneState(todayIndex, milestone) === "current") || milestones[milestones.length - 1];
+  const currentIndex = milestones.findIndex((milestone) => milestoneState(todayIndex, milestone) === "current");
 
   return (
-    <section className="rounded-[2rem] border border-white/[0.08] bg-white/[0.03] p-5 sm:p-7">
-      <div className="flex items-end justify-between gap-4">
+    <section className="relative overflow-hidden rounded-[2rem] border border-white/[0.08] bg-white/[0.025] p-5 shadow-[0_32px_90px_-72px_rgba(34,211,238,.5)] sm:p-7">
+      <div className="pointer-events-none absolute -right-28 -top-28 h-72 w-72 rounded-full bg-cyan-400/[0.045] blur-3xl" />
+      <div className="relative flex items-end justify-between gap-4">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[.2em] text-violet-300/70">Execution map</p>
-          <h2 className="mt-1 text-2xl font-black text-white">Build → prove → advance</h2>
-          <p className="mt-1 max-w-xl text-xs leading-5 text-slate-500">Each stage has an outcome, not just a list of tasks. Move forward when the evidence says you are ready.</p>
+          <p className="text-[10px] font-black uppercase tracking-[.22em] text-slate-600">The path</p>
+          <h2 className="mt-2 text-2xl font-black tracking-tight text-white">From today to the outcome</h2>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">A milestone is a proof point. The work underneath it is only valuable when it moves you toward that proof.</p>
         </div>
-        <span className="shrink-0 text-xs font-bold text-slate-500">Day {todayIndex}</span>
+        <span className="shrink-0 rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1.5 text-[10px] font-black uppercase tracking-[.15em] text-slate-500">Day {todayIndex}</span>
       </div>
 
-      {current && (
-        <div className="mt-6 rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.045] p-4">
-          <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[.18em] text-cyan-200/70"><Target className="h-3.5 w-3.5" />Current stage</div>
-          <div className="mt-1 text-base font-black text-white">{current.title}</div>
-          {current.outcome && <p className="mt-1 text-xs leading-5 text-slate-400">Proof target: {current.outcome}</p>}
+      <div className="relative mt-8">
+        <div className="absolute left-[1.05rem] top-5 bottom-5 w-px bg-gradient-to-b from-cyan-300/45 via-violet-300/20 to-white/[0.04]" />
+        <div className="space-y-3">
+          {milestones.map((milestone, index) => {
+            const state = milestoneState(todayIndex, milestone);
+            const progress = milestone.tasks.length ? Math.round((milestone.tasks.filter((task) => task.progress === "completed").length / milestone.tasks.length) * 100) : 0;
+            const isExpanded = state === "current";
+            return (
+              <motion.article
+                key={milestone.id}
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.25 }}
+                transition={{ duration: .4, delay: index * .035 }}
+                whileHover={{ y: -1 }}
+                className={`relative flex gap-4 rounded-2xl border p-4 transition ${state === "current" ? "border-cyan-300/15 bg-cyan-300/[0.045] shadow-[0_16px_50px_-40px_rgba(34,211,238,.7)]" : state === "complete" ? "border-emerald-300/10 bg-emerald-300/[0.018]" : "border-white/[0.06] bg-black/10"}`}
+              >
+                <div className={`relative z-10 grid h-8 w-8 shrink-0 place-items-center rounded-xl border ${state === "current" ? "border-cyan-300/25 bg-slate-950 text-cyan-300" : state === "complete" ? "border-emerald-300/20 bg-slate-950 text-emerald-300" : "border-white/10 bg-slate-950 text-slate-600"}`}>
+                  {state === "complete" ? <CheckCircle2 className="h-4 w-4" /> : state === "current" ? <Circle className="h-4 w-4 fill-cyan-300 text-cyan-300" /> : <LockKeyhole className="h-3.5 w-3.5" />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[9px] font-black uppercase tracking-[.16em] text-slate-600">Stage {index + 1} · Days {milestone.day_start}–{milestone.day_end}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-[.12em] ${state === "complete" ? "bg-emerald-300/10 text-emerald-200" : state === "current" ? "bg-cyan-300/10 text-cyan-200" : "bg-white/[0.05] text-slate-500"}`}>{state === "complete" ? "Shipped" : state === "current" ? "In progress" : "Planned"}</span>
+                  </div>
+                  <div className="mt-1 flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-base font-black text-white">{milestone.title}</h3>
+                      {milestone.outcome && <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-500">{milestone.outcome}</p>}
+                    </div>
+                    <ArrowUpRight className="mt-0.5 hidden h-4 w-4 shrink-0 text-slate-700 sm:block" />
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-white/[0.06] px-2.5 py-1 text-[8px] font-bold text-slate-500">{milestone.tasks.length} work blocks</span>
+                    <span className="rounded-full border border-white/[0.06] px-2.5 py-1 text-[8px] font-bold text-slate-500">{progress}% complete</span>
+                  </div>
+                  {isExpanded && (
+                    <div className="mt-4 h-1 overflow-hidden rounded-full bg-white/[0.06]">
+                      <motion.div initial={{ width: 0 }} whileInView={{ width: `${progress}%` }} viewport={{ once: true }} transition={{ duration: .8, ease: "easeOut" }} className="h-full rounded-full bg-gradient-to-r from-cyan-300 via-sky-300 to-violet-300" />
+                    </div>
+                  )}
+                </div>
+              </motion.article>
+            );
+          })}
         </div>
-      )}
-
-      <div className="relative mt-7 space-y-4">
-        <div className="absolute bottom-6 left-5 top-6 w-px bg-gradient-to-b from-cyan-300/40 via-violet-300/20 to-white/[0.04]" />
-        {milestones.map((milestone, index) => {
-          const state = milestoneState(todayIndex, milestone);
-          const label = state === "complete" ? "Completed" : state === "current" ? "In progress" : "Upcoming";
-          return (
-            <div key={milestone.id} className={`relative flex gap-4 rounded-2xl border p-4 transition ${state === "current" ? "border-cyan-300/15 bg-cyan-300/[0.035]" : state === "complete" ? "border-emerald-300/10 bg-emerald-300/[0.02]" : "border-white/[0.06] bg-black/10"}`}>
-              <div className="relative z-10 grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-slate-950">
-                {state === "complete" ? <CheckCircle2 className="h-5 w-5 text-emerald-300" /> : state === "current" ? <Circle className="h-5 w-5 fill-cyan-300 text-cyan-300" /> : <LockKeyhole className="h-4 w-4 text-slate-600" />}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2"><span className="text-[9px] font-black uppercase tracking-[.16em] text-slate-600">Stage {index + 1} · Days {milestone.day_start}–{milestone.day_end}</span><span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-[.12em] ${state === "complete" ? "bg-emerald-300/10 text-emerald-200" : state === "current" ? "bg-cyan-300/10 text-cyan-200" : "bg-white/[0.05] text-slate-500"}`}>{label}</span></div>
-                <h3 className="mt-1 text-base font-black text-white">{milestone.title}</h3>
-                {milestone.outcome && <p className="mt-1 text-sm leading-5 text-slate-500">{milestone.outcome}</p>}
-                {!!milestone.tasks?.length && <div className="mt-3 flex flex-wrap gap-1.5"><span className="rounded-full border border-white/[0.06] px-2 py-1 text-[8px] font-bold text-slate-500">{milestone.tasks.length} execution blocks</span><span className="rounded-full border border-white/[0.06] px-2 py-1 text-[8px] font-bold text-slate-500">{milestone.tasks.filter((task) => task.progress === "completed").length} complete</span></div>}
-              </div>
-            </div>
-          );
-        })}
       </div>
     </section>
   );
