@@ -10,6 +10,8 @@ import { NightlyReviewModal } from "@/components/roadmap/NightlyReviewModal";
 import { RoadmapEditDialog, type RoadmapEditPatch } from "@/components/roadmap/RoadmapEditDialog";
 import { InteractiveLearningRoadmap, type LearningMilestone } from "@/components/roadmap/InteractiveLearningRoadmap";
 import { ChessAnalysisSection } from "@/components/roadmap/ChessAnalysisSection";
+import { GoalGraphPanel } from "@/components/roadmap/GoalGraphPanel";
+import { buildGoalGraph } from "@/lib/roadmap-goal-graph";
 import { supabase } from "@/integrations/supabase/client";
 import { useRoadmap } from "@/hooks/use-roadmap";
 import { loadSavedChessRoadmap } from "@/lib/chess-roadmap-persistence";
@@ -79,6 +81,7 @@ function RoadmapPage() {
   const onTrack = overallProgress >= plannedProgress - 10;
   const isChessRoadmap = roadmap.roadmap?.category === "chess";
   const completionGap = Math.max(0, todayRequired.length - todayCompleted);
+  const goalGraph = useMemo(() => roadmap.roadmap ? buildGoalGraph(roadmap.roadmap, roadmap.milestones, roadmap.tasks) : null, [roadmap.roadmap, roadmap.milestones, roadmap.tasks]);
 
   if (roadmap.loading) return (
     <main className="min-h-screen bg-[#020617] px-4 py-16 text-center text-sm text-slate-500">
@@ -125,6 +128,7 @@ function RoadmapPage() {
         <section className="rounded-[2rem] border border-white/[0.08] bg-white/[0.025] p-5 sm:p-7"><div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[.2em] text-slate-600"><CalendarDays className="h-4 w-4" />Today</div><div className="mt-4 flex items-end justify-between gap-4"><div><div className="text-4xl font-black tabular-nums text-white">{todayPercent}%</div><div className="mt-1 text-xs text-slate-600">required work complete</div></div><div className="text-right"><div className="text-sm font-black text-white">{completionGap}</div><div className="text-[9px] font-bold uppercase tracking-[.16em] text-slate-600">remaining</div></div></div><div className="mt-5 h-2 overflow-hidden rounded-full bg-white/[0.06]"><motion.div initial={{ width: 0 }} animate={{ width: `${todayPercent}%` }} transition={{ duration: .8 }} className="h-full rounded-full bg-cyan-300" /></div><button type="button" onClick={() => setNightlyOpen(true)} className="mt-5 inline-flex items-center gap-2 text-xs font-black text-slate-300 transition hover:text-cyan-200">End-of-day review <ArrowRight className="h-3.5 w-3.5" /></button></section>
       </section>
 
+      {goalGraph && <GoalGraphPanel graph={goalGraph} />}
       <DailyFocusCard tasks={roadmap.todayTasks} onToggle={roadmap.toggleTask} loading={roadmap.generating} />
       {isChessRoadmap && <ChessAnalysisSection username={chessUsername} />}
 
