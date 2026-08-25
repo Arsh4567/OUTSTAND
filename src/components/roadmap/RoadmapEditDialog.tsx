@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 export type RoadmapEditPatch = { title: string; goal: string };
 
-export function RoadmapEditDialog({ open, initial, onClose, onSave, onAskAI, saving, askingAI }: { open: boolean; initial: RoadmapEditPatch; onClose: () => void; onSave: (patch: RoadmapEditPatch) => void; onAskAI: (request: string) => void; saving?: boolean; askingAI?: boolean }) {
+export function RoadmapEditDialog({ open, initial, roadmapId, onClose, onSave, onAskAI, onLocalEditApplied, saving, askingAI }: { open: boolean; initial: RoadmapEditPatch; roadmapId: string; onClose: () => void; onSave: (patch: RoadmapEditPatch) => void; onAskAI: (request: string) => void; onLocalEditApplied: () => Promise<void> | void; saving?: boolean; askingAI?: boolean }) {
   const [title, setTitle] = useState(initial.title);
   const [goal, setGoal] = useState(initial.goal);
   const [request, setRequest] = useState("");
@@ -18,9 +18,10 @@ export function RoadmapEditDialog({ open, initial, onClose, onSave, onAskAI, sav
     if (next.length < 5) return;
     setLocalEditing(true);
     try {
-      const local = await tryLocalRoadmapEdit(next);
+      const local = await tryLocalRoadmapEdit(roadmapId, next);
       if (local.handled) {
-        toast.success(local.message || "Roadmap updated without AI.");
+        await onLocalEditApplied();
+        toast.success(local.message || "Roadmap updated without using AI.");
         onClose();
         return;
       }
