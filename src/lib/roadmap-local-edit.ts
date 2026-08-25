@@ -26,6 +26,14 @@ function parseTime(text: string) {
   return hour * 60 + minute;
 }
 
+const formatTime = (minutes: number) => {
+  const hour = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  const suffix = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${String(minute).padStart(2, "0")} ${suffix}`;
+};
+
 export async function tryLocalRoadmapEdit(roadmapId: string, request: string): Promise<LocalRoadmapEditResult> {
   const text = request.trim();
   if (!text) return { handled: false };
@@ -84,7 +92,7 @@ export async function tryLocalRoadmapEdit(roadmapId: string, request: string): P
       p_start_minute: eveningStart,
     } as never);
     if (rpcError) throw rpcError;
-    return { handled: true, message: `Schedule moved to start after ${new Date(0).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: true }).replace(/12:00/, "12:00") /* formatted below */}`.replace("12:00", `${Math.floor(eveningStart / 60)}:${String(eveningStart % 60).padStart(2, "0")}`) };
+    return { handled: true, message: `Schedule moved to start after ${formatTime(eveningStart)} without using AI.` };
   }
 
   return { handled: false };
