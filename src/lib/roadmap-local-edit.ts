@@ -37,21 +37,28 @@ const timeString = (total: number) => {
   return `${String(Math.floor(normalized / 60)).padStart(2, "0")}:${String(normalized % 60).padStart(2, "0")}`;
 };
 
-export async function tryLocalRoadmapEdit(request: string): Promise<LocalRoadmapEditResult> {
+export async function tryLocalRoadmapEdit(roadmapId: string, request: string): Promise<LocalRoadmapEditResult> {
   const text = request.trim();
   if (!text) return { handled: false };
+  if (!roadmapId) throw new Error("A roadmap is required for this edit.");
+
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Please sign in first.");
 
-  const { data: roadmap, error } = await supabase.from("roadmaps").select("id,user_id,title,goal,duration_days,start_date,target_date").eq("user_id", session.user.id).in("status", ["active", "paused"]).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const { data: roadmap, error } = await supabase
+    .from("roadmaps")
+    .select("id,user_id,title,goal,duration_days,start_date,target_date")
+    .eq("id", roadmapId)
+    .eq("user_id", session.user.id)
+    .maybeSingle();
   if (error) throw error;
-  if (!roadmap) return { handled: false };
+  if (!roadmap) throw new Error("Roadmap not found or no longer belongs to this account.");
 
   const rename = text.match(/^(?:rename|change)\s+(?:the\s+)?(?:roadmap\s+)?(?:title|name)\s+(?:to|as)\s+(.+)$/i);
   if (rename?.[1]) {
     const title = rename[1].trim().replace(/[.!?]+$/, "").slice(0, 120);
     if (title.length < 2) return { handled: false };
-    const { error: updateError } = await supabase.from("roadmaps").update({ title }).eq("id", roadmap.id).eq("user_id", session.user.id);
+    const { error: updateError } = await supabase.from("roadmaps").update({ title }).eq("id", roadmapId).eq("user_id", session.user.id);
     if (updateError) throw updateError;
     return { handled: true, message: "Roadmap title updated without using AI." };
   }
@@ -60,29 +67,50 @@ export async function tryLocalRoadmapEdit(request: string): Promise<LocalRoadmap
   if (goal?.[1]) {
     const nextGoal = goal[1].trim().replace(/[.!?]+$/, "").slice(0, 2000);
     if (nextGoal.length < 5) return { handled: false };
-    const { error: updateError } = await supabase.from("roadmaps").update({ goal: nextGoal }).eq("id", roadmap.id).eq("user_id", session.user.id);
+    const { error: updateError } = await supabase.from("roadmaps").update({ goal: nextGoal }).eq("id", roadmapId).eq("user_id", session.user.id);
     if (updateError) throw updateError;
     return { handled: true, message: "Roadmap goal updated without using AI." };
   }
 
   const duration = parseDays(text);
   if (duration && /\b(?:days?|shorten|extend|length|duration)\b/i.test(text)) {
-    const { error: updateError } = await supabase.from("roadmaps").update({ duration_days: duration, target_date: addDays(roadmap.start_date, duration) }).eq("id", roadmap.id).eq("user_id", session.user.id);
+    const { error: updateError } = await supabase.from("roadmaps").update({ duration_days: duration, target_date: addDays(roadmap.start_date, duration) }).eq("id", roadmapId).eq("user_id", session.user.id);
     if (updateError) throw updateError;
-    if (/\b(?:shorten|reduce|make shorter|cut)\b/i.test(text)) await supabase.from("roadmap_tasks").update({ is_required: false }).eq("roadmap_id", roadmap.id).eq("user_id", session.user.id).gt("day_number", duration);
+    if (/\b(?:shorten|reduce|make shorter|cut)\b/i.test(text)) {
+      const { error: taskError } = await supabase
+        .from("roadmap_tasks")
+        .update({ is_required: false })
+        .eq("roadmap_id", roadmapId)
+        .eq("user_id", session.user.id)
+        .gt("day_number", duration);
+      if (taskError) throw taskError;
+    }
     return { handled: true, message: `Roadmap changed to ${duration} days without using AI.` };
   }
 
   const eveningStart = parseTime(text);
   if (eveningStart && /\b(?:evening|sessions?|study|blocks?|tasks?)\b/i.test(text) && /\b(?:after|from|move|shift)\b/i.test(text)) {
-    const { data: tasks, error: taskError } = await supabase.from("roadmap_tasks").select("id,start_time,end_time").eq("roadmap_id", roadmap.id).eq("user_id", session.user.id).order("day_number").order("task_order");
+    const { data: tasks, error: taskError } = await supabase
+      .from("roadmap_tasks")
+      .select("id,start_time,end_time")
+      .eq("roadmap_id", roadmapId)
+      .eq("user_id", session.user.id)
+      .order("day_number")
+      .order("task_order");
     if (taskError) throw taskError;
+
     let cursor = eveningStart;
     for (const task of tasks || []) {
-      const start = toMinutes(task.start_time); const end = toMinutes(task.end_time);
+      const start = toMinutes(task.start_time);
+      const end = toMinutes(task.end_time);
       if (start === null || end === null || end <= start) continue;
       const durationMinutes = Math.max(10, end - start);
-      const { error: updateError } = await supabase.from("roadmap_tasks").update({ start_time: timeString(cursor), end_time: timeString(cursor + durationMinutes) }).eq("id", task.id).eq("user_id", session.user.id);
+      const { error: updateError } = await supabase
+        .from("roadmap_tasks")
+        .update({ start_time: timeString(cursor), end_time: timeString(cursor + durationMinutes) })
+        .eq("id", task.id)
+        .eq("roadmap_id", roadmapId)
+        .eq("user_id", session.user.id);
       if (updateError) throw updateError;
       cursor += durationMinutes + 15;
       if (cursor >= 23 * 60 + 30) break;
