@@ -16,9 +16,10 @@ function AuthenticatedLayout() {
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
     try {
-      // Supabase sessions are restored from browser storage. During a hard
-      // refresh the server-side route guard cannot reliably see that session,
-      // so authentication must be enforced by the client-aware app shell.
+      // Authenticated routes are client-only because the Supabase session is
+      // restored from browser storage. Do not let a transient auth hydration
+      // race during an OAuth redirect decide the route before Supabase has had
+      // a chance to finish restoring the session.
       if (typeof window === "undefined") {
         return { user: null };
       }
@@ -30,7 +31,16 @@ export const Route = createFileRoute("/_authenticated")({
       }
 
       if (!data?.session) {
-        throw redirect({ to: "/auth" });
+        // Give Supabase a single event-loop turn to finish processing an OAuth
+        // callback before declaring the user unauthenticated. This prevents
+        // the callback -> route transition race that can briefly show the app
+        // and then bounce the user back to /auth.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const retry = await supabase.auth.getSession();
+        if (retry.error || !retry.data?.session) {
+          throw redirect({ to: "/auth" });
+        }
+        return { user: retry.data.session.user };
       }
 
       return { user: data.session.user };
