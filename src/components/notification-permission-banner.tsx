@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { requestPushPermission } from "@/lib/notification-engine";
+import { getNotificationPreferences } from "@/lib/notification-engine";
 import { useAuth } from "@/hooks/use-auth";
 
 const DISMISSED_PREFIX = "outstand-notification-banner-dismissed:";
@@ -14,8 +15,35 @@ export function NotificationPermissionBanner() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!userId || typeof window === "undefined") return;
-    setVisible(window.localStorage.getItem(`${DISMISSED_PREFIX}${userId}`) !== "1");
+    let cancelled = false;
+    if (!userId || typeof window === "undefined") {
+      setVisible(false);
+      return;
+    }
+
+    const key = `${DISMISSED_PREFIX}${userId}`;
+    if (window.localStorage.getItem(key) === "1") {
+      setVisible(false);
+      return;
+    }
+
+    if (!("Notification" in window)) {
+      setVisible(false);
+      return;
+    }
+
+    if (Notification.permission === "granted") {
+      void getNotificationPreferences().then((preferences) => {
+        if (cancelled) return;
+        setVisible(!preferences.push_enabled);
+      }).catch(() => {
+        if (!cancelled) setVisible(false);
+      });
+      return () => { cancelled = true; };
+    }
+
+    setVisible(Notification.permission !== "denied");
+    return () => { cancelled = true; };
   }, [userId]);
 
   const dismiss = () => {
