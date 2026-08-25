@@ -39,13 +39,12 @@ function RoadmapPage() {
     let cancelled = false;
     void loadSavedChessRoadmap().then((saved) => {
       if (cancelled || !saved) return;
-      const savedRoadmap = saved.generated_roadmap;
-      const username = typeof saved.chess_com_username === "string" ? saved.chess_com_username.trim() : "";
+      const username = saved.profile.username.trim();
       if (username) setChessUsername(username);
       roadmap.setAnswers((current) => ({
         ...current,
-        ...(username ? { chesscom: { profile: { username, avatar: saved.profile?.avatar ?? null, title: saved.profile?.title ?? null }, ratings: saved.ratings || { rapid: null, blitz: null, bullet: null, tactics: null } } } : {}),
-        ...(savedRoadmap && typeof savedRoadmap === "object" ? { chessRoadmapSaved: savedRoadmap } : {}),
+        chesscom: { profile: saved.profile, ratings: saved.ratings },
+        ...(saved.generatedRoadmap && typeof saved.generatedRoadmap === "object" ? { chessRoadmapSaved: saved.generatedRoadmap } : {}),
       }));
     }).catch(() => undefined);
     return () => { cancelled = true; };
@@ -120,39 +119,21 @@ function RoadmapPage() {
         </div>
       </header>
 
-      <section className="grid gap-4 lg:grid-cols-[1.4fr_.6fr]">
-        {nextTask ? <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-[2rem] border border-cyan-300/15 bg-cyan-300/[0.035] p-5 shadow-[0_30px_90px_-70px_rgba(34,211,238,.65)] sm:p-7"><div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-cyan-300/[0.06] blur-3xl" /><div className="relative"><div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[.2em] text-cyan-200/70"><span className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_16px_rgba(34,211,238,.8)]" />Next best move</div><h2 className="mt-3 max-w-3xl text-2xl font-black tracking-tight text-white sm:text-3xl">{nextTask.title}</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">{nextTask.success_criteria || nextTask.instructions}</p><div className="mt-5 flex flex-wrap gap-2"><span className="rounded-full border border-white/[0.07] bg-black/10 px-3 py-1.5 text-[9px] font-bold text-slate-400">{nextTask.estimated_minutes || 30} min</span><span className="rounded-full border border-white/[0.07] bg-black/10 px-3 py-1.5 text-[9px] font-bold text-slate-400">{nextTask.start_time || "Flexible"}</span><span className="rounded-full border border-cyan-300/10 bg-cyan-300/[0.04] px-3 py-1.5 text-[9px] font-bold text-cyan-200">Outcome first</span></div></div></motion.section> : <section className="rounded-[2rem] border border-emerald-300/10 bg-emerald-300/[0.025] p-5 sm:p-7"><p className="text-[9px] font-black uppercase tracking-[.2em] text-emerald-200/70">Today complete</p><h2 className="mt-3 text-2xl font-black text-white">You shipped the day.</h2><p className="mt-2 text-sm leading-6 text-slate-500">Nothing critical is left in today's queue. Protect the momentum with a review or stop deliberately.</p></section>}
-        <section className="rounded-[2rem] border border-white/[0.08] bg-white/[0.025] p-5 sm:p-7"><div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[.2em] text-slate-600"><CalendarDays className="h-4 w-4" />Today</div><div className="mt-4 flex items-end justify-between gap-4"><div><div className="text-4xl font-black tabular-nums text-white">{todayPercent}%</div><div className="mt-1 text-xs text-slate-600">required work complete</div></div><div className="text-right"><div className="text-sm font-black text-white">{completionGap}</div><div className="text-[9px] font-bold uppercase tracking-[.16em] text-slate-600">remaining</div></div></div><div className="mt-5 h-2 overflow-hidden rounded-full bg-white/[0.06]"><motion.div initial={{ width: 0 }} animate={{ width: `${todayPercent}%` }} transition={{ duration: .8 }} className="h-full rounded-full bg-cyan-300" /></div><button type="button" onClick={() => setNightlyOpen(true)} className="mt-5 inline-flex items-center gap-2 text-xs font-black text-slate-300 transition hover:text-cyan-200">End-of-day review <ArrowRight className="h-3.5 w-3.5" /></button></section>
-      </section>
-
-      <DailyFocusCard tasks={roadmap.todayTasks} onToggle={roadmap.toggleTask} loading={roadmap.generating} />
-      {isChessRoadmap && <ChessAnalysisSection username={chessUsername} />}
-
-      <RoadmapVisualizer milestones={roadmap.milestones} todayIndex={roadmap.todayIndex} />
-
-      <section className="grid gap-4 lg:grid-cols-3">
-        <TrustCard eyebrow="WHY THIS EXISTS" title="Every action has a reason.">Today's work should repair a weakness, build a capability, or move you toward the target. No filler milestones.</TrustCard>
-        <TrustCard eyebrow="MASTERY LOOP" title="Learn → practice → test → repair.">New evidence changes the next action. Progress is a feedback system, not a completed checklist.</TrustCard>
-        <TrustCard eyebrow="WHEN YOU SLIP" title="Protect the deadline, not the plan.">Missed work triggers priority compression: preserve outcome-critical work, reduce volume, and retest before advancing.</TrustCard>
-      </section>
-
+      {isChessRoadmap && <ChessAnalysisSection chessUsername={chessUsername} />}
+      <DailyFocusCard task={nextTask} completed={todayCompleted} total={todayRequired.length} gap={completionGap} onComplete={roadmap.completeTask} />
+      <RoadmapVisualizer roadmap={roadmap.roadmap} tasks={roadmap.tasks} />
       {learningMilestones.length > 0 && <InteractiveLearningRoadmap milestones={learningMilestones} />}
-
-      <section className="rounded-[2rem] border border-white/[0.08] bg-white/[0.025] p-5 sm:p-7"><div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div><div className="text-[10px] font-black uppercase tracking-[.2em] text-slate-600">Proof over activity</div><h2 className="mt-2 text-2xl font-black text-white">Completion is a signal. Results are the proof.</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">The roadmap becomes trustworthy when progress is explained through outcomes such as accuracy, attempts, consistency, confidence, or quality—not just checked boxes.</p></div><div className="shrink-0 rounded-2xl border border-white/[0.06] bg-black/10 px-5 py-4 text-center"><div className="text-3xl font-black tabular-nums text-white">{overallProgress}%</div><div className="text-[9px] font-bold uppercase tracking-[.16em] text-slate-600">proven</div></div></div></section>
-
-      {editOpen && <RoadmapEditDialog open={editOpen} roadmap={{ title: roadmap.roadmap.title, goal: roadmap.roadmap.goal }} saving={savingEdit} askingAI={askingAI} onClose={() => setEditOpen(false)} onSave={saveEdit} onAskAI={askAIToEdit} />}
-      <NightlyReviewModal open={nightlyOpen} saving={reviewing} onClose={() => setNightlyOpen(false)} onSubmit={handleReview} />
+      <RoadmapEditDialog open={editOpen} initial={{ title: roadmap.roadmap.title, goal: roadmap.roadmap.goal }} roadmapId={roadmap.roadmap.id} onClose={() => setEditOpen(false)} onSave={saveEdit} onAskAI={askAIToEdit} onLocalEditApplied={() => roadmap.load(roadmap.roadmap!.id)} saving={savingEdit} askingAI={askingAI} />
+      <NightlyReviewModal open={nightlyOpen} onClose={() => setNightlyOpen(false)} onSave={handleReview} saving={reviewing} />
     </div>
   </main>;
 }
 
-function ChevronRightIcon() { return <ArrowRight className="h-4 w-4" />; }
-
 function SignalCard({ icon, label, value, detail, accent = "default" }: { icon: ReactNode; label: string; value: string; detail: string; accent?: "default" | "cyan" | "emerald" | "amber" }) {
-  const tone = accent === "cyan" ? "border-cyan-300/10 bg-cyan-300/[0.025] text-cyan-200" : accent === "emerald" ? "border-emerald-300/10 bg-emerald-300/[0.02] text-emerald-200" : accent === "amber" ? "border-amber-300/10 bg-amber-300/[0.02] text-amber-200" : "border-white/[0.06] bg-white/[0.02] text-slate-400";
-  return <motion.div whileHover={{ y: -2 }} className={`rounded-2xl border p-4 transition ${tone}`}><div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[.17em] text-slate-600">{icon}{label}</div><div className="mt-2 text-sm font-black text-white">{value}</div><div className="mt-1 text-[10px] leading-5 text-slate-600">{detail}</div></motion.div>;
+  const accentClass = accent === "cyan" ? "text-cyan-200" : accent === "emerald" ? "text-emerald-200" : accent === "amber" ? "text-amber-200" : "text-white";
+  return <div className="rounded-2xl border border-white/[0.06] bg-white/[0.018] p-4"><div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[.16em] text-slate-600">{icon}{label}</div><div className={`mt-2 text-lg font-black ${accentClass}`}>{value}</div><p className="mt-1 text-[10px] leading-4 text-slate-600">{detail}</p></div>;
 }
 
-function TrustCard({ eyebrow, title, children }: { eyebrow: string; title: string; children: ReactNode }) {
-  return <motion.section whileHover={{ y: -2 }} className="rounded-[1.75rem] border border-white/[0.07] bg-white/[0.02] p-5 transition sm:p-6"><div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[.19em] text-slate-600"><Sparkles className="h-3.5 w-3.5" />{eyebrow}</div><h3 className="mt-3 text-lg font-black tracking-tight text-white">{title}</h3><p className="mt-2 text-sm leading-6 text-slate-500">{children}</p></motion.section>;
+function ChevronRightIcon() {
+  return <ArrowRight className="h-4 w-4" />;
 }
