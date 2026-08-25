@@ -45,8 +45,14 @@ export async function getNotificationHistory(limit = 30) { const { data, error }
 function base64UrlToUint8Array(value: string) { const cleaned = value.trim().replace(/^['"]|['"]$/g, "").replace(/\s+/g, ""); if (!cleaned) throw new Error("VAPID public key is empty."); if (!/^[A-Za-z0-9+/_-]+={0,2}$/.test(cleaned)) throw new Error("VAPID public key contains invalid characters."); const base64 = cleaned.replace(/-/g, "+").replace(/_/g, "/"); const remainder = base64.length % 4; if (remainder === 1) throw new Error("VAPID public key has an invalid length."); const padded = base64 + "=".repeat((4 - remainder) % 4); let binary: string; try { binary = atob(padded); } catch { throw new Error("VAPID public key is not valid base64/base64url. Check VITE_VAPID_PUBLIC_KEY in your deployment settings."); } const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0)); if (bytes.length !== 65 || bytes[0] !== 4) throw new Error("VAPID public key is invalid. It must be the 65-byte uncompressed public key generated for Web Push."); return bytes; }
 export async function requestPushPermission() {
   if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) throw new Error("Push notifications aren't supported by this browser.");
-  const permission = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
-  if (permission !== "granted") throw new Error("Notification permission was not granted.");
+  const permission = Notification.permission;
+  if (permission === "denied") throw new Error("Notifications are blocked in your browser settings.");
+  if (permission === "default") {
+    const requested = await Notification.requestPermission();
+    if (requested !== "granted") throw new Error("Notification permission was not granted.");
+  } else if (permission !== "granted") {
+    throw new Error("Notification permission was not granted.");
+  }
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Please sign in first.");
   const registration = await navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).then(() => navigator.serviceWorker.ready);
