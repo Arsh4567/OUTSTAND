@@ -60,6 +60,19 @@ export function useRoadmap() {
 
   useEffect(() => { void load(); }, [load]);
 
+  const updateRoadmap = useCallback(async (roadmapId: string, patch: { title: string; goal: string }) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("Please sign in first.");
+    const title = patch.title.trim().slice(0, 120);
+    const goal = patch.goal.trim().slice(0, 2000);
+    if (title.length < 2) throw new Error("Roadmap title is too short.");
+    if (goal.length < 5) throw new Error("Roadmap goal is too short.");
+    const { data, error } = await supabase.from("roadmaps").update({ title, goal }).eq("id", roadmapId).eq("user_id", session.user.id).select().single();
+    if (error) throw error;
+    setRoadmap(data);
+    return data;
+  }, []);
+
   const askQuestions = useCallback(async (category: string, currentAnswers: Record<string, unknown> = answers) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error("Please sign in to build a roadmap.");
@@ -132,11 +145,14 @@ export function useRoadmap() {
     return { completion: percent, reason: "Your day has been logged. Tomorrow's schedule will be generated when the planner is available." };
   }, [insertNextDaySchedule, load, roadmap, tasks]);
 
-  const todayIndex = useMemo(() => {
-    if (!roadmap?.start_date) return 1;
-    return Math.max(1, Math.floor((Date.now() - new Date(`${roadmap.start_date}T00:00:00`).getTime()) / 86400000) + 1);
-  }, [roadmap?.start_date]);
-  const todayTasks = useMemo(() => tasks.filter((task) => task.day_number === todayIndex), [tasks, todayIndex]);
+  const roadmapByDay = useMemo(() => {
+    const map = new Map<number, RoadmapTask[]>();
+    for (const task of tasks) { const list = map.get(task.day_number) || []; list.push(task); map.set(task.day_number, list); }
+    return map;
+  }, [tasks]);
 
-  return { roadmap, milestones, tasks, questions, answers, loading, generating, setAnswers, load, askQuestions, generate, toggleTask, saveNightlyReview, todayIndex, todayTasks };
+  const todayIndex = roadmap ? Math.max(1, Math.min(roadmap.duration_days, Math.floor((Date.now() - new Date(roadmap.start_date).getTime()) / 86400000) + 1)) : 1;
+  const todayTasks = roadmapByDay.get(todayIndex) || [];
+
+  return { roadmap, milestones, tasks, questions, answers, setAnswers, loading, generating, generate, askQuestions, load, updateRoadmap, toggleTask, saveNightlyReview, todayIndex, todayTasks };
 }
