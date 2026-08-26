@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { ArrowRight, CalendarDays, CheckCircle2, Clock3, Pencil, RotateCcw, Target, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { RoadmapOnboarding } from "@/components/roadmap/RoadmapOnboarding";
@@ -8,6 +8,7 @@ import { RoadmapVisualizer } from "@/components/roadmap/RoadmapVisualizer";
 import { DailyFocusCard } from "@/components/roadmap/DailyFocusCard";
 import { NightlyReviewModal } from "@/components/roadmap/NightlyReviewModal";
 import { RoadmapEditDialog, type RoadmapEditPatch } from "@/components/roadmap/RoadmapEditDialog";
+import { Roadmap3DHero } from "@/components/roadmap/Roadmap3DHero";
 import { useRoadmap } from "@/hooks/use-roadmap";
 
 export const Route = createFileRoute("/roadmap")({ component: RoadmapPage });
@@ -48,9 +49,7 @@ function RoadmapPage() {
       if (!result?.roadmapId) throw new Error("Roadmap was generated but no saved roadmap ID was returned.");
       setShowOnboarding(false);
       toast.success("Your roadmap is ready.");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not generate roadmap.");
-    }
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not generate roadmap."); }
   };
 
   const handleReview = async (reflection: string, energy: number, difficulty: number) => {
@@ -59,9 +58,8 @@ function RoadmapPage() {
       const result = await roadmap.saveNightlyReview(reflection, energy, difficulty);
       toast.success(result?.reason || result?.analysis?.summary || "Tomorrow's priorities were adjusted.");
       setNightlyOpen(false);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not save nightly review.");
-    } finally { setReviewing(false); }
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not save nightly review."); }
+    finally { setReviewing(false); }
   };
 
   const saveEdit = async (patch: RoadmapEditPatch) => {
@@ -74,9 +72,8 @@ function RoadmapPage() {
       await roadmap.load(current.id);
       setEditOpen(false);
       toast.success("Roadmap updated.");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not update roadmap.");
-    } finally { setSavingEdit(false); }
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not update roadmap."); }
+    finally { setSavingEdit(false); }
   };
 
   const requiredTasks = useMemo(() => roadmap.tasks.filter((task) => task.is_required), [roadmap.tasks]);
@@ -91,6 +88,7 @@ function RoadmapPage() {
   const completionGap = Math.max(0, todayRequired.length - todayCompleted);
   const milestoneIndex = Math.max(0, roadmap.milestones.findIndex((item) => roadmap.todayIndex >= item.day_start && roadmap.todayIndex <= item.day_end));
   const currentMilestone = roadmap.milestones[milestoneIndex];
+  const milestoneLabel = currentMilestone ? `${milestoneIndex + 1}/${roadmap.milestones.length}` : "—";
 
   if (roadmap.loading) return (
     <main className="min-h-screen bg-[#080d1c] px-4 py-16 text-center text-slate-300">
@@ -128,45 +126,21 @@ function RoadmapPage() {
     <main className="min-h-screen overflow-hidden bg-[#080d1c] px-4 pb-24 pt-4 text-white sm:px-6 lg:px-8">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_10%_5%,rgba(34,211,238,.16),transparent_24%),radial-gradient(circle_at_90%_10%,rgba(217,70,239,.12),transparent_24%),radial-gradient(circle_at_50%_55%,rgba(59,130,246,.07),transparent_35%)]" />
       <div className="relative z-10 mx-auto max-w-7xl space-y-5 sm:space-y-7">
-        <header className="relative isolate overflow-hidden rounded-[2.25rem] border border-white/10 bg-[#10182b]/90 shadow-[0_45px_140px_-80px_rgba(34,211,238,.55)] backdrop-blur-xl">
-          <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(34,211,238,.08),transparent_35%,rgba(217,70,239,.08))]" />
-          <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-fuchsia-400/15 blur-3xl" />
-          <div className="absolute -left-24 bottom-0 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
-
-          <div className="relative grid min-h-[390px] gap-8 p-6 sm:p-9 lg:grid-cols-[1.15fr_.85fr] lg:p-10">
-            <div className="relative z-20 flex flex-col justify-center">
-              <div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[.18em] text-slate-300">
-                <span className="rounded-full border border-cyan-200/25 bg-cyan-200/10 px-3 py-1.5 text-cyan-100">Day {roadmap.todayIndex}</span>
-                <span className="text-slate-500">of {roadmap.roadmap.duration_days}</span>
-                <span className="h-1 w-1 rounded-full bg-slate-600" />
-                <span className="text-slate-400">{daysLeft} days left</span>
-              </div>
-
-              <p className="mt-7 text-sm font-bold text-slate-400">Your destination</p>
-              <h1 className="mt-1 max-w-3xl text-[clamp(3.4rem,10vw,7rem)] font-black leading-[.88] tracking-[-.07em] text-white">{currentTitle}</h1>
-              <p className="mt-5 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">{roadmap.roadmap.goal}</p>
-
-              <div className="mt-7 flex flex-wrap items-center gap-2">
-                <button type="button" onClick={() => setEditOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-black text-slate-950 transition-transform duration-200 hover:-translate-y-0.5 hover:bg-cyan-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"><Pencil className="h-4 w-4" /> Edit roadmap</button>
-                <button type="button" onClick={() => setNightlyOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.07] px-4 py-2.5 text-xs font-black text-white transition-colors hover:bg-white/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200"><RotateCcw className="h-4 w-4" /> Review</button>
-              </div>
-            </div>
-
-            <div className="relative hidden min-h-[330px] lg:block" aria-hidden="true">
-              <RoadScene />
-              <div className="absolute bottom-5 right-5 z-20 w-52 rounded-2xl border border-white/10 bg-[#0a1120]/80 p-4 shadow-2xl backdrop-blur-md">
-                <div className="flex items-end justify-between"><div><p className="text-[9px] font-black uppercase tracking-[.16em] text-slate-500">Plan completion</p><p className="mt-1 text-3xl font-black tabular-nums">{overallProgress}%</p></div><span className="mb-1 rounded-full bg-cyan-300/10 px-2 py-1 text-[9px] font-black text-cyan-100">{completedCount}/{requiredTasks.length}</span></div>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10"><motion.div initial={{ width: 0 }} animate={{ width: `${overallProgress}%` }} transition={{ duration: .75, ease: "easeOut" }} className="h-full rounded-full bg-gradient-to-r from-cyan-300 via-sky-300 to-fuchsia-300" /></div>
-              </div>
-            </div>
-          </div>
-
-          <div className="relative grid grid-cols-3 border-t border-white/10 bg-black/10">
-            <HeroMetric label="Today" value={`${todayCompleted}/${todayRequired.length}`} icon={<CheckCircle2 className="h-4 w-4" />} />
-            <HeroMetric label="Days left" value={String(daysLeft)} icon={<CalendarDays className="h-4 w-4" />} />
-            <HeroMetric label="Milestone" value={currentMilestone ? `${milestoneIndex + 1}/${roadmap.milestones.length}` : "—"} icon={<Target className="h-4 w-4" />} />
-          </div>
-        </header>
+        <Roadmap3DHero
+          title={currentTitle}
+          goal={roadmap.roadmap.goal}
+          day={roadmap.todayIndex}
+          durationDays={roadmap.roadmap.duration_days}
+          daysLeft={daysLeft}
+          overallProgress={overallProgress}
+          completedCount={completedCount}
+          requiredCount={requiredTasks.length}
+          todayCompleted={todayCompleted}
+          todayRequired={todayRequired.length}
+          milestoneLabel={milestoneLabel}
+          onEdit={() => setEditOpen(true)}
+          onReview={() => setNightlyOpen(true)}
+        />
 
         <section className="grid gap-4 lg:grid-cols-[1.25fr_.75fr]">
           {nextTask ? (
@@ -204,30 +178,12 @@ function RoadmapPage() {
         </section>
       </div>
 
-      <RoadmapEditDialog open={editOpen} initial={{ title: roadmap.roadmap.title, goal: roadmap.roadmap.goal }} roadmapId={roadmap.roadmap.id} onClose={() => setEditOpen(false)} onSave={saveEdit} onAskAI={() => {}} onLocalEditApplied={() => {}} saving={savingEdit} askingAI={false} />
+      <RoadmapEditDialog open={editOpen} initial={{ title: roadmap.roadmap.title, goal: roadmap.roadmap.goal }} roadmapId={roadmap.roadmap.id} onClose={() => setEditOpen(false)} onSave={saveEdit} saving={savingEdit} />
       <NightlyReviewModal open={nightlyOpen} onClose={() => setNightlyOpen(false)} onSubmit={handleReview} loading={reviewing} />
     </main>
   );
 }
 
-function RoadScene() {
-  return (
-    <div className="absolute inset-0 overflow-hidden rounded-[2rem]">
-      <div className="absolute inset-x-0 top-8 h-40 bg-[radial-gradient(ellipse_at_center,rgba(34,211,238,.2),transparent_62%)]" />
-      <div className="absolute left-1/2 top-4 h-24 w-24 -translate-x-1/2 rounded-full bg-cyan-200/30 blur-2xl" />
-      <div className="absolute bottom-0 left-1/2 h-[310px] w-[88%] -translate-x-1/2 [clip-path:polygon(43%_0,57%_0,100%_100%,0_100%)] bg-gradient-to-b from-slate-500/50 via-slate-700/80 to-slate-950/95" />
-      <div className="absolute bottom-0 left-1/2 h-[310px] w-[4px] -translate-x-1/2 bg-[repeating-linear-gradient(to_bottom,rgba(255,255,255,.9)_0_22px,transparent_22px_46px)] [clip-path:polygon(35%_0,65%_0,100%_100%,0_100%)] opacity-80" />
-      <div className="absolute bottom-0 left-1/2 h-[310px] w-[76%] -translate-x-1/2 [clip-path:polygon(46%_0,54%_0,100%_100%,0_100%)] bg-gradient-to-b from-cyan-300/15 via-violet-400/10 to-fuchsia-400/10" />
-      <div className="absolute bottom-7 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full bg-white shadow-[0_0_22px_8px_rgba(34,211,238,.65)]" />
-      <div className="absolute bottom-0 left-0 h-24 w-full bg-gradient-to-t from-[#0a1120] to-transparent" />
-    </div>
-  );
-}
-
-function HeroMetric({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
-  return <div className="flex min-w-0 items-center gap-2 border-r border-white/10 px-4 py-4 last:border-r-0 sm:px-6"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/[0.06] text-cyan-200">{icon}</span><div className="min-w-0"><div className="text-[9px] font-black uppercase tracking-[.15em] text-slate-500">{label}</div><div className="mt-0.5 truncate text-sm font-black tabular-nums text-white">{value}</div></div></div>;
-}
-
-function InfoTile({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
+function InfoTile({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
   return <section className="rounded-[1.5rem] border border-white/10 bg-[#10182b]/75 p-5 transition-transform duration-200 hover:-translate-y-0.5"><div className="flex items-center gap-2 text-cyan-100"><span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-cyan-300/15 to-violet-300/10">{icon}</span><span className="text-xs font-black">{title}</span></div><p className="mt-3 line-clamp-3 text-xs leading-5 text-slate-400">{text}</p></section>;
 }
