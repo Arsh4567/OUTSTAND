@@ -5,7 +5,15 @@ import { generateText } from "ai";
 import { getAIProvider, modelFor } from "./ai-provider.js";
 
 const env = (...names: string[]) => names.map((name) => process.env[name]).find((value) => typeof value === "string" && value.trim());
-const RequestSchema = z.object({ milestone: z.string().trim().min(5).max(2000), availableMinutes: z.coerce.number().finite().min(15).max(240).default(120) }).strict();
+const RequestSchema = z.object({
+  milestone: z.string().trim().min(5).max(2000),
+  // Preserve the existing endpoint behavior: missing or non-numeric budgets fall back to 120,
+  // while numeric values are clamped to the established 15-240 minute range.
+  availableMinutes: z.preprocess((value) => {
+    const parsed = Number(value ?? 120);
+    return Number.isFinite(parsed) ? Math.min(240, Math.max(15, Math.round(parsed))) : 120;
+  }, z.number().int().min(15).max(240)),
+}).strict();
 const TaskSchema = z.object({ title: z.string().trim().min(1).max(160), minutes: z.coerce.number().int().min(5).max(45) }).strict();
 
 function sendJson(res: VercelResponse, status: number, data: unknown) {
