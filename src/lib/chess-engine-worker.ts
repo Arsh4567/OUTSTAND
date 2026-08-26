@@ -9,6 +9,10 @@ type Pending = {
   reject: (error: Error) => void;
 };
 
+const ENGINE_JS = "/stockfish/stockfish-18-lite-single.js";
+const ENGINE_WASM = "/stockfish/stockfish-18-lite-single.wasm";
+const INIT_TIMEOUT_MS = 15_000;
+
 let worker: Worker | null = null;
 let ready: Promise<void> | null = null;
 let sequence = 0;
@@ -17,67 +21,84 @@ let activeRequestId: number | null = null;
 let latestScore: number | null = null;
 let latestMate: number | null = null;
 
-function createWorker(): Worker {
-  const scriptUrl = new URL('/stockfish/stockfish-18-lite-single.js', window.location.href).href;
-  const wasmUrl = new URL('/stockfish/stockfish-18-lite-single.wasm', window.location.href).href;
+function resetWorker(error: Error) {
+  for (const request of pending.values()) request.reject(error);
+  pending.clear();
+  activeRequestId = null;
 
-  // Stockfish.js 18 is an Emscripten UCI runtime. It expects its Emscripten
-  // Module configuration to exist BEFORE importScripts() evaluates the JS.
-  // A blob worker lets us provide locateFile() without changing the user's
-  // exact WASM filename and without relying on fragile URL fragments.
+  const current = worker;
+  worker = null;
+  ready = null;
+  current?.terminate();
+}
+
+function createWorker(): Worker {
+  const scriptUrl = new URL(ENGINE_JS, window.location.origin).href;
+  const wasmUrl = new URL(ENGINE_WASM, window.location.origin).href;
+
+  // Stockfish.js is an Emscripten UCI runtime. Configure Module before the
+  // runtime is evaluated, and resolve the WASM explicitly because the worker
+  // itself is created from a blob URL.
   const bootstrap = `
     self.Module = {
       locateFile: function(file) {
-        if (file === 'stockfish.wasm') return ${JSON.stringify(wasmUrl)};
-        return file;
+        return file === "stockfish.wasm" ? ${JSON.stringify(wasmUrl)} : file;
       }
     };
     importScripts(${JSON.stringify(scriptUrl)});
   `;
 
-  const blob = new Blob([bootstrap], { type: 'application/javascript' });
-  const blobUrl = URL.createObjectURL(blob);
-  const engineWorker = new Worker(blobUrl);
-  URL.revokeObjectURL(blobUrl);
-  return engineWorker;
+  const blobUrl = URL.createObjectURL(
+    new Blob([bootstrap], { type: "application/javascript" }),
+  );
+
+  try {
+    return new Worker(blobUrl);
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
 }
 
-function getWorker(): Worker {
-  if (worker) return worker;
-  worker = createWorker();
+function getWorker(): { worker: Worker; ready: Promise<void> } {
+  if (worker && ready) return { worker, ready };
 
-  ready = new Promise((resolve, reject) => {
-    let settled = false;
-    const cleanup = () => {
-      worker?.removeEventListener('message', listener);
-      window.clearTimeout(timeout);
-    };
-    const finish = (error?: Error) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      if (error) reject(error);
-      else resolve();
-    };
-    const listener = (event: MessageEvent) => {
-      const line = typeof event.data === 'string' ? event.data.trim() : '';
-      if (line === 'uciok') finish();
-    };
-    const timeout = window.setTimeout(() => {
-      finish(new Error('Stockfish engine did not initialize within 15 seconds. Check that both Stockfish JS and WASM files are deployed under /stockfish/.'));
-    }, 15000);
+  const nextWorker = createWorker();
+  worker = nextWorker;
 
-    worker!.addEventListener('message', listener);
-    worker!.addEventListener('error', (event) => {
-      finish(new Error(event.message || 'Stockfish worker failed to load.'));
-    }, { once: true });
+  let resolveReady!: () => void;
+  let rejectReady!: (error: Error) => void;
+  ready = new Promise<void>((resolve, reject) => {
+    resolveReady = resolve;
+    rejectReady = reject;
   });
 
-  worker.addEventListener('message', (event: MessageEvent) => {
-    const line = typeof event.data === 'string' ? event.data.trim() : '';
+  let settled = false;
+  const timeout = window.setTimeout(() => {
+    if (settled) return;
+    settled = true;
+    const error = new Error(
+      `Stockfish engine did not initialize within ${INIT_TIMEOUT_MS / 1000} seconds. ` +
+      `Check ${ENGINE_JS} and ${ENGINE_WASM} are reachable in production.`,
+    );
+    rejectReady(error);
+    resetWorker(error);
+  }, INIT_TIMEOUT_MS);
+
+  const finishReady = (error?: Error) => {
+    if (settled) return;
+    settled = true;
+    window.clearTimeout(timeout);
+    if (error) rejectReady(error);
+    else resolveReady();
+  };
+
+  nextWorker.addEventListener("message", (event: MessageEvent) => {
+    const line = typeof event.data === "string" ? event.data.trim() : "";
+    if (line === "uciok") finishReady();
+
     if (!line) return;
 
-    if (line.startsWith('info ')) {
+    if (line.startsWith("info ")) {
       const cp = line.match(/\bscore cp (-?\d+)/);
       const mate = line.match(/\bscore mate (-?\d+)/);
       if (cp) latestScore = Number(cp[1]);
@@ -85,7 +106,7 @@ function getWorker(): Worker {
       return;
     }
 
-    if (!line.startsWith('bestmove ') || activeRequestId === null) return;
+    if (!line.startsWith("bestmove ") || activeRequestId === null) return;
 
     const id = activeRequestId;
     const request = pending.get(id);
@@ -100,24 +121,35 @@ function getWorker(): Worker {
     });
   });
 
-  worker.addEventListener('error', (event) => {
-    const error = new Error(event.message || 'Stockfish worker failed to load.');
-    for (const request of pending.values()) request.reject(error);
-    pending.clear();
-    activeRequestId = null;
-    ready = null;
+  nextWorker.addEventListener("error", (event) => {
+    const error = new Error(event.message || "Stockfish worker failed to load.");
+    finishReady(error);
+    resetWorker(error);
   });
 
-  worker.postMessage('uci');
-  return worker;
+  // UCI negotiation must start after the message/error listeners are attached.
+  nextWorker.postMessage("uci");
+
+  return { worker: nextWorker, ready };
 }
 
-export async function analyzePosition(fen: string, depth = 14): Promise<EngineLine> {
-  const sf = getWorker();
-  await ready;
+export async function analyzePosition(
+  fen: string,
+  depth = 14,
+): Promise<EngineLine> {
+  if (typeof window === "undefined" || typeof Worker === "undefined") {
+    throw new Error("Stockfish analysis is only available in a browser.");
+  }
+
+  const { worker: sf, ready: engineReady } = getWorker();
+  await engineReady;
+
+  if (!worker || worker !== sf) {
+    throw new Error("Stockfish worker was reset before analysis could start.");
+  }
 
   // Stockfish is a single UCI engine, so serialize analysis requests.
-  if (activeRequestId !== null) sf.postMessage('stop');
+  if (activeRequestId !== null) sf.postMessage("stop");
 
   const id = ++sequence;
   latestScore = null;
@@ -126,7 +158,7 @@ export async function analyzePosition(fen: string, depth = 14): Promise<EngineLi
 
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject });
-    sf.postMessage('ucinewgame');
+    sf.postMessage("ucinewgame");
     sf.postMessage(`position fen ${fen}`);
     sf.postMessage(`go depth ${Math.max(8, Math.min(22, depth))}`);
   });
