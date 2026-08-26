@@ -6,12 +6,12 @@ import { z } from "zod";
 const env = (...names: string[]) => names.map((name) => process.env[name]).find((value) => typeof value === "string" && value.trim());
 const categories = new Set(["habit", "goal", "motivation", "update", "system"]);
 const NotificationSchema = z.object({
-  category: z.string().default("system"),
-  title: z.string().trim().min(1).max(100).default("OUTSTAND"),
-  body: z.string().trim().min(1).max(280).default("You have an update from OUTSTAND."),
-  url: z.string().startsWith("/").default("/"),
-  dedupeKey: z.string().trim().max(160).nullable().optional(),
-}).strict();
+  category: z.preprocess((value) => String(value || "system"), z.string()),
+  title: z.preprocess((value) => String(value || "OUTSTAND").slice(0, 100), z.string().min(1).max(100)),
+  body: z.preprocess((value) => String(value || "You have an update from OUTSTAND.").slice(0, 280), z.string().min(1).max(280)),
+  url: z.preprocess((value) => typeof value === "string" && value.startsWith("/") ? value : "/", z.string()),
+  dedupeKey: z.preprocess((value) => typeof value === "string" ? value.slice(0, 160) : null, z.string().max(160).nullable()),
+});
 
 const sendError = (res: VercelResponse, status: number, error: string, code: string) =>
   res.status(status).setHeader("Cache-Control", "no-store").json({ error, code });
