@@ -73,16 +73,7 @@ export async function tryLocalRoadmapEdit(roadmapId: string, request: string): P
   if (duration && /\b(?:days?|shorten|extend|length|duration)\b/i.test(text)) {
     const { error: updateError } = await supabase.from("roadmaps").update({ duration_days: duration, target_date: addDays(roadmap.start_date, duration) }).eq("id", roadmapId).eq("user_id", session.user.id);
     if (updateError) throw updateError;
-    if (/\b(?:shorten|reduce|make shorter|cut)\b/i.test(text)) {
-      const { error: taskError } = await supabase
-        .from("roadmap_tasks")
-        .update({ is_required: false })
-        .eq("roadmap_id", roadmapId)
-        .eq("user_id", session.user.id)
-        .gt("day_number", duration);
-      if (taskError) throw taskError;
-    }
-    return { handled: true, message: `Roadmap changed to ${duration} days without using AI.` };
+    return { handled: true, message: `Roadmap changed to ${duration} days.` };
   }
 
   const eveningStart = parseTime(text);
@@ -92,7 +83,7 @@ export async function tryLocalRoadmapEdit(roadmapId: string, request: string): P
       p_start_minute: eveningStart,
     } as never);
     if (rpcError) throw rpcError;
-    return { handled: true, message: `Schedule moved to start after ${formatTime(eveningStart)} without using AI.` };
+    return { handled: true, message: `Schedule moved to start after ${formatTime(eveningStart)}.` };
   }
 
   return { handled: false };
