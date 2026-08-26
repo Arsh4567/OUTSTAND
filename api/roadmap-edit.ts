@@ -32,7 +32,7 @@ async function callGemini(prompt: string) {
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": google },
-    body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.15 } }),
+    body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.1, maxOutputTokens: 1200 } }),
   });
   const raw = await response.text();
   if (!response.ok) throw new Error(`Gemini request failed (${response.status}).`);
@@ -49,7 +49,7 @@ async function callGroq(prompt: string) {
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${groq}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model, temperature: 0.15, max_tokens: 5000, reasoning_effort: "medium", response_format: { type: "json_object" }, messages: [{ role: "system", content: "You are OUTSTAND Intelligence. Modify an existing execution roadmap without inventing user facts. Preserve completed progress. Only change what the user requested. Return JSON only." }, { role: "user", content: prompt }] }),
+    body: JSON.stringify({ model, temperature: 0.1, max_tokens: 1200, reasoning_effort: "low", response_format: { type: "json_object" }, messages: [{ role: "system", content: "You are OUTSTAND Smart Change. You are a PATCH ENGINE, not a roadmap generator. Never create, delete, or regenerate a roadmap. Never rewrite the whole plan. Only propose small changes to EXISTING incomplete tasks that directly satisfy the user's request. Preserve all completed tasks exactly. Return JSON only and keep it very small." }, { role: "user", content: prompt }] }),
   });
   const raw = await response.text();
   if (!response.ok) throw new Error(`Groq request failed (${response.status}).`);
@@ -68,12 +68,12 @@ async function callAI(prompt: string) {
 
 const validTime = (value: unknown) => typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 const minutesOf = (value: string) => value.split(":").map(Number).reduce((h, m) => h * 60 + m);
-const timeString = (total: number) => { const minutes = ((total % 1440) + 1440) % 1440; return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`; };
 
 function validateSchedule(schedule: any[]) {
-  if (!Array.isArray(schedule)) throw new Error("The AI did not return a schedule.");
+  if (!Array.isArray(schedule)) throw new Error("The AI did not return task changes.");
+  if (schedule.length > 8) throw new Error("Smart Change is limited to 8 task changes at a time.");
   for (const block of schedule) {
-    if (!Number.isInteger(block.day) || block.day < 1 || typeof block.title !== "string" || !validTime(block.startTime) || !validTime(block.endTime) || typeof block.instructions !== "string" || !Number.isInteger(block.estimatedMinutes) || block.estimatedMinutes < 10 || block.estimatedMinutes > 90 || typeof block.successCriteria !== "string" || !block.successCriteria.trim()) throw new Error("The AI returned an invalid schedule block.");
+    if (typeof block.taskId !== "string" || !Number.isInteger(block.day) || block.day < 1 || !validTime(block.startTime) || !validTime(block.endTime) || !Number.isInteger(block.estimatedMinutes) || block.estimatedMinutes < 10 || block.estimatedMinutes > 90) throw new Error("The AI returned an invalid task patch.");
     if (minutesOf(block.endTime) <= minutesOf(block.startTime)) throw new Error("The AI returned an invalid time range.");
   }
 }
@@ -85,48 +85,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { client, userId } = await auth(req);
     const input = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
     const roadmapId = typeof input.roadmapId === "string" ? input.roadmapId : "";
-    const request = typeof input.request === "string" ? input.request.trim() : "";
+    const request = typeof input.request === "string" ? input.request.trim().slice(0, 500) : "";
     if (!roadmapId || request.length < 5) return json(res, 400, { error: "A roadmap and a clear smart-change request are required." });
 
-    const { data: roadmap, error: roadmapError } = await client.from("roadmaps").select("id,user_id,title,goal,category,duration_days,start_date,target_date").eq("id", roadmapId).eq("user_id", userId).maybeSingle();
+    const { data: roadmap, error: roadmapError } = await client.from("roadmaps").select("id,user_id,title,category,duration_days").eq("id", roadmapId).eq("user_id", userId).maybeSingle();
     if (roadmapError) throw roadmapError;
     if (!roadmap) return json(res, 404, { error: "Roadmap not found." });
 
-    const [{ data: tasks, error: taskError }, { data: milestones, error: milestoneError }, { data: progressRows, error: progressError }] = await Promise.all([
-      client.from("roadmap_tasks").select("*").eq("roadmap_id", roadmapId).eq("user_id", userId).order("day_number").order("task_order"),
-      client.from("roadmap_milestones").select("*").eq("roadmap_id", roadmapId).eq("user_id", userId).order("milestone_order"),
+    const [{ data: tasks, error: taskError }, { data: progressRows, error: progressError }] = await Promise.all([
+      client.from("roadmap_tasks").select("id,day_number,title,estimated_minutes,start_time,end_time,is_required").eq("roadmap_id", roadmapId).eq("user_id", userId).order("day_number").order("task_order"),
       client.from("roadmap_task_progress").select("task_id,status").eq("roadmap_id", roadmapId).eq("user_id", userId),
     ]);
-    if (taskError || milestoneError || progressError) throw taskError || milestoneError || progressError;
+    if (taskError || progressError) throw taskError || progressError;
 
     const completed = new Set((progressRows || []).filter((row: any) => row.status === "completed").map((row: any) => row.task_id));
-    const editableTasks = (tasks || []).map((task: any) => ({ id: task.id, day: task.day_number, title: task.title, instructions: task.instructions, estimatedMinutes: task.estimated_minutes, startTime: task.start_time, endTime: task.end_time, successCriteria: task.success_criteria, isRequired: task.is_required, completed: completed.has(task.id) }));
+    const editableTasks = (tasks || []).map((task: any) => ({ id: task.id, day: task.day_number, title: task.title, minutes: task.estimated_minutes, start: task.start_time, end: task.end_time, required: task.is_required, completed: completed.has(task.id) }));
 
-    const prompt = `Existing roadmap:\n${JSON.stringify({ id: roadmap.id, title: roadmap.title, goal: roadmap.goal, category: roadmap.category, durationDays: roadmap.duration_days, startDate: roadmap.start_date, targetDate: roadmap.target_date })}\nMilestones:\n${JSON.stringify(milestones || [])}\nTasks:\n${JSON.stringify(editableTasks)}\nUser request:\n${request}\n\nReturn JSON with:\n{\"changed\":true,\"message\":\"brief confirmation\",\"roadmap\":{\"title\":\"optional new title\",\"goal\":\"optional new goal\",\"durationDays\":number,\"targetDate\":\"YYYY-MM-DD\"},\"scheduleChanges\":[{\"taskId\":\"existing task id\",\"day\":number,\"startTime\":\"HH:MM\",\"endTime\":\"HH:MM\",\"title\":\"optional\",\"instructions\":\"optional\",\"successCriteria\":\"optional\",\"estimatedMinutes\":number,\"isRequired\":boolean}]}.\nRules: preserve every completed task's completion state; do not delete completed tasks; keep task IDs when editing existing tasks; only include scheduleChanges for tasks that actually need changes; never invent resources or user facts; do not change the user's goal unless directly requested; if the request cannot be safely fulfilled, return changed=false with a clear message.`;
+    const prompt = `You are patching an existing roadmap. Do NOT generate a roadmap. Do NOT create tasks. Do NOT delete tasks. Do NOT change the roadmap title, goal, duration, dates, or milestones. Only move/retime/rename/rewrite EXISTING incomplete tasks when directly required by the request. Completed tasks are immutable. If no safe change is needed, return changed=false.\n\nRoadmap context: ${JSON.stringify({ title: roadmap.title, category: roadmap.category, durationDays: roadmap.duration_days })}\nExisting tasks: ${JSON.stringify(editableTasks)}\nUser request: ${request}\n\nReturn ONLY: {"changed":true|false,"message":"brief","taskChanges":[{"taskId":"existing id","day":1,"startTime":"HH:MM","endTime":"HH:MM","title":"only if needed","instructions":"only if needed","successCriteria":"only if needed","estimatedMinutes":30,"isRequired":true}]}\nRules: taskId MUST come from the supplied list; max 8 changes; omit unchanged fields; never return a new task; never return the full roadmap; keep the response concise.`;
 
     const result = await callAI(prompt);
     if (result?.changed === false) return json(res, 200, result);
-    const scheduleChanges = Array.isArray(result?.scheduleChanges) ? result.scheduleChanges : [];
+    const scheduleChanges = Array.isArray(result?.taskChanges) ? result.taskChanges : [];
     validateSchedule(scheduleChanges);
 
     const updates: Array<Promise<unknown>> = [];
-    if (result?.roadmap && typeof result.roadmap === "object") {
-      const roadmapPatch: Record<string, unknown> = {};
-      if (typeof result.roadmap.title === "string" && result.roadmap.title.trim()) roadmapPatch.title = result.roadmap.title.trim().slice(0, 120);
-      if (typeof result.roadmap.goal === "string" && result.roadmap.goal.trim()) roadmapPatch.goal = result.roadmap.goal.trim().slice(0, 2000);
-      if (Number.isInteger(result.roadmap.durationDays)) roadmapPatch.duration_days = Math.max(1, Math.min(730, result.roadmap.durationDays));
-      if (typeof result.roadmap.targetDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(result.roadmap.targetDate)) roadmapPatch.target_date = result.roadmap.targetDate;
-      if (Object.keys(roadmapPatch).length) updates.push(client.from("roadmaps").update(roadmapPatch).eq("id", roadmapId).eq("user_id", userId));
-    }
-
     for (const change of scheduleChanges) {
       const original = editableTasks.find((task: any) => task.id === change.taskId);
-      if (!original) continue;
-      if (original.completed) continue;
+      if (!original || original.completed) continue;
       const patch: Record<string, unknown> = { day_number: change.day, start_time: change.startTime, end_time: change.endTime, estimated_minutes: change.estimatedMinutes };
-      if (typeof change.title === "string" && change.title.trim()) patch.title = change.title.trim();
-      if (typeof change.instructions === "string" && change.instructions.trim()) patch.instructions = change.instructions.trim();
-      if (typeof change.successCriteria === "string" && change.successCriteria.trim()) patch.success_criteria = change.successCriteria.trim();
+      if (typeof change.title === "string" && change.title.trim()) patch.title = change.title.trim().slice(0, 200);
+      if (typeof change.instructions === "string" && change.instructions.trim()) patch.instructions = change.instructions.trim().slice(0, 2000);
+      if (typeof change.successCriteria === "string" && change.successCriteria.trim()) patch.success_criteria = change.successCriteria.trim().slice(0, 1000);
       if (typeof change.isRequired === "boolean") patch.is_required = change.isRequired;
       updates.push(client.from("roadmap_tasks").update(patch).eq("id", change.taskId).eq("roadmap_id", roadmapId).eq("user_id", userId));
     }
@@ -137,7 +126,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (failed?.error) throw failed.error;
     }
 
-    return json(res, 200, { changed: updates.length > 0, message: result?.message || (updates.length ? "Smart change applied to your roadmap." : "No roadmap changes were needed."), changesApplied: updates.length });
+    return json(res, 200, { changed: updates.length > 0, message: result?.message || (updates.length ? "Smart change applied to existing tasks." : "No safe changes were needed."), changesApplied: updates.length });
   } catch (error) {
     const status = Number((error as any)?.status) || 500;
     console.error("[roadmap-edit]", error);
