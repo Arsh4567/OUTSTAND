@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Pencil, Sparkles, X, Zap } from "lucide-react";
+import { toast } from "sonner";
 import { tryLocalRoadmapEdit } from "@/lib/roadmap-local-edit";
 
 export type RoadmapEditPatch = { title: string; goal: string };
@@ -46,6 +47,7 @@ export function RoadmapEditDialog({ open, initial, roadmapId, onClose, onSave, o
       if (local.handled) {
         await onLocalEditApplied?.();
         setRequest("");
+        toast.success(local.message || "Roadmap updated instantly.");
         return;
       }
 
@@ -56,8 +58,7 @@ export function RoadmapEditDialog({ open, initial, roadmapId, onClose, onSave, o
     } catch (error) {
       console.error("Smart roadmap change failed", error);
       const message = error instanceof Error ? error.message : "Could not apply smart change.";
-      setRequest((current) => current);
-      window.dispatchEvent(new CustomEvent("outstand:roadmap-smart-change-error", { detail: message }));
+      toast.error(message);
     } finally {
       setLocalEditing(false);
     }
