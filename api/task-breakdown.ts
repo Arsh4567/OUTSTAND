@@ -13,8 +13,8 @@ const RequestSchema = z.object({
     const parsed = Number(value ?? 120);
     return Number.isFinite(parsed) ? Math.min(240, Math.max(15, Math.round(parsed))) : 120;
   }, z.number().int().min(15).max(240)),
-}).strict();
-const TaskSchema = z.object({ title: z.string().trim().min(1).max(160), minutes: z.coerce.number().int().min(5).max(45) }).strict();
+});
+const TaskSchema = z.object({ title: z.string().trim().min(1).max(160), minutes: z.coerce.number().int().min(5).max(45) });
 
 function sendJson(res: VercelResponse, status: number, data: unknown) {
   res.status(status).setHeader("Cache-Control", "no-store").json(data);
