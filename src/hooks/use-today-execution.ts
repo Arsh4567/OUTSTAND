@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getExecutionSummary, type ExecutionTask } from "@/lib/today-execution";
-import type { TodayExecutionSummaryRow } from "@/integrations/supabase/types";
+import type { TodayExecutionSummaryRow } from "@/integrations/supabase/today-execution-types";
 
 type TodayExecutionRow = Pick<
   TodayExecutionSummaryRow,
@@ -19,7 +19,7 @@ function normalize(row: TodayExecutionRow): ExecutionTask {
     startTime: row.start_time,
     endTime: row.end_time,
     isRequired: Boolean(row.is_required),
-    status: (row.status as ExecutionTask["status"]) || "pending",
+    status: row.status || "pending",
   };
 }
 
