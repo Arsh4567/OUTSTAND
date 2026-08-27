@@ -67,8 +67,6 @@ export default function SidebarLayout({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isOpen]);
 
-  if (pathname === "/roadmap") return <>{children}</>;
-
   return (
     <MotionConfig reducedMotion="user">
       <div className="min-h-screen bg-background font-sans text-foreground selection:bg-primary/20 selection:text-primary">
@@ -81,7 +79,7 @@ export default function SidebarLayout({ children }: { children: ReactNode }) {
 
               <Link to="/dashboard" className="hidden items-center gap-3 sm:flex" aria-label="Go to dashboard">
                 <div className="grid h-9 w-9 place-items-center rounded-xl border border-primary/25 bg-primary/10"><Sparkles className="h-4 w-4 text-primary" /></div>
-                <div className="leading-none"><div className="text-[11px] font-black uppercase tracking-[0.34em] text-muted-foreground">Outstand</div><div className="mt-1 text-[10px] font-semibold tracking-[0.16em] text-muted-foreground/80">PERSONAL OS</div></div>
+                <div className="leading-none"><div className="text-[11px] font-black uppercase tracking-[0.34em] text-foreground">Outstand</div><div className="mt-1 text-[10px] font-semibold tracking-[0.16em] text-muted-foreground">PERSONAL OS</div></div>
               </Link>
 
               <Link to="/dashboard" aria-label={`Current streak: ${currentStreak} days`} className="group ml-0 flex min-w-0 items-center gap-2 rounded-2xl border border-warning/20 bg-warning/10 px-2.5 py-2 transition hover:border-warning/35 hover:bg-warning/15 sm:ml-1 sm:px-3">
