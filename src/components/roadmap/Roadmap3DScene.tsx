@@ -36,7 +36,7 @@ function RoadMesh() {
   }, []);
 
   return (
-    <mesh geometry={geometry} rotation={[-Math.PI * 0.01, 0, 0]} receiveShadow>
+    <mesh geometry={geometry} rotation={[-Math.PI * 0.01, 0, 0]}>
       <meshStandardMaterial color="#071525" metalness={0.65} roughness={0.7} />
     </mesh>
   );
@@ -75,7 +75,7 @@ function Terrain() {
   return (
     <group>
       {points.map(([x, y, z, scale], index) => (
-        <mesh key={index} position={[x, y, z]} scale={[scale, scale * (1.5 + (index % 2) * 0.7), scale]} castShadow receiveShadow>
+        <mesh key={index} position={[x, y, z]} scale={[scale, scale * (1.5 + (index % 2) * 0.7), scale]}>
           <coneGeometry args={[1, 2.6, 6]} />
           <meshStandardMaterial color={index % 2 ? "#0e2138" : "#102a48"} roughness={0.95} />
         </mesh>
@@ -95,7 +95,7 @@ function Destination({ progress, reduced }: { progress: number; reduced: boolean
   return (
     <Float speed={reduced ? 0 : 1.1} rotationIntensity={reduced ? 0 : 0.1} floatIntensity={reduced ? 0 : 0.25}>
       <group position={[0, 0.4, -18]} scale={scale}>
-        <mesh ref={ring} castShadow>
+        <mesh ref={ring}>
           <torusGeometry args={[1.15, 0.09, 16, 64]} />
           <meshStandardMaterial color="#8b5cf6" emissive="#8b5cf6" emissiveIntensity={5} metalness={0.7} roughness={0.2} />
         </mesh>
@@ -115,7 +115,7 @@ function SceneContents({ progress, reduced }: { progress: number; reduced: boole
     <>
       <PerspectiveCamera makeDefault position={[0, 2.8, 8.5]} fov={46} />
       <ambientLight intensity={0.42} />
-      <directionalLight position={[4, 8, 7]} intensity={1.8} color="#cfeaff" castShadow />
+      <directionalLight position={[4, 8, 7]} intensity={1.8} color="#cfeaff" />
       <pointLight position={[-6, 1, -7]} intensity={8} color="#22d3ee" />
       <pointLight position={[6, 0, -10]} intensity={7} color="#8b5cf6" />
       <fog attach="fog" args={["#050b15", 9, 46]} />
@@ -133,7 +133,7 @@ export function Roadmap3DScene({ progress, accent = "cyan" }: Roadmap3DSceneProp
   return (
     <div className="absolute inset-0 overflow-hidden rounded-[2rem]">
       <div className={`absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(34,211,238,.18),transparent_35%),radial-gradient(circle_at_75%_45%,rgba(139,92,246,.12),transparent_30%)] ${accent === "violet" ? "opacity-90" : ""}`} />
-      <Canvas dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance", alpha: true }} shadows>
+      <Canvas dpr={[1, 1.5]} gl={{ antialias: true, powerPreference: "high-performance", alpha: true }}>
         <SceneContents progress={progress} reduced={reduced} />
       </Canvas>
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#06101f] to-transparent" />
