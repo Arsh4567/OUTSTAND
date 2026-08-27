@@ -15,7 +15,7 @@ export function useAppState() {
   const [rawHabits, setHabits] = useLocalStorage<Habit[]>("ht.habits.v1", seedHabits); const [rawSessions, setSessions] = useLocalStorage<FocusSession[]>("ht.sessions.v1", []); const [rawOutstand, setOutstand] = useLocalStorage<OutstandCompletion[]>("ht.outstand.v1", []);
   const [currentStreak, setCurrentStreak] = useState(0); const [cloudBestStreak, setCloudBestStreak] = useState(0);
   const habits = Array.isArray(rawHabits) ? rawHabits : []; const sessions = Array.isArray(rawSessions) ? rawSessions : []; const outstand = Array.isArray(rawOutstand) ? rawOutstand.map((item) => ({ ...item, xp: Number.isFinite(item?.xp) ? Math.max(0, item.xp) : 0 })) : [];
-  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null); const hasSyncedOnce = useRef(false); const syncAbortRef = useRef<AbortController | null>(null); const syncDataRef = useRef({ habits, sessions, outstand }); syncDataRef.current = { habits, sessions, outstand };
+  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null); const hasSyncedOnce = useRef(false); const syncAbortRef = useRef<AbortController | null>(null);
 
   const refreshCloudStreak = useCallback(async (recordToday = false) => {
     try {
@@ -28,15 +28,16 @@ export function useAppState() {
   }, []);
   useEffect(() => { void refreshCloudStreak(false); }, [refreshCloudStreak]);
 
+  const syncDataRef = useRef({ habits, sessions, outstand }); syncDataRef.current = { habits, sessions, outstand };
   useEffect(() => {
     if (syncTimer.current) clearTimeout(syncTimer.current); syncAbortRef.current?.abort(); const controller = new AbortController(); syncAbortRef.current = controller;
     const sync = async () => { try { const { supabase } = await import("@/integrations/supabase/client"); const { data: { session } } = await supabase.auth.getSession(); if (!session || controller.signal.aborted) return; for (let attempt=0;attempt<MAX_SYNC_RETRIES;attempt+=1) { try { const response=await fetch("/api/sync-productivity-state",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${session.access_token}`},body:JSON.stringify({habits,sessions,outstand}),signal:controller.signal}); if(response.ok){hasSyncedOnce.current=true;return} if(response.status>=400&&response.status<500&&response.status!==408&&response.status!==429)return; } catch(error){if(isAbortError(error))return;if(attempt===MAX_SYNC_RETRIES-1)return} await new Promise<void>(resolve=>setTimeout(resolve,500*2**attempt)); if(controller.signal.aborted)return; } } catch(error){if(!controller.signal.aborted&&!isAbortError(error))console.warn("Outstand cloud sync unavailable:",error)} };
     syncTimer.current=setTimeout(sync,hasSyncedOnce.current?1200:250); return()=>{if(syncTimer.current)clearTimeout(syncTimer.current);controller.abort();if(syncAbortRef.current===controller)syncAbortRef.current=null};
   }, [habits, sessions, outstand]);
 
-  // The debounced sync effect above is the single source of truth for productivity-state writes.
+  // The debounced sync effect is the single source of truth for productivity-state writes.
   // Auth transitions only refresh derived streak state; they no longer fire a second concurrent
-  // full-state write that can race the normal sync and overwrite a newer local snapshot.
+  // full-state write that could race the normal sync and overwrite a newer local snapshot.
   useEffect(() => { let active=true; let unsubscribe:(()=>void)|undefined; void import("@/integrations/supabase/client").then(({supabase})=>{ if(!active)return; const subscription=supabase.auth.onAuthStateChange((event)=>{ if(event!=="SIGNED_IN"&&event!=="TOKEN_REFRESHED")return; if(!active)return; if(event==="SIGNED_IN")void refreshCloudStreak(false); }); unsubscribe=()=>subscription.data.subscription.unsubscribe(); }); return()=>{active=false;unsubscribe?.()}; }, [refreshCloudStreak]);
 
   const xp = useMemo(() => calculateLocalXp(habits, sessions, outstand), [habits, sessions, outstand]); const levelState = useMemo(() => levelFromXP(xp), [xp]); const markTodayActive = useCallback(() => { void refreshCloudStreak(true); }, [refreshCloudStreak]);
@@ -47,6 +48,6 @@ export function useAppState() {
   const updateHabit=(id:string,data:Partial<Pick<Habit,"name"|"emoji"|"color"|"notificationTime">>)=>setHabits(prev=>{const current=Array.isArray(prev)?prev:[];const nextName=typeof data.name==="string"?data.name.trim():undefined;if(nextName!==undefined&&!nextName)return current;if(nextName!==undefined){const normalized=normalizeHabitName(nextName);if(current.some(habit=>habit.id!==id&&normalizeHabitName(habit.name)===normalized))return current}return current.map(habit=>habit.id===id?{...habit,...data,name:nextName??habit.name}:habit)});
   const deleteHabit=(id:string)=>setHabits(prev=>(Array.isArray(prev)?prev:[]).filter(habit=>habit.id!==id));
   const recordSession=(durationMin:number,completed:boolean)=>{const safeDuration=Math.min(240,Math.max(0,Math.round(Number.isFinite(durationMin)?durationMin:0)));if(completed&&safeDuration<=0)return;setSessions(prev=>[{id:safeUuid(),startedAt:new Date().toISOString(),durationMin:safeDuration,completed:Boolean(completed)},...(Array.isArray(prev)?prev:[])].slice(0,500));if(completed)markTodayActive();};
-  const streaks=useMemo(()=>habits.map(habit=>({id:habit.id,streak:computeStreak(Array.isArray(habit.history)?habit.history:[]}))),[habits]); const bestStreak=Math.max(cloudBestStreak,streaks.reduce((best,current)=>Math.max(best,current.streak||0),0));
+  const streaks=useMemo(()=>habits.map(habit=>({id:habit.id,streak:computeStreak(Array.isArray(habit.history)?habit.history:[])})),[habits]); const bestStreak=Math.max(cloudBestStreak,streaks.reduce((best,current)=>Math.max(best,current.streak||0),0));
   return {habits,sessions,outstand,xp,level:levelState.level,progressToNextLevel:levelState.progressPct,streaks,bestStreak,currentStreak,toggleToday,addHabit,setInitialHabits,updateHabit,deleteHabit,recordSession,recordOutstand,refreshCloudStreak,maxHabits:MAX_HABITS};
 }
