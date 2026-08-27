@@ -151,7 +151,7 @@ function RootShell({ children }: { children: ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body className="min-h-screen bg-background text-foreground selection:bg-blue-400/20">
+      <body className="min-h-screen bg-background text-foreground selection:bg-primary/20">
         {children}
         <Scripts />
       </body>
@@ -176,20 +176,28 @@ function RootComponent() {
     return () => window.removeEventListener("storage", applyTheme);
   }, []);
 
-  const isPublicExperience =
-    pathname === "/" ||
-    pathname === "/roadmap" ||
-    pathname.startsWith("/auth") ||
-    pathname.startsWith("/onboarding");
+  const usesAppChrome =
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/outstand") ||
+    pathname.startsWith("/focus") ||
+    pathname.startsWith("/dopamine") ||
+    pathname.startsWith("/league") ||
+    pathname.startsWith("/friends") ||
+    pathname.startsWith("/chat") ||
+    pathname.startsWith("/notifications") ||
+    pathname.startsWith("/profile") ||
+    pathname.startsWith("/user-profile") ||
+    pathname.startsWith("/intelligence") ||
+    pathname.startsWith("/habits");
 
   return (
     <QueryClientProvider client={queryClient}>
-      {isPublicExperience ? (
-        <AppShell />
-      ) : (
+      {usesAppChrome ? (
         <SidebarLayout>
           <AppShell />
         </SidebarLayout>
+      ) : (
+        <AppShell />
       )}
       <Toaster />
       <QuickActions />
