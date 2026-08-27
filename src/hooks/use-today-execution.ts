@@ -52,10 +52,7 @@ export function useTodayExecution() {
 
     const { data, error: queryError } = await supabase
       .from("today_execution_summary" as never)
-      .select("task_id, roadmap_id, title, instructions, success_criteria, estimated_minutes, start_time, end_time, is_required, status")
-      .eq("user_id", session.user.id)
-      .order("start_time", { ascending: true, nullsFirst: false })
-      .order("task_order", { ascending: true } as never);
+      .select("task_id, roadmap_id, title, instructions, success_criteria, estimated_minutes, start_time, end_time, is_required, status");
 
     if (queryError) {
       setError(queryError.message);
