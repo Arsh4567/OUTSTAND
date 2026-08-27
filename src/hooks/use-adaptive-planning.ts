@@ -10,7 +10,15 @@ type Snapshot = {
   pace_ratio: number;
   remaining_required: number;
   available_days: number;
-  recommendation: { headline: string; explanation: string; action: string };
+  recommendation: {
+    headline: string;
+    explanation: string;
+    action: string;
+    expectedCompletionPct?: number;
+    variancePct?: number;
+    confidence?: AdaptiveRecommendation["confidence"];
+    modelVersion?: string;
+  };
 };
 
 export function useAdaptivePlanning(roadmapId: string | undefined, input: AdaptiveInput | null) {
@@ -61,6 +69,10 @@ export function useAdaptivePlanning(roadmapId: string | undefined, input: Adapti
           headline: recommendation.headline,
           explanation: recommendation.explanation,
           action: recommendation.action,
+          expectedCompletionPct: recommendation.expectedCompletionPct,
+          variancePct: recommendation.variancePct,
+          confidence: recommendation.confidence,
+          modelVersion: "adaptive-v2",
         },
         accepted_at: new Date().toISOString(),
       } as never).select().single();
