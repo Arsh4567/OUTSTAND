@@ -2,11 +2,10 @@ import { jsonSchema, tool, type ToolSet } from "ai";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type Db = SupabaseClient<any, "public", any, any, any>;
-
 const today = () => new Date().toISOString().slice(0, 10);
 const hhmm = (value: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 
-export function createProductivityTools(client: Db, userId: string): ToolSet {
+export function createProductivityTools(client: Db, userId: string, accessToken: string): ToolSet {
   return {
     get_today: tool({
       description: "Read the user's current OUTSTAND state: today's roadmap tasks, their completion status, and habits. Use this before answering what should I do today/now, what is pending, or progress questions when fresh data is needed.",
@@ -14,7 +13,7 @@ export function createProductivityTools(client: Db, userId: string): ToolSet {
       execute: async () => {
         const [{ data: roadmaps, error: roadmapError }, { data: habits, error: habitsError }] = await Promise.all([
           client.from("roadmaps").select("id,title,goal,start_date,duration_days,status").eq("user_id", userId).in("status", ["active", "paused"]).order("created_at", { ascending: false }).limit(1),
-          client.from("productivity_state").select("habits").eq("user_id", userId).maybeSingle(),
+          client.from("user_productivity_state").select("habits").eq("user_id", userId).maybeSingle(),
         ]);
         if (roadmapError) throw roadmapError;
         if (habitsError && habitsError.code !== "PGRST116") throw habitsError;
@@ -30,10 +29,10 @@ export function createProductivityTools(client: Db, userId: string): ToolSet {
       },
     }),
     mark_habit: tool({
-      description: "Mark one of the user's existing habits done or undone for today. Never invent a habit; match by the supplied habit id or exact/close name.",
+      description: "Mark one of the user's existing habits done or undone for today. Never invent a habit.",
       inputSchema: jsonSchema<{ habitId: string; completed: boolean }>({ type: "object", properties: { habitId: { type: "string", description: "Existing habit id" }, completed: { type: "boolean", description: "Whether the habit should be marked complete today" } }, required: ["habitId", "completed"], additionalProperties: false }),
       execute: async ({ habitId, completed }) => {
-        const { data, error } = await client.from("productivity_state").select("habits").eq("user_id", userId).maybeSingle();
+        const { data, error } = await client.from("user_productivity_state").select("habits").eq("user_id", userId).maybeSingle();
         if (error) throw error;
         const current = Array.isArray(data?.habits) ? data.habits : [];
         const index = current.findIndex((habit: any) => habit?.id === habitId);
@@ -41,7 +40,7 @@ export function createProductivityTools(client: Db, userId: string): ToolSet {
         const history = Array.isArray(current[index]?.history) ? current[index].history : [];
         const nextHistory = completed ? Array.from(new Set([...history, today()])) : history.filter((day: string) => day !== today());
         const next = current.map((habit: any, i: number) => i === index ? { ...habit, history: nextHistory } : habit);
-        const { error: updateError } = await client.from("productivity_state").upsert({ user_id: userId, habits: next }, { onConflict: "user_id" });
+        const { error: updateError } = await client.from("user_productivity_state").update({ habits: next, updated_at: new Date().toISOString() }).eq("user_id", userId);
         if (updateError) throw updateError;
         return { changed: true, habitId, completed, date: today(), habitName: current[index].name };
       },
@@ -50,14 +49,15 @@ export function createProductivityTools(client: Db, userId: string): ToolSet {
       description: "Apply a small safe change to the user's existing roadmap. Use only when the user explicitly asks to move, retime, rename, simplify, or otherwise change the roadmap. Never create or delete tasks. Completed tasks remain immutable.",
       inputSchema: jsonSchema<{ roadmapId: string; request: string }>({ type: "object", properties: { roadmapId: { type: "string", description: "Existing roadmap id from current context" }, request: { type: "string", description: "The user's requested roadmap change" } }, required: ["roadmapId", "request"], additionalProperties: false }),
       execute: async ({ roadmapId, request }) => {
-        const response = await fetch(`${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"}/api/roadmap-edit`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${await getAccessToken(client)}` }, body: JSON.stringify({ roadmapId, request }) });
+        const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
+        const response = await fetch(`${base}/api/roadmap-edit`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ roadmapId, request }) });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Could not change the roadmap.");
         return result;
       },
     }),
     set_reminder: tool({
-      description: "Create or update a recurring OUTSTAND reminder. Use when the user explicitly asks the assistant to remind them. Store the reminder in the existing Supabase notification scheduler.",
+      description: "Create a recurring OUTSTAND reminder when the user explicitly asks for a reminder. Store it in the existing Supabase notification scheduler.",
       inputSchema: jsonSchema<{ title: string; body: string; time: string; category: "habit" | "goal" | "motivation" | "update" | "system"; daysOfWeek?: number[] }>({ type: "object", properties: { title: { type: "string" }, body: { type: "string" }, time: { type: "string", description: "Local 24-hour time HH:MM" }, category: { type: "string", enum: ["habit", "goal", "motivation", "update", "system"] }, daysOfWeek: { type: "array", items: { type: "integer", minimum: 0, maximum: 6 } } }, required: ["title", "body", "time", "category"], additionalProperties: false }),
       execute: async ({ title, body, time, category, daysOfWeek }) => {
         if (!hhmm(time)) throw new Error("Reminder time must use HH:MM format.");
@@ -69,10 +69,4 @@ export function createProductivityTools(client: Db, userId: string): ToolSet {
       },
     }),
   };
-}
-
-async function getAccessToken(client: Db) {
-  const { data, error } = await client.auth.getSession();
-  if (error || !data.session?.access_token) throw new Error("Could not authorize roadmap change.");
-  return data.session.access_token;
 }
