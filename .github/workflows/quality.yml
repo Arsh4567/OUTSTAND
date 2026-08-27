@@ -1,34 +1,38 @@
 name: Quality Gate
 
 on:
+  push:
+    branches: [main]
   pull_request:
-  # Main-branch quality runs after the lockfile sync workflow completes.
-  # This prevents the initial push check from racing the lockfile update.
-  workflow_run:
-    workflows: ["Sync Bun lockfile"]
-    types: [completed]
     branches: [main]
 
-# Avoid wasting CI capacity on stale validation runs when new commits arrive.
 concurrency:
   group: quality-gate-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   quality:
-    # Only validate successful lockfile-sync runs; PRs still run directly.
-    if: github.event_name == 'pull_request' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
       - name: Typecheck
         run: bunx tsc --noEmit
+
       - name: Lint
         run: bun run lint
+
       - name: Production build
         run: bun run build
