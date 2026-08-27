@@ -1,32 +1,25 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getExecutionSummary, type ExecutionTask } from "@/lib/today-execution";
+import type { TodayExecutionSummaryRow } from "@/integrations/supabase/types";
 
-type TodayExecutionRow = {
-  task_id: string;
-  roadmap_id: string;
-  title: string;
-  instructions: string;
-  success_criteria: string | null;
-  estimated_minutes: number | null;
-  start_time: string | null;
-  end_time: string | null;
-  is_required: boolean;
-  status: "pending" | "in_progress" | "completed" | "skipped";
-};
+type TodayExecutionRow = Pick<
+  TodayExecutionSummaryRow,
+  "task_id" | "roadmap_id" | "title" | "instructions" | "success_criteria" | "estimated_minutes" | "start_time" | "end_time" | "is_required" | "status"
+>;
 
 function normalize(row: TodayExecutionRow): ExecutionTask {
   return {
-    id: row.task_id,
-    roadmapId: row.roadmap_id,
-    title: row.title,
-    instructions: row.instructions,
+    id: String(row.task_id),
+    roadmapId: String(row.roadmap_id),
+    title: String(row.title),
+    instructions: String(row.instructions || row.title),
     successCriteria: row.success_criteria,
     estimatedMinutes: Math.max(1, Number(row.estimated_minutes) || 30),
     startTime: row.start_time,
     endTime: row.end_time,
     isRequired: Boolean(row.is_required),
-    status: row.status || "pending",
+    status: (row.status as ExecutionTask["status"]) || "pending",
   };
 }
 
@@ -61,7 +54,7 @@ export function useTodayExecution() {
       return;
     }
 
-    setTasks(((data || []) as TodayExecutionRow[]).map(normalize));
+    setTasks(((data || []) as TodayExecutionRow[]).filter((row) => row.task_id && row.roadmap_id && row.title).map(normalize));
     setLoading(false);
   }, []);
 
