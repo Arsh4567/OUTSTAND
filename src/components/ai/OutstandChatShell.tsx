@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { UIMessage } from "@ai-sdk/react";
-import { Bot, History, MessageCircle, Sparkles } from "lucide-react";
+import { Bot } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
@@ -20,6 +20,7 @@ const messageId = () => typeof crypto !== "undefined" && crypto.randomUUID ? cry
 
 export function OutstandChatShell() {
   const [open, setOpen] = useState(false);
+  const [prefill, setPrefill] = useState("");
   const [messages, setMessages] = useState<UIMessage[]>([]);
   const [historyKey, setHistoryKey] = useState(0);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -38,6 +39,16 @@ export function OutstandChatShell() {
     bestStreak,
     dopamineScore: log?.score ?? 50,
   }), [user, profile, habits, sessions, outstand, xp, bestStreak, log, today]);
+
+  useEffect(() => {
+    const handleOperatorOpen = (event: Event) => {
+      const prompt = (event as CustomEvent<{ prompt?: string }>).detail?.prompt?.trim();
+      setPrefill(prompt || "");
+      setOpen(true);
+    };
+    window.addEventListener("outstand:open-ai", handleOperatorOpen);
+    return () => window.removeEventListener("outstand:open-ai", handleOperatorOpen);
+  }, []);
 
   useEffect(() => {
     if (!open || !user) return;
@@ -94,32 +105,21 @@ export function OutstandChatShell() {
   if (!user) return null;
 
   return <>
-    <motion.div
-      className="fixed bottom-24 right-4 z-[80] md:bottom-8 md:right-8"
-      initial={{ opacity: 0, scale: 0.8, y: 20 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-    >
-      <Button
-        onClick={() => setOpen(true)}
-        aria-label="Open Outstand Intelligence"
-        className="group relative h-16 w-16 overflow-hidden rounded-full border border-cyan-200/20 bg-slate-950 p-0 shadow-[0_18px_60px_rgba(0,0,0,.45)]"
-      >
+    <motion.div className="fixed bottom-24 right-4 z-[80] md:bottom-8 md:right-8" initial={{ opacity: 0, scale: 0.8, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}>
+      <Button onClick={() => { setPrefill(""); setOpen(true); }} aria-label="Open Outstand Intelligence" className="group relative h-16 w-16 overflow-hidden rounded-full border border-cyan-200/20 bg-slate-950 p-0 shadow-[0_18px_60px_rgba(0,0,0,.45)]">
         <span className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(125,211,252,.75),transparent_32%),linear-gradient(135deg,#4f46e5,#0891b2_48%,#0f172a)]" />
         <span className="absolute inset-1 rounded-full border border-white/10" />
-        <span className="relative z-10 flex flex-col items-center text-white">
-          <Bot className="h-6 w-6 transition-transform duration-300 group-hover:scale-110" />
-          <span className="mt-0.5 text-[7px] font-black uppercase tracking-[.22em] text-cyan-100/80">AI</span>
-        </span>
+        <span className="relative z-10 flex flex-col items-center text-white"><Bot className="h-6 w-6 transition-transform duration-300 group-hover:scale-110" /><span className="mt-0.5 text-[7px] font-black uppercase tracking-[.22em] text-cyan-100/80">AI</span></span>
       </Button>
     </motion.div>
 
-    <Drawer open={open} onOpenChange={setOpen} direction="right">
+    <Drawer open={open} onOpenChange={(nextOpen) => { setOpen(nextOpen); if (!nextOpen) setPrefill(""); }} direction="right">
       <DrawerContent className="h-[100dvh] w-full border-l border-white/10 bg-[#050812] text-white sm:max-w-xl">
         {open && <OutstandChatPanel
           initialMessages={messages}
           context={context}
-          onClose={() => setOpen(false)}
+          initialPrompt={prefill}
+          onClose={() => { setOpen(false); setPrefill(""); }}
           onClear={() => { setMessages([]); setHistoryKey((value) => value + 1); }}
           historyLoading={historyLoading}
         />}
