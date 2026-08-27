@@ -36,9 +36,15 @@ export function useFocusTimer(onSuccessSync?: (durationMinutes: number) => void)
     if (!savedEnd || !savedDuration) return () => { mountedRef.current = false; };
     const remaining = savedEnd - Date.now();
     if (remaining > 0) {
-      setDurationMs(savedDuration); setEndTime(savedEnd); setRemainingMs(Math.min(savedDuration, remaining)); setState("running");
+      setDurationMs(savedDuration);
+      setEndTime(savedEnd);
+      setRemainingMs(Math.min(savedDuration, remaining));
+      setState("running");
     } else {
-      window.localStorage.removeItem(STORAGE_END); setDurationMs(savedDuration); setRemainingMs(0); setState("completed");
+      window.localStorage.removeItem(STORAGE_END);
+      setDurationMs(savedDuration);
+      setRemainingMs(0);
+      setState("completed");
     }
     return () => { mountedRef.current = false; };
   }, []);
@@ -47,48 +53,78 @@ export function useFocusTimer(onSuccessSync?: (durationMinutes: number) => void)
     if ((state !== "idle" && state !== "paused" && state !== "completed") || !Number.isFinite(minutes) || minutes <= 0 || minutes > 240) return;
     const ms = Math.round(minutes * 60 * 1000);
     durationRef.current = ms;
-    setDurationMs(ms); setRemainingMs(ms); setEndTime(null); setState("idle"); setSaveError(null); completionHandledRef.current = false;
-    window.localStorage.removeItem(STORAGE_END); window.localStorage.setItem(STORAGE_DURATION, String(ms));
+    setDurationMs(ms);
+    setRemainingMs(ms);
+    setEndTime(null);
+    setState("idle");
+    setSaveError(null);
+    completionHandledRef.current = false;
+    window.localStorage.removeItem(STORAGE_END);
+    window.localStorage.setItem(STORAGE_DURATION, String(ms));
   }, [state]);
 
   const start = useCallback(() => {
     if ((state !== "idle" && state !== "paused") || remainingMs <= 0) return;
-    const activeDuration = durationRef.current;
     const end = Date.now() + remainingMs;
-    completionHandledRef.current = false; setSaveError(null); setEndTime(end); setState("running");
-    setDurationMs(activeDuration);
-    window.localStorage.setItem(STORAGE_END, String(end)); window.localStorage.setItem(STORAGE_DURATION, String(activeDuration));
+    completionHandledRef.current = false;
+    setSaveError(null);
+    setEndTime(end);
+    setState("running");
+    window.localStorage.setItem(STORAGE_END, String(end));
+    window.localStorage.setItem(STORAGE_DURATION, String(durationRef.current));
   }, [remainingMs, state]);
 
   const pause = useCallback(() => {
     if (state !== "running") return;
     const nextRemaining = endTime ? Math.max(0, endTime - Date.now()) : remainingMs;
-    setRemainingMs(nextRemaining); setEndTime(null); setState(nextRemaining === 0 ? "completed" : "paused"); window.localStorage.removeItem(STORAGE_END);
+    setRemainingMs(nextRemaining);
+    setEndTime(null);
+    setState(nextRemaining === 0 ? "completed" : "paused");
+    window.localStorage.removeItem(STORAGE_END);
   }, [endTime, remainingMs, state]);
 
   const reset = useCallback(() => {
-    setState("idle"); setRemainingMs(durationRef.current); setEndTime(null); setIsSaving(false); setSaveError(null); completionHandledRef.current = false;
-    window.localStorage.removeItem(STORAGE_END); window.localStorage.setItem(STORAGE_DURATION, String(durationRef.current));
+    setState("idle");
+    setRemainingMs(durationRef.current);
+    setEndTime(null);
+    setIsSaving(false);
+    setSaveError(null);
+    completionHandledRef.current = false;
+    window.localStorage.removeItem(STORAGE_END);
+    window.localStorage.setItem(STORAGE_DURATION, String(durationRef.current));
   }, []);
 
   useEffect(() => {
     if (state !== "running" || endTime == null) return;
-    const complete = async () => {
+    const complete = () => {
       if (completionHandledRef.current) return;
       completionHandledRef.current = true;
-      const completedMinutes = Math.max(1, Math.round(durationMs / 60000));
-      window.localStorage.removeItem(STORAGE_END); setState("completed"); setEndTime(null); setRemainingMs(0); setIsSaving(false); setSaveError(null);
-      if (mountedRef.current) onSuccessSync?.(completedMinutes);
+      const completedMinutes = Math.max(1, Math.round(durationRef.current / 60000));
+      window.localStorage.removeItem(STORAGE_END);
+      setState("completed");
+      setEndTime(null);
+      setRemainingMs(0);
+      if (mountedRef.current && onSuccessSync) {
+        setIsSaving(true);
+        Promise.resolve(onSuccessSync(completedMinutes))
+          .catch((error: unknown) => {
+            if (!mountedRef.current) return;
+            setSaveError(error instanceof Error ? error.message : "Focus session could not be saved.");
+          })
+          .finally(() => {
+            if (mountedRef.current) setIsSaving(false);
+          });
+      }
     };
     const tick = () => {
       const nextRemaining = Math.max(0, endTime - Date.now());
       setRemainingMs(nextRemaining);
-      if (nextRemaining === 0) void complete();
+      if (nextRemaining === 0) complete();
     };
     tick();
     const interval = window.setInterval(tick, 1000);
     return () => window.clearInterval(interval);
-  }, [durationMs, endTime, onSuccessSync, state]);
+  }, [endTime, onSuccessSync, state]);
 
   const safeDuration = Math.max(1, durationMs);
   const remaining = Math.min(Math.max(0, remainingMs), safeDuration);
