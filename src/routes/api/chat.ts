@@ -55,8 +55,8 @@ ${intentText}
 MEMORY POLICY
 - Memory is a long-term personalization aid, not a source of current app state.
 - Retrieve memory only when personalization materially helps or the user refers to a previous preference, goal, constraint, strategy, or pattern.
-- Save memory only when the user explicitly states a stable fact or when a durable preference or strategy is clearly established through the interaction.
-- Do not save secrets, authentication data, highly sensitive personal information, temporary details, or facts that are only guesses.
+- Save memory only when the user explicitly states a stable fact or when a durable preference or strategy is clearly established.
+- Do not save secrets, authentication data, highly sensitive personal information, temporary details, or guesses.
 - Never invent memory. Never present memory as current state unless confirmed by tools.
 
 ACTION POLICY
@@ -66,9 +66,9 @@ ACTION POLICY
 - Do not tell the user how to do an available action manually.
 - Never invent ids. Get ids from get_today, get_progress, or current context.
 - Current browser context may be stale. Supabase tool results are authoritative.
-- For mutations, prefer: read current state -> perform mutation -> use the tool's verification result -> report exact result.
-- Only complete or undo a habit when the user explicitly asks.
-- Only change or create a roadmap when the user explicitly asks.
+- For mutations, use the tool's verification result. Do not perform redundant rereads when the tool has already verified the write.
+- Only complete or undo a habit when explicitly requested.
+- Only change or create a roadmap when explicitly requested.
 - Creating a roadmap requires enough information. If the generator reports missing information, ask the returned question rather than guessing.
 - Completing a task means setting its progress to completed when the user clearly refers to an existing task.
 - Reopening a task is consequential. Do it only when clearly requested.
@@ -80,7 +80,13 @@ PLANNING
 - For progress or setback questions use get_progress.
 - For a new roadmap, create it with create_roadmap after collecting only materially necessary information.
 - For a roadmap adjustment, use change_roadmap with the user's exact request and current roadmap id.
-- For focus plans, use current roadmap state and make the next concrete action obvious. Keep the plan compact.
+- For focus plans, use current roadmap state and make the next concrete action obvious.
+
+PERFORMANCE
+- Prefer the minimum number of tool calls that can safely complete the request.
+- Parallelize independent reads when tools support it.
+- Do not call get_today and get_progress for the same request unless both are materially necessary.
+- Avoid repeating information already present in verified tool results.
 
 RESPONSE STYLE
 - Concise, decisive, calm, friendly.
@@ -107,6 +113,13 @@ async function authenticate(request: Request): Promise<AuthResult> {
   return { client, userId, token };
 }
 function isQuotaError(error: unknown) { const message = error instanceof Error ? error.message : String(error); const candidate = error as { statusCode?: number; status?: number }; return candidate?.statusCode === 429 || candidate?.status === 429 || /429|quota|resource[_ -]?exhausted|rate[_ -]?limit|free[_ -]?tier/i.test(message); }
+function maxStepsForIntent(intent: ReturnType<typeof classifyIntent>) {
+  if (intent.intent === "chat") return 1;
+  if (intent.intent === "read_today" || intent.intent === "read_progress") return 2;
+  if (intent.intent === "set_reminder" || intent.intent === "complete_habit" || intent.intent === "undo_habit" || intent.intent === "complete_task" || intent.intent === "update_task") return 3;
+  if (intent.intent === "create_roadmap" || intent.intent === "change_roadmap") return 5;
+  return 3;
+}
 
 export const Route = createFileRoute("/api/chat")({ server: { handlers: {
   GET: async ({ request }) => { const auth = await authenticate(request); if ("error" in auth) return auth.error; try { const provider = getProvider(); return json({ ok: true, service: "outstand-ai", status: "ready", provider: provider.name, memory: true }); } catch { return json({ ok: false, service: "outstand-ai", status: "unavailable" }, 503); } },
@@ -120,8 +133,8 @@ export const Route = createFileRoute("/api/chat")({ server: { handlers: {
       const latestText = latestUser ? textFromMessage(latestUser).trim() : "";
       const intent = classifyIntent(latestText);
       const intentText = `intent=${intent.intent}; confidence=${intent.confidence.toFixed(2)}; needsFreshState=${intent.needsFreshState}; requiresConfirmation=${intent.requiresConfirmation}; target=${intent.target || "none"}; guidance=${intentGuidance(intent)}`;
-      const provider = getProvider(); const modelMessages = uiMessages.slice(-12);
-      const result = streamText({ model: provider.model, system: systemPrompt(parsed.data.appContext, intentText), messages: await convertToModelMessages(modelMessages), tools: createProductivityTools(auth.client as any, auth.userId, auth.token), stopWhen: stepCountIs(8), maxOutputTokens: 900, maxRetries: 0, abortSignal: request.signal, onError: (error) => { if (isQuotaError(error)) console.warn(`[AI] ${provider.name} quota/rate limit reached.`); else console.error(`[AI] ${provider.name} stream error:`, error); } });
+      const provider = getProvider(); const modelMessages = uiMessages.slice(-10); const maxSteps = maxStepsForIntent(intent);
+      const result = streamText({ model: provider.model, system: systemPrompt(parsed.data.appContext, intentText), messages: await convertToModelMessages(modelMessages), tools: createProductivityTools(auth.client as any, auth.userId, auth.token), stopWhen: stepCountIs(maxSteps), maxOutputTokens: intent.intent === "chat" ? 450 : 750, maxRetries: 0, abortSignal: request.signal, onError: (error) => { if (isQuotaError(error)) console.warn(`[AI] ${provider.name} quota/rate limit reached.`); else console.error(`[AI] ${provider.name} stream error:`, error); } });
       return result.toUIMessageStreamResponse({
         originalMessages: modelMessages,
         generateMessageId: createIdGenerator({ prefix: "msg", size: 16 }),
