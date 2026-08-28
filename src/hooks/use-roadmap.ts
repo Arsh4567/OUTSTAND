@@ -5,8 +5,7 @@ import { toast } from "sonner";
 export type RoadmapQuestion = { id: string; question: string; type: "text" | "number" | "choice" | "multiline"; required?: boolean; options?: string[]; placeholder?: string };
 export type RoadmapTask = { id: string; day_number: number; task_order: number; title: string; instructions: string; estimated_minutes: number | null; task_type: string; methodology_tags: string[]; resources: Array<{ title?: string; url?: string; note?: string }>; spaced_repetition_day: number | null; difficulty: string | null; success_criteria: string | null; is_required: boolean; start_time: string | null; end_time: string | null; guidance: Record<string, unknown>; progress?: "pending" | "in_progress" | "completed" | "skipped"; evidence_of_work?: string | null };
 export type RoadmapMilestone = { id: string; milestone_order: number; day_start: number; day_end: number; title: string; outcome: string | null; description: string | null; methodology_tags: string[]; tasks: RoadmapTask[] };
-
-type RoadmapSummary = { id: string; title: string; goal: string; start_date: string; target_date: string | null; duration_days: number; status: string; category: string; created_at?: string | null };
+type RoadmapSummary = { id: string; title: string; goal: string; start_date: string; target_date: string | null; duration_days: number; status: string; category: string; created_at?: string | null; user_id?: string | null };
 
 type ActionResponse<T = unknown> = { error?: string; [key: string]: T | string | boolean | null | undefined };
 
@@ -22,17 +21,7 @@ function normalizeQuestions(value: unknown): RoadmapQuestion[] {
   }));
 }
 
-const fallbackFollowUp: RoadmapQuestion = {
-  id: "roadmap_missing_detail",
-  question: "What is the single most important result you want to achieve by the end of this roadmap?",
-  type: "multiline",
-  required: true,
-  placeholder: "For example: score 90%+ in my next exam, reach 1200 chess rating, or build my first working website.",
-};
-
-function authHeaders(accessToken: string) {
-  return { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" };
-}
+const fallbackFollowUp: RoadmapQuestion = { id: "roadmap_missing_detail", question: "What is the single most important result you want to achieve by the end of this roadmap?", type: "multiline", required: true, placeholder: "For example: score 90%+ in my next exam, reach 1200 chess rating, or build my first working website." };
 
 export function useRoadmap() {
   const [roadmaps, setRoadmaps] = useState<RoadmapSummary[]>([]);
@@ -48,36 +37,18 @@ export function useRoadmap() {
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError) throw sessionError;
     if (!session?.access_token) throw new Error("Please sign in to use your roadmap.");
-
-    const response = await fetch("/api/chat", {
-      method: "POST",
-      headers: authHeaders(session.access_token),
-      credentials: "include",
-      body: JSON.stringify({ messages: [{ id: crypto.randomUUID(), role: "user", parts: [{ type: "text", text: `OUTSTAND_INTERNAL_ACTION:${action}` }] }], appContext: { internalAction: action, actionPayload: body } }),
-    });
-
-    if (!response.ok) throw new Error((await response.text()) || `Roadmap action failed (${response.status}).`);
-    const contentType = response.headers.get("content-type") || "";
-    if (!contentType.includes("application/json")) throw new Error("Roadmap service returned an unexpected response.");
-    const data = (await response.json()) as T & { error?: string };
+    const { data, error } = await supabase.functions.invoke("outstand-ai", { body: { action, ...body }, headers: { Authorization: `Bearer ${session.access_token}` } });
+    if (error) throw error;
     if (data?.error) throw new Error(String(data.error));
-    return data;
+    return data as T;
   }, []);
 
   const fetchRoadmaps = useCallback(async (preferredRoadmapId?: string) => {
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError) throw sessionError;
-    if (!session?.access_token) throw new Error("Please sign in to view your roadmap.");
-
-    const { data, error } = await supabase
-      .from("roadmaps")
-      .select("id,title,goal,start_date,target_date,duration_days,status,category,created_at")
-      .eq("user_id", session.user.id)
-      .in("status", ["active", "paused"])
-      .order("created_at", { ascending: false })
-      .limit(4);
+    if (!session) throw new Error("Please sign in to view your roadmap.");
+    const { data, error } = await supabase.from("roadmaps").select("id,title,goal,start_date,target_date,duration_days,status,category,created_at,user_id").eq("user_id", session.user.id).in("status", ["active", "paused"]).order("created_at", { ascending: false }).limit(4);
     if (error) throw error;
-
     const list = (data ?? []) as RoadmapSummary[];
     setRoadmaps(list);
     return (preferredRoadmapId && list.find((item) => item.id === preferredRoadmapId)) || list[0] || null;
@@ -87,24 +58,16 @@ export function useRoadmap() {
     setLoading(true);
     try {
       const roadmapData = await fetchRoadmaps(preferredRoadmapId);
-      if (!roadmapData) {
-        setRoadmap(null);
-        setMilestones([]);
-        setTasks([]);
-        return;
-      }
+      if (!roadmapData) { setRoadmap(null); setMilestones([]); setTasks([]); return; }
       setRoadmap(roadmapData);
-
       const [milestoneResult, taskResult, progressResult] = await Promise.all([
-        supabase.from("roadmap_milestones").select("*").eq("roadmap_id", roadmapData.id).eq("user_id", roadmapData.user_id ?? "").order("milestone_order"),
-        supabase.from("roadmap_tasks").select("*").eq("roadmap_id", roadmapData.id).eq("user_id", roadmapData.user_id ?? "").order("day_number").order("start_time").order("task_order"),
-        supabase.from("roadmap_task_progress").select("task_id,status,evidence_of_work").eq("roadmap_id", roadmapData.id).eq("user_id", roadmapData.user_id ?? ""),
+        supabase.from("roadmap_milestones").select("*").eq("roadmap_id", roadmapData.id).order("milestone_order"),
+        supabase.from("roadmap_tasks").select("*").eq("roadmap_id", roadmapData.id).order("day_number").order("start_time").order("task_order"),
+        supabase.from("roadmap_task_progress").select("task_id,status,evidence_of_work").eq("roadmap_id", roadmapData.id).eq("user_id", roadmapData.user_id || ""),
       ]);
-
       if (milestoneResult.error) throw milestoneResult.error;
       if (taskResult.error) throw taskResult.error;
       if (progressResult.error) throw progressResult.error;
-
       const progress = new Map((progressResult.data || []).map((item) => [item.task_id, item]));
       const hydrated = (taskResult.data || []).map((task) => {
         const current = progress.get(task.id);
@@ -115,22 +78,20 @@ export function useRoadmap() {
     } catch (error) {
       console.error("Failed to load roadmap:", error);
       toast.error(error instanceof Error ? error.message : "Could not load roadmap.");
-      setRoadmap(null);
-      setMilestones([]);
-      setTasks([]);
-    } finally {
-      setLoading(false);
-    }
+      setRoadmap(null); setMilestones([]); setTasks([]);
+    } finally { setLoading(false); }
   }, [fetchRoadmaps]);
 
   useEffect(() => { void load(); }, [load]);
 
   const updateRoadmap = useCallback(async (roadmapId: string, patch: { title: string; goal: string }) => {
-    const title = patch.title.trim().slice(0, 120);
-    const goal = patch.goal.trim().slice(0, 2000);
+    const title = patch.title.trim().slice(0, 120), goal = patch.goal.trim().slice(0, 2000);
     if (title.length < 2) throw new Error("Roadmap title is too short.");
     if (goal.length < 5) throw new Error("Roadmap goal is too short.");
-    const { data, error } = await supabase.from("roadmaps").update({ title, goal }).eq("id", roadmapId).eq("user_id", (await supabase.auth.getUser()).data.user?.id ?? "").select("id,title,goal,start_date,target_date,duration_days,status,category,created_at").single();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError) throw userError;
+    if (!user) throw new Error("Please sign in again.");
+    const { data, error } = await supabase.from("roadmaps").update({ title, goal }).eq("id", roadmapId).eq("user_id", user.id).select("id,title,goal,start_date,target_date,duration_days,status,category,created_at,user_id").single();
     if (error) throw error;
     setRoadmap(data as RoadmapSummary);
     setRoadmaps((items) => items.map((item) => item.id === roadmapId ? { ...item, ...(data as RoadmapSummary) } : item));
@@ -143,87 +104,52 @@ export function useRoadmap() {
   }, [invoke]);
 
   const deleteRoadmap = useCallback(async (roadmapId: string) => {
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError) throw sessionError;
-    if (!session?.access_token) throw new Error("Please sign in again.");
-    const { data, error } = await supabase.functions.invoke("outstand-ai", { body: { action: "delete_roadmap", roadmapId }, headers: { Authorization: `Bearer ${session.access_token}` } });
-    if (error) throw error;
-    if (data?.error) throw new Error(String(data.error));
+    const data = await invoke("delete_roadmap", { roadmapId });
     const next = roadmaps.filter((item) => item.id !== roadmapId);
     setRoadmaps(next);
-    if (roadmap?.id === roadmapId) {
-      setRoadmap(next[0] || null);
-      setMilestones([]);
-      setTasks([]);
-      if (next[0]) await load(next[0].id);
-    }
+    if (roadmap?.id === roadmapId) { setRoadmap(next[0] || null); setMilestones([]); setTasks([]); if (next[0]) await load(next[0].id); }
     return data;
-  }, [load, roadmap, roadmaps]);
+  }, [invoke, load, roadmap, roadmaps]);
 
   const askQuestions = useCallback(async (category: string, currentAnswers: Record<string, unknown> = answers) => {
-    const { data, error } = await supabase.functions.invoke("outstand-ai", { body: { action: "roadmap_questions", category, answers: currentAnswers } });
-    if (error) throw error;
-    if (data?.error) throw new Error(String(data.error));
+    const data = await invoke("roadmap_questions", { category, answers: currentAnswers });
     const next = normalizeQuestions(data?.questions);
     if (!next.length) throw new Error("The roadmap intake did not return any questions. Please try again.");
-    setQuestions(next);
-    return next;
-  }, [answers]);
+    setQuestions(next); return next;
+  }, [answers, invoke]);
 
   const generate = useCallback(async (category: string, currentAnswers: Record<string, unknown>) => {
     setGenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke("outstand-ai", { body: { action: "generate_roadmap", category, answers: currentAnswers } });
-      if (error) throw error;
-      if (data?.error) throw new Error(String(data.error));
-      if (data?.needsMoreInfo) {
-        const next = normalizeQuestions(data.questions);
-        const visible = next.length ? next : [fallbackFollowUp];
-        setQuestions(visible);
-        return { ...data, questions: visible };
-      }
+      const data = await invoke("generate_roadmap", { category, answers: currentAnswers });
+      if (data?.needsMoreInfo) { const next = normalizeQuestions(data.questions); const visible = next.length ? next : [fallbackFollowUp]; setQuestions(visible); return { ...data, questions: visible }; }
       if (!data?.roadmapId) throw new Error("Roadmap was generated but no saved roadmap ID was returned.");
-      setAnswers(currentAnswers);
-      await load(data.roadmapId);
-      return data;
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not generate roadmap.");
-      throw error;
-    } finally {
-      setGenerating(false);
-    }
-  }, [load]);
+      setAnswers(currentAnswers); await load(data.roadmapId); return data;
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not generate roadmap."); throw error; }
+    finally { setGenerating(false); }
+  }, [invoke, load]);
 
-  const insertNextDaySchedule = useCallback(async (roadmapId: string, userId: string, nextDay: number, schedule: unknown[]) => {
-    return await invoke("insert_next_day_schedule", { roadmapId, userId, nextDay, schedule });
-  }, [invoke]);
+  const insertNextDaySchedule = useCallback(async (roadmapId: string, userId: string, nextDay: number, schedule: unknown[]) => invoke("insert_next_day_schedule", { roadmapId, userId, nextDay, schedule }), [invoke]);
 
   const toggleTask = useCallback(async (task: RoadmapTask) => {
     if (!roadmap) return;
     const status = task.progress === "completed" ? "pending" : "completed";
-    const { data, error } = await supabase.functions.invoke("outstand-ai", { body: { action: "set_task_progress", taskId: task.id, roadmapId: roadmap.id, status } });
-    if (error) throw error;
+    const data = await invoke("set_task_progress", { taskId: task.id, roadmapId: roadmap.id, status });
     if (data?.verified === false) throw new Error("Task progress could not be verified.");
-    await load(roadmap.id);
-    return data;
-  }, [load, roadmap]);
+    await load(roadmap.id); return data;
+  }, [invoke, load, roadmap]);
 
   const saveNightlyReview = useCallback(async (reflection: string, energy: number, difficulty: number) => {
     if (!roadmap) throw new Error("No roadmap selected.");
-    const { data, error } = await supabase.functions.invoke("outstand-ai", { body: { action: "save_nightly_review", roadmapId: roadmap.id, reflection, energy, difficulty } });
-    if (error) throw error;
-    if (data?.error) throw new Error(String(data.error));
-    await load(roadmap.id);
-    return data;
-  }, [load, roadmap]);
+    const data = await invoke("save_nightly_review", { roadmapId: roadmap.id, reflection, energy, difficulty });
+    await load(roadmap.id); return data;
+  }, [invoke, load, roadmap]);
 
   const todayIndex = useMemo(() => {
     if (!roadmap?.start_date) return 1;
-    const start = new Date(`${roadmap.start_date}T00:00:00`);
-    const now = new Date();
+    const start = new Date(`${roadmap.start_date}T00:00:00`), now = new Date();
     return Math.max(1, Math.floor((new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - start.getTime()) / 86400000) + 1);
   }, [roadmap?.start_date]);
-
   const todayTasks = useMemo(() => tasks.filter((task) => task.day_number === Math.min(todayIndex, Number(roadmap?.duration_days || todayIndex))), [tasks, todayIndex, roadmap?.duration_days]);
 
   return { roadmaps, roadmap, milestones, tasks, todayTasks, todayIndex, questions, answers, setAnswers, loading, generating, load, generate, askQuestions, updateRoadmap, smartChange, deleteRoadmap, toggleTask, saveNightlyReview, insertNextDaySchedule };
