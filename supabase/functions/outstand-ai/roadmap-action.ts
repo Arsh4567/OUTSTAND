@@ -1,4 +1,4 @@
-import { getOwnedRoadmap, listOwnedRoadmaps, updateOwnedRoadmap, deleteOwnedRoadmap, createBasicRoadmap } from "../../../api/roadmap-service.ts";
+import { getOwnedRoadmap, listOwnedRoadmaps, updateOwnedRoadmap, deleteOwnedRoadmap, createBasicRoadmap, smartChangeRoadmap } from "../../../api/roadmap-service.ts";
 
 export async function handleRoadmapAction(client: any, userId: string, action: string, body: any) {
   if (action === "list_roadmaps") return { roadmaps: await listOwnedRoadmaps(client, userId), verified: true };
@@ -35,6 +35,13 @@ export async function handleRoadmapAction(client: any, userId: string, action: s
     const roadmapId = typeof body.roadmapId === "string" ? body.roadmapId : "";
     if (!roadmapId) throw new Error("roadmapId is required.");
     return await updateOwnedRoadmap(client, userId, roadmapId, { title: body.title, goal: body.goal });
+  }
+
+  if (action === "smart_change") {
+    const roadmapId = typeof body.roadmapId === "string" ? body.roadmapId : "";
+    const request = typeof body.request === "string" ? body.request : "";
+    if (!roadmapId) throw new Error("roadmapId is required.");
+    return await smartChangeRoadmap(client, userId, roadmapId, request);
   }
 
   if (action === "delete_roadmap") {
