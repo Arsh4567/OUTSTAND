@@ -39,28 +39,25 @@ async function getSessionOrThrow() {
   return data.session;
 }
 
-async function readRoadmapData(roadmapData: RoadmapSummary) {
+async function readRoadmapData(roadmapData: RoadmapSummary, userId: string) {
+  if (roadmapData.user_id && roadmapData.user_id !== userId) throw new Error("Roadmap does not belong to this account.");
   const [milestoneResult, taskResult, progressResult] = await Promise.all([
-    supabase.from("roadmap_milestones").select("*").eq("roadmap_id", roadmapData.id).eq("user_id", roadmapData.user_id || "").order("milestone_order"),
-    supabase.from("roadmap_tasks").select("*").eq("roadmap_id", roadmapData.id).eq("user_id", roadmapData.user_id || "").order("day_number").order("start_time").order("task_order"),
-    supabase.from("roadmap_task_progress").select("task_id,status,evidence_of_work").eq("roadmap_id", roadmapData.id).eq("user_id", roadmapData.user_id || ""),
+    supabase.from("roadmap_milestones").select("*").eq("roadmap_id", roadmapData.id).eq("user_id", userId).order("milestone_order"),
+    supabase.from("roadmap_tasks").select("*").eq("roadmap_id", roadmapData.id).eq("user_id", userId).order("day_number").order("start_time").order("task_order"),
+    supabase.from("roadmap_task_progress").select("task_id,status,evidence_of_work").eq("roadmap_id", roadmapData.id).eq("user_id", userId),
   ]);
-
   if (milestoneResult.error) throw milestoneResult.error;
   if (taskResult.error) throw taskResult.error;
   if (progressResult.error) throw progressResult.error;
-
   const progress = new Map((progressResult.data || []).map((item) => [item.task_id, item]));
   const hydrated = (taskResult.data || []).map((task) => {
     const current = progress.get(task.id);
     return { ...task, progress: current?.status || "pending", evidence_of_work: current?.evidence_of_work ?? null } as RoadmapTask;
   });
-
   const hydratedMilestones = (milestoneResult.data || []).map((milestone) => ({
     ...milestone,
     tasks: hydrated.filter((task) => task.day_number >= milestone.day_start && task.day_number <= milestone.day_end),
   })) as RoadmapMilestone[];
-
   return { milestones: hydratedMilestones, tasks: hydrated };
 }
 
@@ -80,6 +77,11 @@ export function useRoadmap() {
     setTasks([]);
   }, []);
 
+  const resetIntake = useCallback(() => {
+    setQuestions([]);
+    setAnswers({});
+  }, []);
+
   const invoke = useCallback(async <T = ActionResponse>(action: string, body: Record<string, unknown> = {}): Promise<T> => {
     const session = await getSessionOrThrow();
     const { data, error } = await supabase.functions.invoke("outstand-ai", {
@@ -94,7 +96,7 @@ export function useRoadmap() {
           const payload = await response.json();
           if (payload?.error) message = String(payload.error);
         }
-      } catch { /* keep stable fallback */ }
+      } catch {}
       throw new Error(message);
     }
     if (data?.error) throw new Error(String(data.error));
@@ -103,35 +105,27 @@ export function useRoadmap() {
 
   const fetchRoadmaps = useCallback(async (preferredRoadmapId?: string) => {
     const session = await getSessionOrThrow();
-    const { data, error } = await supabase
-      .from("roadmaps")
+    const { data, error } = await supabase.from("roadmaps")
       .select("id,title,goal,start_date,target_date,duration_days,status,category,created_at,user_id")
       .eq("user_id", session.user.id)
       .in("status", [...ROADMAP_STATUSES])
       .order("created_at", { ascending: false })
       .limit(4);
     if (error) throw error;
-
     const list = (data ?? []) as RoadmapSummary[];
     setRoadmaps(list);
-
-    if (!list.length) {
-      resetRoadmapState();
-      return null;
-    }
-
-    const selected = (preferredRoadmapId && list.find((item) => item.id === preferredRoadmapId)) || list[0];
-    return selected;
+    if (!list.length) { resetRoadmapState(); return null; }
+    return (preferredRoadmapId && list.find((item) => item.id === preferredRoadmapId)) || list[0];
   }, [resetRoadmapState]);
 
   const load = useCallback(async (preferredRoadmapId?: string) => {
     setLoading(true);
     try {
+      const session = await getSessionOrThrow();
       const selected = await fetchRoadmaps(preferredRoadmapId);
       if (!selected) return null;
-
+      const nextData = await readRoadmapData(selected, session.user.id);
       setRoadmap(selected);
-      const nextData = await readRoadmapData(selected);
       setTasks(nextData.tasks);
       setMilestones(nextData.milestones);
       return selected;
@@ -140,34 +134,15 @@ export function useRoadmap() {
       toast.error(error instanceof Error ? error.message : "Could not load roadmap.");
       resetRoadmapState();
       return null;
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, [fetchRoadmaps, resetRoadmapState]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   const selectRoadmap = useCallback(async (roadmapId: string) => {
-    if (!roadmapId) return false;
-    const selected = await fetchRoadmaps(roadmapId);
-    if (!selected || selected.id !== roadmapId) return false;
-    setLoading(true);
-    try {
-      setRoadmap(selected);
-      const nextData = await readRoadmapData(selected);
-      setTasks(nextData.tasks);
-      setMilestones(nextData.milestones);
-      return true;
-    } catch (error) {
-      console.error("Failed to switch roadmap:", error);
-      toast.error(error instanceof Error ? error.message : "Could not switch roadmap.");
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchRoadmaps]);
+    if (!roadmapId || roadmapId === roadmap?.id) return roadmapId === roadmap?.id;
+    return Boolean(await load(roadmapId));
+  }, [load, roadmap?.id]);
 
   const updateRoadmap = useCallback(async (roadmapId: string, patch: { title: string; goal: string }) => {
     const title = patch.title.trim().slice(0, 120);
@@ -177,10 +152,8 @@ export function useRoadmap() {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError) throw userError;
     if (!user) throw new Error("Please sign in again.");
-
     const { error } = await supabase.from("roadmaps").update({ title, goal }).eq("id", roadmapId).eq("user_id", user.id);
     if (error) throw error;
-
     await load(roadmapId);
     return roadmapId;
   }, [load]);
@@ -191,6 +164,7 @@ export function useRoadmap() {
   }, [invoke]);
 
   const deleteRoadmap = useCallback(async (roadmapId: string) => {
+    if (!roadmapId) throw new Error("A roadmap is required.");
     await invoke("delete_roadmap", { roadmapId });
     await load();
   }, [invoke, load]);
@@ -220,13 +194,10 @@ export function useRoadmap() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not generate roadmap.");
       throw error;
-    } finally {
-      setGenerating(false);
-    }
+    } finally { setGenerating(false); }
   }, [invoke, load]);
 
   const insertNextDaySchedule = useCallback((roadmapId: string, userId: string, nextDay: number, schedule: unknown[]) => invoke("insert_next_day_schedule", { roadmapId, userId, nextDay, schedule }), [invoke]);
-
   const toggleTask = useCallback(async (task: RoadmapTask) => {
     if (!roadmap) return;
     const status = task.progress === "completed" ? "pending" : "completed";
@@ -247,27 +218,5 @@ export function useRoadmap() {
   const boundedTodayIndex = useMemo(() => Math.min(todayIndex, Math.max(1, Number(roadmap?.duration_days || todayIndex))), [todayIndex, roadmap?.duration_days]);
   const todayTasks = useMemo(() => tasks.filter((task) => task.day_number === boundedTodayIndex), [tasks, boundedTodayIndex]);
 
-  return {
-    roadmaps,
-    roadmap,
-    milestones,
-    tasks,
-    todayTasks,
-    todayIndex: boundedTodayIndex,
-    questions,
-    answers,
-    setAnswers,
-    loading,
-    generating,
-    load,
-    selectRoadmap,
-    generate,
-    askQuestions,
-    updateRoadmap,
-    smartChange,
-    deleteRoadmap,
-    toggleTask,
-    saveNightlyReview,
-    insertNextDaySchedule,
-  };
+  return { roadmaps, roadmap, milestones, tasks, todayTasks, todayIndex: boundedTodayIndex, questions, answers, setAnswers, resetIntake, loading, generating, load, selectRoadmap, generate, askQuestions, updateRoadmap, smartChange, deleteRoadmap, toggleTask, saveNightlyReview, insertNextDaySchedule };
 }
