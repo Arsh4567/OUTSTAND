@@ -103,6 +103,9 @@ async function roadmapAction(auth: any, action: string, body: any) {
     const answers = body.answers && typeof body.answers === "object" ? body.answers : {};
     const goal = typeof answers.goal === "string" ? answers.goal.trim() : "";
     if (!goal) return { needsMoreInfo: true, questions: [{ id: "goal", question: "What result are you aiming for?", type: "multiline", required: true }] };
+    const { count, error: countError } = await client.from("roadmaps").select("id", { count: "exact", head: true }).eq("user_id", auth.userId).in("status", ["active", "paused"]);
+    if (countError) throw countError;
+    if ((count ?? 0) >= 4) return { error: "You can have a maximum of 4 active roadmaps." };
     const { data, error } = await client.from("roadmaps").insert({ user_id: auth.userId, title: goal.slice(0, 60) || "My roadmap", goal, start_date: today(), target_date: null, duration_days: Number(answers.durationDays) || 30, status: "active", category }).select("id").single();
     if (error) throw error;
     return { roadmapId: data.id, created: true };
@@ -129,8 +132,10 @@ serve(async (req) => {
     if (req.method !== "POST") return json({ error: "Method not allowed.", code: "METHOD_NOT_ALLOWED" }, 405);
 
     const body = await req.json().catch(() => null);
-    const internalAction = typeof body?.appContext?.internalAction === "string" ? body.appContext.internalAction : null;
-    if (internalAction) return json(await roadmapAction(auth, internalAction, body.appContext.actionPayload || body));
+    // Roadmap mutations use the hook's explicit `action` field. Older callers may
+    // put the action inside appContext; support both shapes so the API stays compatible.
+    const internalAction = typeof body?.action === "string" ? body.action : (typeof body?.appContext?.internalAction === "string" ? body.appContext.internalAction : null);
+    if (internalAction) return json(await roadmapAction(auth, internalAction, body?.actionPayload || body?.appContext?.actionPayload || body));
 
     const messages = Array.isArray(body?.messages) ? body.messages : [];
     if (!messages.length) return json({ error: "At least one chat message is required.", code: "EMPTY_MESSAGES" }, 400);
