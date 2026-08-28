@@ -82,8 +82,7 @@ async function loadAI() {
 }
 
 Deno.serve(async (req) => {
-  // Keep preflight completely independent from auth, database, AI providers, and app imports.
-  if (req.method === "OPTIONS") return new Response("ok", { status: 204, headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
   try {
     const auth = await authenticate(req);
     if ("error" in auth) return auth.error;
