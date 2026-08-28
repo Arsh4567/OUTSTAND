@@ -18,6 +18,7 @@ function normalizeQuestions(value: unknown): RoadmapQuestion[] {
 const fallbackFollowUp: RoadmapQuestion = { id: "roadmap_missing_detail", question: "What is the single most important result you want to achieve by the end of this roadmap?", type: "multiline", required: true, placeholder: "For example: score 90%+ in my next exam, reach 1200 chess rating, or build my first working website." };
 
 export function useRoadmap() {
+  const [roadmaps, setRoadmaps] = useState<any[]>([]);
   const [roadmap, setRoadmap] = useState<any | null>(null);
   const [milestones, setMilestones] = useState<RoadmapMilestone[]>([]);
   const [tasks, setTasks] = useState<RoadmapTask[]>([]);
@@ -26,22 +27,22 @@ export function useRoadmap() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
 
+  const fetchRoadmaps = useCallback(async (preferredRoadmapId?: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("Please sign in to view your roadmap.");
+    const response = await fetch("/api/roadmaps", { headers: { Authorization: `Bearer ${session.access_token}` } });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Could not load roadmaps.");
+    const list = Array.isArray(result.roadmaps) ? result.roadmaps : [];
+    setRoadmaps(list);
+    const selected = (preferredRoadmapId && list.find((item: any) => item.id === preferredRoadmapId)) || list[0] || null;
+    return selected;
+  }, []);
+
   const load = useCallback(async (preferredRoadmapId?: string) => {
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Please sign in to view your roadmap.");
-      let roadmapData: any | null = null;
-      if (preferredRoadmapId) {
-        const { data, error } = await supabase.from("roadmaps").select("*").eq("id", preferredRoadmapId).eq("user_id", session.user.id).maybeSingle();
-        if (error) throw error;
-        roadmapData = data;
-      }
-      if (!roadmapData) {
-        const { data, error } = await supabase.from("roadmaps").select("*").eq("user_id", session.user.id).in("status", ["active", "paused"]).order("created_at", { ascending: false }).limit(1);
-        if (error) throw error;
-        roadmapData = data?.[0] ?? null;
-      }
+      const roadmapData = await fetchRoadmaps(preferredRoadmapId);
       if (!roadmapData) { setRoadmap(null); setMilestones([]); setTasks([]); return; }
       setRoadmap(roadmapData);
       const [{ data: milestoneRows, error: milestoneError }, { data: taskRows, error: taskError }, { data: progressRows, error: progressError }] = await Promise.all([
@@ -56,7 +57,7 @@ export function useRoadmap() {
       setMilestones((milestoneRows || []).map((milestone) => ({ ...milestone, tasks: hydratedTasks.filter((task) => task.day_number >= milestone.day_start && task.day_number <= milestone.day_end) })) as RoadmapMilestone[]);
     } catch (error) { toast.error(error instanceof Error ? error.message : "Could not load roadmap."); }
     finally { setLoading(false); }
-  }, []);
+  }, [fetchRoadmaps]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -70,8 +71,30 @@ export function useRoadmap() {
     const { data, error } = await supabase.from("roadmaps").update({ title, goal }).eq("id", roadmapId).eq("user_id", session.user.id).select().single();
     if (error) throw error;
     setRoadmap(data);
+    setRoadmaps((items) => items.map((item) => item.id === data.id ? { ...item, ...data } : item));
     return data;
   }, []);
+
+  const smartChange = useCallback(async (roadmapId: string, request: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("Please sign in first.");
+    const response = await fetch("/api/roadmap-edit", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ roadmapId, request }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Could not apply smart roadmap change.");
+    return { handled: true, message: result.message || "Smart roadmap change applied." };
+  }, []);
+
+  const archiveRoadmap = useCallback(async (roadmapId: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("Please sign in first.");
+    const response = await fetch("/api/roadmaps", { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ roadmapId, status: "archived" }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Could not archive roadmap.");
+    const nextList = roadmaps.filter((item) => item.id !== roadmapId);
+    setRoadmaps(nextList);
+    if (roadmap?.id === roadmapId) await load(nextList[0]?.id);
+    return result.roadmap;
+  }, [roadmap, roadmaps, load]);
 
   const askQuestions = useCallback(async (category: string, currentAnswers: Record<string, unknown> = answers) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -139,20 +162,17 @@ export function useRoadmap() {
     const { data: dailyLog, error: dailyError } = await supabase.from("roadmap_daily_logs").upsert({ roadmap_id: roadmap.id, user_id: roadmap.user_id, log_date: today, planned_tasks: requiredTasks.length, completed_tasks: completed, completion_percent: percent, reflection, energy_level: energy, difficulty_rating: difficulty }, { onConflict: "roadmap_id,log_date" }).select().single(); if (dailyError || !dailyLog) throw dailyError || new Error("Could not save nightly log.");
     const nextDay = completedDay + 1; const { data: { session } } = await supabase.auth.getSession();
     if (session) {
-      const response = await fetch("/api/roadmap", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ mode: "adapt", context: { roadmapId: roadmap.id, reflection, energy, difficulty, completion: percent, nextDay } }) });
-      if (response.ok) { const result = await response.json(); await supabase.from("nightly_reviews").upsert({ roadmap_id: roadmap.id, daily_log_id: dailyLog.id, user_id: roadmap.user_id, review_date: today, ai_summary: result.analysis?.summary || null, ai_feedback: result.analysis?.recommendation || null, adaptation: result, strengths: result.analysis?.strengths || [], blockers: result.analysis?.blockers || [] }, { onConflict: "roadmap_id,review_date" }); await insertNextDaySchedule(roadmap.id, roadmap.user_id, nextDay, result.nextDaySchedule); await load(roadmap.id); return result; }
+      const response = await fetch("/api/roadmap", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ mode: "adapt", roadmapId: roadmap.id, nextDay, metrics: { completionPercent: percent, energy, difficulty, completed, planned: requiredTasks.length }, context: { startDate: roadmap.start_date, durationDays: roadmap.duration_days, targetDate: roadmap.target_date } }) });
+      const result = await response.json(); if (response.ok && result?.analysis?.plan) { const analysis = result.analysis; await insertNextDaySchedule(roadmap.id, roadmap.user_id, nextDay, analysis.plan); }
+      return result;
     }
-    return { completion: percent, reason: "Your day has been logged. Tomorrow's schedule will be generated when the planner is available." };
-  }, [insertNextDaySchedule, load, roadmap, tasks]);
+    return { dailyLog };
+  }, [roadmap, tasks, insertNextDaySchedule]);
 
-  const roadmapByDay = useMemo(() => {
-    const map = new Map<number, RoadmapTask[]>();
-    for (const task of tasks) { const list = map.get(task.day_number) || []; list.push(task); map.set(task.day_number, list); }
-    return map;
-  }, [tasks]);
+  const todayIndex = useMemo(() => roadmap ? Math.max(1, Math.floor((Date.now() - new Date(roadmap.start_date).getTime()) / 86400000) + 1) : 0, [roadmap]);
+  const todayTasks = useMemo(() => tasks.filter((task) => task.day_number === todayIndex), [tasks, todayIndex]);
+  const completedRequired = useMemo(() => todayTasks.filter((task) => task.is_required && task.progress === "completed").length, [todayTasks]);
+  const requiredTotal = useMemo(() => todayTasks.filter((task) => task.is_required).length, [todayTasks]);
 
-  const todayIndex = roadmap ? Math.max(1, Math.min(roadmap.duration_days, Math.floor((Date.now() - new Date(roadmap.start_date).getTime()) / 86400000) + 1)) : 1;
-  const todayTasks = roadmapByDay.get(todayIndex) || [];
-
-  return { roadmap, milestones, tasks, questions, answers, setAnswers, loading, generating, generate, askQuestions, load, updateRoadmap, toggleTask, saveNightlyReview, todayIndex, todayTasks };
+  return { roadmaps, roadmap, milestones, tasks, questions, answers, loading, generating, todayIndex, todayTasks, completedRequired, requiredTotal, setAnswers, load, updateRoadmap, smartChange, archiveRoadmap, askQuestions, generate, insertNextDaySchedule, toggleTask, saveNightlyReview };
 }
