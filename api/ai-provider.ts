@@ -12,7 +12,7 @@ export async function getAIProvider(preferred?: AIProviderName): Promise<Provide
   const geminiKey = env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY");
   const order: AIProviderName[] = preferred
     ? [preferred, preferred === "groq" ? "gemini" : "groq"]
-    : ["gemini", "groq"];
+    : ["groq", "gemini"];
 
   for (const providerName of order) {
     if (providerName === "groq" && groqKey) {
@@ -42,8 +42,8 @@ export async function getAIProvider(preferred?: AIProviderName): Promise<Provide
 }
 
 export function modelFor(providerName: AIProviderName, provider: any, task: "chat" | "roadmap") {
-  if (providerName === "groq") return provider(task === "chat" ? "openai/gpt-oss-20b" : "openai/gpt-oss-20b");
-  return provider("gemini-2.5-flash-lite");
+  if (providerName === "groq") return provider("openai/gpt-oss-20b");
+  return provider("gemini-3.5-flash-lite");
 }
 
 export function isRateLimitError(error: unknown) {
