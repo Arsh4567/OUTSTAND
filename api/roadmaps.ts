@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-type Db = SupabaseClient<any, "public", any, any, any>;
+type Db = SupabaseClient<any, "public", any, any>;
 const env = (...names: string[]) => names.map((name) => process.env[name]).find((value) => typeof value === "string" && value.trim());
 
 async function auth(req: VercelRequest) {
@@ -28,6 +28,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { data, error } = await client.from("roadmaps").select("id,title,goal,category,status,start_date,target_date,duration_days,created_at,updated_at").eq("user_id", userId).in("status", ["active", "paused"]).order("created_at", { ascending: false }).limit(4);
     if (error) return send(res, 500, { error: "Could not load roadmaps.", code: error.code });
     return send(res, 200, { roadmaps: data || [], maxRoadmaps: 4, count: data?.length || 0 });
+  }
+
+  if (req.method === "POST") {
+    const { count, error: countError } = await client.from("roadmaps").select("id", { count: "exact", head: true }).eq("user_id", userId).in("status", ["active", "paused"]);
+    if (countError) return send(res, 500, { error: "Could not check roadmap capacity.", code: countError.code });
+    if ((count || 0) >= 4) return send(res, 409, { error: "You can have a maximum of 4 active or paused roadmaps.", code: "ROADMAP_LIMIT_REACHED", maxRoadmaps: 4, count });
+    const input = req.body && typeof req.body === "object" ? req.body : {};
+    if (typeof input.title !== "string" || input.title.trim().length < 2 || typeof input.goal !== "string" || input.goal.trim().length < 5) return send(res, 400, { error: "A roadmap title and goal are required.", code: "INVALID_ROADMAP" });
+    const payload = {
+      user_id: userId,
+      title: input.title.trim().slice(0, 120),
+      goal: input.goal.trim().slice(0, 2000),
+      category: typeof input.category === "string" ? input.category : "custom",
+      questionnaire: input.questionnaire && typeof input.questionnaire === "object" ? input.questionnaire : {},
+      generation_metadata: input.generation_metadata && typeof input.generation_metadata === "object" ? input.generation_metadata : {},
+      duration_days: Math.max(1, Math.min(730, Number(input.duration_days) || 30)),
+      start_date: typeof input.start_date === "string" ? input.start_date : new Date().toISOString().slice(0, 10),
+      target_date: typeof input.target_date === "string" ? input.target_date : null,
+      status: "active",
+    };
+    const { data, error } = await client.from("roadmaps").insert(payload).select("id,title,goal,category,status,start_date,target_date,duration_days,created_at,updated_at").single();
+    if (error || !data) return send(res, 500, { error: "Roadmap could not be created.", code: error?.code || "ROADMAP_CREATE_FAILED" });
+    return send(res, 201, { roadmap: data, maxRoadmaps: 4, count: (count || 0) + 1 });
   }
 
   if (req.method === "PATCH") {
