@@ -52,9 +52,7 @@ export function OutstandChatPanel({ initialMessages, context, initialPrompt = ""
       const response = await fetch(aiEndpoint, { method: "GET", headers: { Authorization: `Bearer ${data.session.access_token}` }, credentials: "include" });
       if (!response.ok) { setHealthy(false); setHealthMessage(await response.text()); return false; }
       setHealthy(true); setHealthMessage(null); return true;
-    } catch (error) {
-      setHealthy(false); setHealthMessage(formatAiError(error)); return false;
-    }
+    } catch (error) { setHealthy(false); setHealthMessage(formatAiError(error)); return false; }
   };
   useEffect(() => { void refresh(); }, []);
 
