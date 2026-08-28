@@ -18,7 +18,23 @@ export async function getAIProvider(preferred?: AIProviderName): Promise<Provide
     if (providerName === "groq" && groqKey) {
       try {
         const { createGroq } = await import("@ai-sdk/groq");
-        return { name: "groq", provider: createGroq({ apiKey: groqKey }) };
+        const provider = createGroq({
+          apiKey: groqKey,
+          fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+            if (!init?.body || typeof init.body !== "string") return fetch(input, init);
+            try {
+              const body = JSON.parse(init.body);
+              if (body.model === "openai/gpt-oss-20b") {
+                body.reasoning_effort = body.reasoning_effort || "low";
+                body.service_tier = body.service_tier || "auto";
+              }
+              return fetch(input, { ...init, body: JSON.stringify(body) });
+            } catch {
+              return fetch(input, init);
+            }
+          },
+        });
+        return { name: "groq", provider };
       } catch (error) {
         console.error("Groq provider initialization failed:", error);
         if (preferred === "groq") throw error;
