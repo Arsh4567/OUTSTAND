@@ -33,10 +33,11 @@ async function getSessionOrThrow() {
 }
 
 async function readRoadmapData(roadmapData: RoadmapSummary) {
+  if (!roadmapData.user_id) throw new Error("Roadmap owner could not be resolved.");
   const [milestoneResult, taskResult, progressResult] = await Promise.all([
-    supabase.from("roadmap_milestones").select("*").eq("roadmap_id", roadmapData.id).eq("user_id", roadmapData.user_id || "").order("milestone_order"),
-    supabase.from("roadmap_tasks").select("*").eq("roadmap_id", roadmapData.id).eq("user_id", roadmapData.user_id || "").order("day_number").order("start_time").order("task_order"),
-    supabase.from("roadmap_task_progress").select("task_id,status,evidence_of_work").eq("roadmap_id", roadmapData.id).eq("user_id", roadmapData.user_id || ""),
+    supabase.from("roadmap_milestones").select("*").eq("roadmap_id", roadmapData.id).eq("user_id", roadmapData.user_id).order("milestone_order"),
+    supabase.from("roadmap_tasks").select("*").eq("roadmap_id", roadmapData.id).eq("user_id", roadmapData.user_id).order("day_number").order("start_time").order("task_order"),
+    supabase.from("roadmap_task_progress").select("task_id,status,evidence_of_work").eq("roadmap_id", roadmapData.id).eq("user_id", roadmapData.user_id),
   ]);
   if (milestoneResult.error) throw milestoneResult.error;
   if (taskResult.error) throw taskResult.error;
@@ -66,7 +67,15 @@ export function useRoadmap() {
     if (error) {
       let message = "Roadmap service request failed.";
       const response = (error as any)?.context;
-      try { if (response && typeof response.json === "function") { const payload = await response.json(); if (payload?.error) message = String(payload.error); } } catch { /* stable fallback */ }
+      try {
+        if (response && typeof response.json === "function") {
+          const payload = await response.json();
+          if (payload?.error) message = String(payload.error);
+          else if (payload?.message) message = String(payload.message);
+        }
+      } catch { /* preserve fallback */ }
+      const details = (error as any)?.message;
+      if (details && details !== "Failed to send a request to the Edge Function") message = String(details);
       throw new Error(message);
     }
     if (data?.error) throw new Error(String(data.error));
