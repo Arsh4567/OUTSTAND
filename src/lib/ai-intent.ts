@@ -21,7 +21,7 @@ export function classifyIntent(text: string): AIIntent {
   const mentionsTask = has("task", "today's", "today", "next", "schedule");
   const undo = has("undo", "uncomplete", "not done", "mark as pending", "reopen");
   const complete = has("done", "complete", "completed", "finished", "finish", "tick", "mark");
-  const change = has("change", "edit", "adjust", "move", "reschedule", "simplify", "shift", "rename");
+  const change = has("change", "edit", "adjust", "move", "reschedule", "simplify", "shift", "rename", "customize", "customise");
   const progress = has("progress", "how am i doing", "performance", "streak", "setback", "behind");
   const reminder = has("remind me", "reminder", "reminders");
   const create = has("create", "make", "build", "generate", "start") && mentionsRoadmap;
@@ -40,7 +40,7 @@ export function classifyIntent(text: string): AIIntent {
 
 export function intentGuidance(intent: AIIntent) {
   switch (intent.intent) {
-    case "create_roadmap": return "Execute create_roadmap when enough information is available. Do not answer with instructions for using the roadmap UI.";
+    case "create_roadmap": return "Create only when both category and goal are known. If either is missing, ask a concise follow-up or use the structured roadmap intake; never call create_roadmap with missing required arguments.";
     case "change_roadmap": return "Read the current roadmap first, then use change_roadmap. Preserve completed work and do not claim a change before the tool succeeds.";
     case "complete_task": return "Read current tasks if needed, identify the exact existing task, then call set_task_progress with completed.";
     case "update_task": return "Treat reopening as consequential: only do it when the user clearly requested undoing completion.";
