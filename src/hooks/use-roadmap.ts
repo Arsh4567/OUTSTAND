@@ -39,9 +39,8 @@ async function getSessionOrThrow() {
   return data.session;
 }
 
-async function readRoadmapData(roadmapData: RoadmapSummary) {
-  const userId = roadmapData.user_id;
-  if (!userId) throw new Error("Roadmap account information is missing.");
+async function readRoadmapData(roadmapData: RoadmapSummary, userId: string) {
+  if (roadmapData.user_id && roadmapData.user_id !== userId) throw new Error("Roadmap does not belong to this account.");
   const [milestoneResult, taskResult, progressResult] = await Promise.all([
     supabase.from("roadmap_milestones").select("*").eq("roadmap_id", roadmapData.id).eq("user_id", userId).order("milestone_order"),
     supabase.from("roadmap_tasks").select("*").eq("roadmap_id", roadmapData.id).eq("user_id", userId).order("day_number").order("start_time").order("task_order"),
@@ -50,7 +49,6 @@ async function readRoadmapData(roadmapData: RoadmapSummary) {
   if (milestoneResult.error) throw milestoneResult.error;
   if (taskResult.error) throw taskResult.error;
   if (progressResult.error) throw progressResult.error;
-
   const progress = new Map((progressResult.data || []).map((item) => [item.task_id, item]));
   const hydrated = (taskResult.data || []).map((task) => {
     const current = progress.get(task.id);
@@ -98,7 +96,7 @@ export function useRoadmap() {
           const payload = await response.json();
           if (payload?.error) message = String(payload.error);
         }
-      } catch { /* ignore unreadable edge-function payload */ }
+      } catch {}
       throw new Error(message);
     }
     if (data?.error) throw new Error(String(data.error));
@@ -123,9 +121,10 @@ export function useRoadmap() {
   const load = useCallback(async (preferredRoadmapId?: string) => {
     setLoading(true);
     try {
+      const session = await getSessionOrThrow();
       const selected = await fetchRoadmaps(preferredRoadmapId);
       if (!selected) return null;
-      const nextData = await readRoadmapData(selected);
+      const nextData = await readRoadmapData(selected, session.user.id);
       setRoadmap(selected);
       setTasks(nextData.tasks);
       setMilestones(nextData.milestones);
@@ -135,32 +134,15 @@ export function useRoadmap() {
       toast.error(error instanceof Error ? error.message : "Could not load roadmap.");
       resetRoadmapState();
       return null;
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, [fetchRoadmaps, resetRoadmapState]);
 
   useEffect(() => { void load(); }, [load]);
 
   const selectRoadmap = useCallback(async (roadmapId: string) => {
     if (!roadmapId || roadmapId === roadmap?.id) return roadmapId === roadmap?.id;
-    setLoading(true);
-    try {
-      const selected = await fetchRoadmaps(roadmapId);
-      if (!selected || selected.id !== roadmapId) throw new Error("Roadmap not found.");
-      const nextData = await readRoadmapData(selected);
-      setRoadmap(selected);
-      setTasks(nextData.tasks);
-      setMilestones(nextData.milestones);
-      return true;
-    } catch (error) {
-      console.error("Failed to switch roadmap:", error);
-      toast.error(error instanceof Error ? error.message : "Could not switch roadmap.");
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchRoadmaps, roadmap?.id]);
+    return Boolean(await load(roadmapId));
+  }, [load, roadmap?.id]);
 
   const updateRoadmap = useCallback(async (roadmapId: string, patch: { title: string; goal: string }) => {
     const title = patch.title.trim().slice(0, 120);
