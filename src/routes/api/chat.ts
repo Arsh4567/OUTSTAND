@@ -38,6 +38,9 @@ Focus sessions: ${sessions}
 Outstand items: ${outstandItems}
 
 TOOLS
+- get_memory: retrieve a small set of relevant saved preferences, goals, constraints, strategies, and patterns.
+- save_memory: save one explicit, stable, useful non-sensitive fact that can improve future assistance.
+- delete_memory: forget one saved memory when the user explicitly asks.
 - get_today: authoritative current roadmap, today's tasks, task progress, and habits.
 - get_progress: authoritative roadmap history, completion counts, recent daily logs, and habit progress.
 - create_roadmap: generate and persist a new real roadmap using the existing OUTSTAND roadmap engine.
@@ -49,6 +52,13 @@ TOOLS
 REQUEST CLASSIFICATION
 ${intentText}
 
+MEMORY POLICY
+- Memory is a long-term personalization aid, not a source of current app state.
+- Retrieve memory only when personalization materially helps or the user refers to a previous preference, goal, constraint, strategy, or pattern.
+- Save memory only when the user explicitly states a stable fact or when a durable preference or strategy is clearly established through the interaction.
+- Do not save secrets, authentication data, highly sensitive personal information, temporary details, or facts that are only guesses.
+- Never invent memory. Never present memory as current state unless confirmed by tools.
+
 ACTION POLICY
 - You are an operator, not a chatbot-only advisor.
 - Use the classified intent as routing guidance, then use tools to execute the request safely.
@@ -56,14 +66,21 @@ ACTION POLICY
 - Do not tell the user how to do an available action manually.
 - Never invent ids. Get ids from get_today, get_progress, or current context.
 - Current browser context may be stale. Supabase tool results are authoritative.
-- For mutations, prefer: read current state -> perform mutation -> read again when verification is useful -> report exact result.
+- For mutations, prefer: read current state -> perform mutation -> use the tool's verification result -> report exact result.
 - Only complete or undo a habit when the user explicitly asks.
 - Only change or create a roadmap when the user explicitly asks.
 - Creating a roadmap requires enough information. If the generator reports missing information, ask the returned question rather than guessing.
 - Completing a task means setting its progress to completed when the user clearly refers to an existing task.
 - Reopening a task is consequential. Do it only when clearly requested.
 - For combined requests, execute the necessary tools in sequence rather than answering only one part.
-- Never claim a mutation succeeded unless the tool returned success.
+- Never claim a mutation succeeded unless the tool returned verified success.
+
+PLANNING
+- For "what should I do now/today" use get_today first when current state matters.
+- For progress or setback questions use get_progress.
+- For a new roadmap, create it with create_roadmap after collecting only materially necessary information.
+- For a roadmap adjustment, use change_roadmap with the user's exact request and current roadmap id.
+- For focus plans, use current roadmap state and make the next concrete action obvious. Keep the plan compact.
 
 RESPONSE STYLE
 - Concise, decisive, calm, friendly.
@@ -92,7 +109,7 @@ async function authenticate(request: Request): Promise<AuthResult> {
 function isQuotaError(error: unknown) { const message = error instanceof Error ? error.message : String(error); const candidate = error as { statusCode?: number; status?: number }; return candidate?.statusCode === 429 || candidate?.status === 429 || /429|quota|resource[_ -]?exhausted|rate[_ -]?limit|free[_ -]?tier/i.test(message); }
 
 export const Route = createFileRoute("/api/chat")({ server: { handlers: {
-  GET: async ({ request }) => { const auth = await authenticate(request); if ("error" in auth) return auth.error; try { const provider = getProvider(); return json({ ok: true, service: "outstand-ai", status: "ready", provider: provider.name }); } catch { return json({ ok: false, service: "outstand-ai", status: "unavailable" }, 503); } },
+  GET: async ({ request }) => { const auth = await authenticate(request); if ("error" in auth) return auth.error; try { const provider = getProvider(); return json({ ok: true, service: "outstand-ai", status: "ready", provider: provider.name, memory: true }); } catch { return json({ ok: false, service: "outstand-ai", status: "unavailable" }, 503); } },
   POST: async ({ request }) => {
     try {
       const auth = await authenticate(request); if ("error" in auth) return auth.error;
@@ -104,7 +121,7 @@ export const Route = createFileRoute("/api/chat")({ server: { handlers: {
       const intent = classifyIntent(latestText);
       const intentText = `intent=${intent.intent}; confidence=${intent.confidence.toFixed(2)}; needsFreshState=${intent.needsFreshState}; requiresConfirmation=${intent.requiresConfirmation}; target=${intent.target || "none"}; guidance=${intentGuidance(intent)}`;
       const provider = getProvider(); const modelMessages = uiMessages.slice(-12);
-      const result = streamText({ model: provider.model, system: systemPrompt(parsed.data.appContext, intentText), messages: await convertToModelMessages(modelMessages), tools: createProductivityTools(auth.client as any, auth.userId, auth.token), stopWhen: stepCountIs(6), maxOutputTokens: 700, maxRetries: 0, abortSignal: request.signal, onError: (error) => { if (isQuotaError(error)) console.warn(`[AI] ${provider.name} quota/rate limit reached.`); else console.error(`[AI] ${provider.name} stream error:`, error); } });
+      const result = streamText({ model: provider.model, system: systemPrompt(parsed.data.appContext, intentText), messages: await convertToModelMessages(modelMessages), tools: createProductivityTools(auth.client as any, auth.userId, auth.token), stopWhen: stepCountIs(8), maxOutputTokens: 900, maxRetries: 0, abortSignal: request.signal, onError: (error) => { if (isQuotaError(error)) console.warn(`[AI] ${provider.name} quota/rate limit reached.`); else console.error(`[AI] ${provider.name} stream error:`, error); } });
       return result.toUIMessageStreamResponse({
         originalMessages: modelMessages,
         generateMessageId: createIdGenerator({ prefix: "msg", size: 16 }),
