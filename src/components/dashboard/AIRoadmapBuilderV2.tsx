@@ -17,6 +17,10 @@ const categories = [
   ["custom", "Something else", "Any other meaningful goal"],
 ] as const;
 
+type CanonicalRoadmapRpc = {
+  rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: string | null; error: { message: string } | null }>;
+};
+
 export function AIRoadmapBuilderV2({ habits, name, level, xp, streak, onClose, onPlanCreated }: { habits: Habit[]; name: string; level: number; xp: number; streak: number; onClose: () => void; onPlanCreated: (plan: AIRoadmapPlan) => void }) {
   const [category, setCategory] = useState("academics");
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -57,7 +61,8 @@ export function AIRoadmapBuilderV2({ habits, name, level, xp, streak, onClose, o
         const nextPlan = data.plan as AIRoadmapPlan;
         if (!nextPlan?.title || !nextPlan?.durationDays || !Array.isArray(nextPlan.milestones)) throw new Error("The AI returned an incomplete roadmap. Please try building it again.");
 
-        const { data: roadmapId, error: saveError } = await supabase.rpc("create_canonical_roadmap_from_plan", {
+        const canonicalRpc = supabase as unknown as CanonicalRoadmapRpc;
+        const { data: roadmapId, error: saveError } = await canonicalRpc.rpc("create_canonical_roadmap_from_plan", {
           p_category: category,
           p_title: nextPlan.title,
           p_goal: nextPlan.summary || nextPlan.title,
