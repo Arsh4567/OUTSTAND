@@ -48,88 +48,22 @@ function RoadmapPage() {
   const [deleting, setDeleting] = useState(false);
 
   const startOnboarding = async () => {
-    try {
-      await roadmap.askQuestions(category, {});
-      setShowOnboarding(true);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not start roadmap intake.");
-    }
+    try { await roadmap.resetIntake(); await roadmap.askQuestions(category, {}); setShowOnboarding(true); }
+    catch (error) { toast.error(error instanceof Error ? error.message : "Could not start roadmap intake."); }
   };
 
   const generate = async () => {
-    try {
-      const result = await roadmap.generate(category, roadmap.answers);
-      if (result?.needsMoreInfo) {
-        setShowOnboarding(true);
-        return;
-      }
-      if (!result?.roadmapId) throw new Error("Roadmap was generated but no saved roadmap ID was returned.");
-      setShowOnboarding(false);
-      toast.success("Your roadmap is ready.");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not generate roadmap.");
-    }
+    try { const result = await roadmap.generate(category, roadmap.answers); if (result?.needsMoreInfo) { setShowOnboarding(true); return; } if (!result?.roadmapId) throw new Error("Roadmap was generated but no saved roadmap ID was returned."); setShowOnboarding(false); toast.success("Your roadmap is ready."); }
+    catch (error) { toast.error(error instanceof Error ? error.message : "Could not generate roadmap."); }
   };
 
-  const handleReview = async (reflection: string, energy: number, difficulty: number) => {
-    setReviewing(true);
-    try {
-      const result = await roadmap.saveNightlyReview(reflection, energy, difficulty);
-      toast.success(result?.reason || result?.analysis?.summary || "Tomorrow's priorities were adjusted.");
-      setNightlyOpen(false);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not save nightly review.");
-    } finally {
-      setReviewing(false);
-    }
-  };
+  const handleReview = async (reflection: string, energy: number, difficulty: number) => { setReviewing(true); try { const result = await roadmap.saveNightlyReview(reflection, energy, difficulty); toast.success(result?.reason || result?.analysis?.summary || "Tomorrow's priorities were adjusted."); setNightlyOpen(false); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not save nightly review."); } finally { setReviewing(false); } };
 
-  const saveEdit = async (patch: RoadmapEditPatch) => {
-    const current = roadmap.roadmap;
-    if (!current) return;
-    setSavingEdit(true);
-    try {
-      await roadmap.updateRoadmap(current.id, patch);
-      setEditOpen(false);
-      toast.success("Roadmap updated.");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not update roadmap.");
-    } finally {
-      setSavingEdit(false);
-    }
-  };
+  const saveEdit = async (patch: RoadmapEditPatch) => { const current = roadmap.roadmap; if (!current) return; setSavingEdit(true); try { await roadmap.updateRoadmap(current.id, patch); setEditOpen(false); toast.success("Roadmap updated."); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not update roadmap."); } finally { setSavingEdit(false); } };
 
-  const smartChange = async (request: string) => {
-    const current = roadmap.roadmap;
-    if (!current) return;
-    setAskingAI(true);
-    try {
-      const result = await roadmap.smartChange(current.id, request);
-      await roadmap.load(current.id);
-      toast.success(result?.message || "Smart roadmap change applied.");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not apply smart change.");
-      throw error;
-    } finally {
-      setAskingAI(false);
-    }
-  };
+  const smartChange = async (request: string) => { const current = roadmap.roadmap; if (!current) return; setAskingAI(true); try { const result = await roadmap.smartChange(current.id, request); await roadmap.load(current.id); toast.success(result?.message || "Smart roadmap change applied."); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not apply smart change."); throw error; } finally { setAskingAI(false); } };
 
-  const deleteCurrentRoadmap = async () => {
-    const current = roadmap.roadmap;
-    if (!current) return;
-    setDeleting(true);
-    try {
-      await roadmap.deleteRoadmap(current.id);
-      setEditOpen(false);
-      toast.success("Roadmap deleted.");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not delete roadmap.");
-      throw error;
-    } finally {
-      setDeleting(false);
-    }
-  };
+  const deleteCurrentRoadmap = async () => { const current = roadmap.roadmap; if (!current) return; setDeleting(true); try { await roadmap.deleteRoadmap(current.id); setEditOpen(false); toast.success("Roadmap deleted."); } catch (error) { toast.error(error instanceof Error ? error.message : "Could not delete roadmap."); throw error; } finally { setDeleting(false); } };
 
   const requiredTasks = useMemo(() => roadmap.tasks.filter((task) => task.is_required), [roadmap.tasks]);
   const completedCount = useMemo(() => requiredTasks.filter((task) => task.progress === "completed").length, [requiredTasks]);
@@ -139,48 +73,17 @@ function RoadmapPage() {
   const todayPercent = todayRequired.length ? Math.round((todayCompleted / todayRequired.length) * 100) : 0;
   const nextTask = roadmap.todayTasks.find((task) => task.progress !== "completed");
   const currentTitle = roadmap.roadmap ? displayTitle(roadmap.roadmap.title, roadmap.roadmap.goal) : "Your roadmap";
-  const daysLeft = roadmap.roadmap?.target_date
-    ? daysBetweenTodayAnd(roadmap.roadmap.target_date)
-    : Math.max(0, Number(roadmap.roadmap?.duration_days || 0) - roadmap.todayIndex + 1);
+  const daysLeft = roadmap.roadmap?.target_date ? daysBetweenTodayAnd(roadmap.roadmap.target_date) : Math.max(0, Number(roadmap.roadmap?.duration_days || 0) - roadmap.todayIndex + 1);
   const currentMilestone = roadmap.milestones.find((item) => roadmap.todayIndex >= item.day_start && roadmap.todayIndex <= item.day_end);
   const milestoneIndex = currentMilestone ? roadmap.milestones.indexOf(currentMilestone) : -1;
   const milestoneLabel = currentMilestone ? `${milestoneIndex + 1}/${roadmap.milestones.length}` : "—";
   const plannedMinutesToday = todayRequired.reduce((sum, task) => sum + (Number(task.estimated_minutes) || 30), 0);
   const completedMinutesToday = todayRequired.filter((task) => task.progress === "completed").reduce((sum, task) => sum + (Number(task.estimated_minutes) || 30), 0);
 
-  const adaptive = useAdaptivePlanning(roadmap.roadmap?.id, roadmap.roadmap ? {
-    elapsedDays: roadmap.todayIndex,
-    totalDays: Math.max(1, roadmap.roadmap.duration_days || 1),
-    todayRequired: todayRequired.length,
-    todayCompleted,
-    totalRequired: requiredTasks.length,
-    totalCompleted: completedCount,
-    remainingDays: daysLeft,
-    plannedMinutesToday,
-    completedMinutesToday,
-  } : null);
+  const adaptive = useAdaptivePlanning(roadmap.roadmap?.id, roadmap.roadmap ? { elapsedDays: roadmap.todayIndex, totalDays: Math.max(1, roadmap.roadmap.duration_days || 1), todayRequired: todayRequired.length, todayCompleted, totalRequired: requiredTasks.length, totalCompleted: completedCount, remainingDays: daysLeft, plannedMinutesToday, completedMinutesToday } : null);
+  const recovery = useRecoveryIntelligence(roadmap.roadmap?.id, roadmap.roadmap ? { plannedTasks: todayRequired.length, completedTasks: todayCompleted, plannedMinutes: plannedMinutesToday, completedMinutes: completedMinutesToday, daysObserved: Math.max(1, roadmap.todayIndex), missedDays: 0, averageDifficulty: 3, recentDifficulty: 3 } : null);
 
-  const recovery = useRecoveryIntelligence(roadmap.roadmap?.id, roadmap.roadmap ? {
-    plannedTasks: todayRequired.length,
-    completedTasks: todayCompleted,
-    plannedMinutes: plannedMinutesToday,
-    completedMinutes: completedMinutesToday,
-    daysObserved: Math.max(1, roadmap.todayIndex),
-    missedDays: 0,
-    averageDifficulty: 3,
-    recentDifficulty: 3,
-  } : null);
-
-  const applyRecovery = async () => {
-    const ok = await recovery.applyRecovery();
-    if (ok) {
-      toast.success("Recovery protocol saved. Keep the next day intentionally small.");
-      await roadmap.load(roadmap.roadmap?.id);
-    } else {
-      toast.error("Recovery protocol could not be saved.");
-    }
-  };
-
+  const applyRecovery = async () => { const ok = await recovery.applyRecovery(); if (ok) { toast.success("Recovery protocol saved. Keep the next day intentionally small."); await roadmap.load(roadmap.roadmap?.id); } else toast.error("Recovery protocol could not be saved."); };
   const ambient = <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#050812]"><div className="absolute left-[4%] top-[5%] h-72 w-72 rounded-full bg-cyan-300/[.045] blur-3xl" /><div className="absolute right-[6%] top-[18%] h-80 w-80 rounded-full bg-violet-400/[.04] blur-3xl" /></div>;
 
   if (roadmap.loading) return <main className="relative min-h-screen overflow-hidden bg-[#050812] px-4 py-16 text-center text-slate-300">{ambient}<div className="mx-auto max-w-sm rounded-[2rem] border border-cyan-300/10 bg-[#07101d]/92 p-8 shadow-[0_30px_100px_-55px_rgba(34,211,238,.4)] backdrop-blur-xl"><div className="mx-auto h-12 w-12 animate-pulse rounded-2xl bg-gradient-to-br from-cyan-300/50 via-sky-400/35 to-violet-400/35" /><p className="mt-5 text-xs font-black uppercase tracking-[.18em]">Loading your roadmaps</p><p className="mt-2 text-sm text-slate-500">Restoring your saved plans and progress.</p></div></main>;
@@ -189,15 +92,13 @@ function RoadmapPage() {
 
   return <main className="relative min-h-screen overflow-hidden bg-[#050812] px-4 pb-24 pt-4 text-slate-100 sm:px-6 lg:px-8">{ambient}<div className="relative z-10 mx-auto max-w-7xl space-y-5 sm:space-y-7"><section className="rounded-[2rem] border border-white/10 bg-[#07101d]/92 p-5 shadow-[0_24px_80px_-55px_rgba(34,211,238,.25)] backdrop-blur-xl sm:p-7"><div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"><div className="min-w-0"><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[.18em] text-cyan-200"><Target className="h-3.5 w-3.5" /> Roadmap command center</div><h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">{currentTitle}</h1><div className="mt-4 flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[.12em]"><span className="rounded-full border border-cyan-300/15 bg-cyan-300/[.05] px-3 py-1.5 text-cyan-100">{roadmap.roadmap.category || "goal"}</span><span className="rounded-full border border-white/10 bg-white/[.03] px-3 py-1.5 text-slate-500">Day {roadmap.todayIndex} of {roadmap.roadmap.duration_days}</span><span className="rounded-full border border-white/10 bg-white/[.03] px-3 py-1.5 text-slate-500">{daysLeft} days left</span></div></div><div className="flex flex-wrap gap-2"><div className="rounded-2xl border border-white/10 bg-white/[.03] px-4 py-3"><div className="text-[10px] font-black uppercase tracking-[.14em] text-slate-500">Overall</div><div className="mt-1 text-xl font-black">{overallProgress}%</div></div><button type="button" onClick={() => setEditOpen(true)} className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[.03] px-4 py-3 text-xs font-black text-slate-200 transition hover:bg-white/[.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200"><Pencil className="h-4 w-4" /> Edit</button></div></div>
 
-  <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-black/10 p-4"><div className="mb-3 flex items-center justify-between gap-3"><div><div className="text-[10px] font-black uppercase tracking-[.16em] text-slate-500">My roadmaps</div><div className="mt-1 text-xs text-slate-600">Choose a goal to continue.</div></div><div className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[.12em] text-slate-500">{roadmap.roadmaps.length}/4</div></div><div className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-none">{roadmap.roadmaps.map((item, index) => <button key={item.id} type="button" title={displayTitle(item.title, item.goal)} onClick={() => void roadmap.selectRoadmap(item.id)} className={`min-w-[180px] max-w-[230px] flex-1 snap-start rounded-2xl border px-3.5 py-3 text-left transition ${item.id === roadmap.roadmap?.id ? "border-cyan-300/30 bg-cyan-300/[.08] shadow-[0_12px_35px_-25px_rgba(34,211,238,.8)]" : "border-white/10 bg-white/[.02] hover:border-white/15 hover:bg-white/[.05]"}`}><div className="flex items-center justify-between gap-2"><span className="text-[9px] font-black uppercase tracking-[.14em] text-slate-600">{index + 1}</span>{item.id === roadmap.roadmap?.id && <span className="h-1.5 w-1.5 rounded-full bg-cyan-200" />}</div><div className="mt-2 line-clamp-2 text-sm font-black leading-5 text-slate-200">{cleanRoadmapName(item.title, item.goal)}</div><div className="mt-1 text-[10px] font-semibold uppercase tracking-[.12em] text-slate-600">{item.category || "goal"}</div></button>)}<button type="button" disabled={roadmap.roadmaps.length >= 4} onClick={() => { setQuestionsClear: undefined; setShowOnboarding(false); roadmap.setAnswers({}); setCategory("skill_learning"); setShowOnboarding(true); }} className="min-w-[150px] rounded-2xl border border-dashed border-white/10 bg-white/[.01] px-3.5 py-3 text-left text-xs font-black text-slate-500 transition hover:border-cyan-300/20 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40"><Plus className="mb-2 h-4 w-4" /> Add roadmap</button></div></div>
+  <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-black/10 p-4"><div className="mb-3 flex items-center justify-between gap-3"><div><div className="text-[10px] font-black uppercase tracking-[.16em] text-slate-500">My roadmaps</div><div className="mt-1 text-xs text-slate-600">Choose a goal to continue.</div></div><div className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[.12em] text-slate-500">{roadmap.roadmaps.length}/4</div></div><div className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-none">{roadmap.roadmaps.map((item, index) => <button key={item.id} type="button" title={displayTitle(item.title, item.goal)} onClick={() => void roadmap.selectRoadmap(item.id)} className={`min-w-[180px] max-w-[230px] flex-1 snap-start rounded-2xl border px-3.5 py-3 text-left transition ${item.id === roadmap.roadmap?.id ? "border-cyan-300/30 bg-cyan-300/[.08] shadow-[0_12px_35px_-25px_rgba(34,211,238,.8)]" : "border-white/10 bg-white/[.02] hover:border-white/15 hover:bg-white/[.05]"}`}><div className="flex items-center justify-between gap-2"><span className="text-[9px] font-black uppercase tracking-[.14em] text-slate-600">{index + 1}</span>{item.id === roadmap.roadmap?.id && <span className="h-1.5 w-1.5 rounded-full bg-cyan-200" />}</div><div className="mt-2 line-clamp-2 text-sm font-black leading-5 text-slate-200">{cleanRoadmapName(item.title, item.goal)}</div><div className="mt-1 text-[10px] font-semibold uppercase tracking-[.12em] text-slate-600">{item.category || "goal"}</div></button>)}<button type="button" disabled={roadmap.roadmaps.length >= 4} onClick={() => { roadmap.resetIntake(); roadmap.setAnswers({}); setCategory("skill_learning"); setShowOnboarding(true); }} className="min-w-[150px] rounded-2xl border border-dashed border-white/10 bg-white/[.01] px-3.5 py-3 text-left text-xs font-black text-slate-500 transition hover:border-cyan-300/20 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40"><Plus className="mb-2 h-4 w-4" /> Add roadmap</button></div></div>
   </section>
-
   <DailyFocusCard tasks={roadmap.todayTasks} todayIndex={roadmap.todayIndex} todayPercent={todayPercent} nextTask={nextTask} onToggle={roadmap.toggleTask} />
   <RoadmapVisualizer milestones={roadmap.milestones} todayIndex={roadmap.todayIndex} onToggleTask={roadmap.toggleTask} />
   {adaptive.recommendation && <AdaptivePlanCard recommendation={adaptive.recommendation} latest={adaptive.latest} saving={adaptive.saving} onSave={adaptive.saveInsight} />}
   {recovery.recommendation && <RecoveryModeCard recommendation={recovery.recommendation} onApply={applyRecovery} applying={recovery.saving} />}
   <div className="flex flex-wrap gap-3"><button type="button" onClick={() => setNightlyOpen(true)} className="rounded-2xl border border-white/10 bg-white/[.03] px-4 py-3 text-xs font-black">Nightly review</button><button type="button" onClick={() => setEditOpen(true)} className="rounded-2xl border border-white/10 bg-white/[.03] px-4 py-3 text-xs font-black">Edit roadmap</button></div>
-
   <RoadmapEditDialog open={editOpen} roadmap={roadmap.roadmap} onOpenChange={setEditOpen} onSave={saveEdit} onSmartChange={smartChange} onDelete={deleteCurrentRoadmap} saving={savingEdit || askingAI} deleting={deleting} />
   <NightlyReviewModal open={nightlyOpen} onOpenChange={setNightlyOpen} onSubmit={handleReview} submitting={reviewing} />
   </div></main>;
