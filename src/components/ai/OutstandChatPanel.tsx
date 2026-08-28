@@ -9,7 +9,7 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAppState } from "@/hooks/use-app-state";
-import { checkAiHealth, formatAiError, readAiResponseError } from "@/lib/ai-assistant";
+import { checkAiHealth, formatAiError } from "@/lib/ai-assistant";
 import { Button } from "@/components/ui/button";
 import { DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
@@ -53,7 +53,16 @@ export function OutstandChatPanel({ initialMessages, context, initialPrompt = ""
 
   const { messages, status, sendMessage, stop, error } = useChat({
     id: "outstand-assistant-production",
-    transport: new DefaultChatTransport({ api: "/api/chat", credentials: "same-origin" }),
+    transport: new DefaultChatTransport({
+      api: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/outstand-ai`,
+      credentials: "omit",
+      fetch: async (input, init) => {
+        const { data } = await supabase.auth.getSession();
+        const headers = new Headers(init?.headers);
+        if (data.session?.access_token) headers.set("Authorization", `Bearer ${data.session.access_token}`);
+        return fetch(input, { ...init, headers });
+      },
+    }),
     onError: (err) => { const message = formatAiError(err); setHealthy(false); setHealthMessage(message); toast.error(message); },
   });
   const displayedMessages = messages.length > 0 ? messages : initialMessages;
@@ -72,8 +81,11 @@ export function OutstandChatPanel({ initialMessages, context, initialPrompt = ""
   const clear = async () => {
     const { data, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !data.session?.access_token) { toast.error(sessionError?.message || "Please sign in again."); return; }
-    try { const response = await fetch("/api/chat", { method: "DELETE", headers: { Authorization: `Bearer ${data.session.access_token}` } }); if (!response.ok) throw new Error(await readAiResponseError(response)); onClear(); toast.success("AI memory cleared"); }
-    catch (err) { toast.error(formatAiError(err)); }
+    try {
+      const { error: clearError } = await supabase.functions.invoke("outstand-ai", { method: "DELETE", headers: { Authorization: `Bearer ${data.session.access_token}` } });
+      if (clearError) throw clearError;
+      onClear(); toast.success("AI memory cleared");
+    } catch (err) { toast.error(formatAiError(err)); }
   };
   const copyResponse = async (messageId: string, value: string) => {
     if (!value) return; setCopyingId(messageId);
