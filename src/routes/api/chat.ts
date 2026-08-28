@@ -4,6 +4,7 @@ import { consumeStream, convertToModelMessages, createIdGenerator, stepCountIs, 
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createGroq } from "@ai-sdk/groq";
 import { z } from "zod";
+import { classifyIntent, intentGuidance } from "@/lib/ai-intent";
 import { createProductivityTools } from "../../../api/ai-productivity-tools";
 
 const RequestSchema = z.object({ messages: z.array(z.unknown()).min(1).max(40), appContext: z.unknown().optional() });
@@ -16,7 +17,7 @@ type ProviderChoice = { name: "groq" | "gemini"; model: ReturnType<ReturnType<ty
 function json(data: unknown, status = 200, headers: HeadersInit = {}) { return new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers } }); }
 function env(...names: string[]) { return names.map((name) => process.env[name]).find((value) => typeof value === "string" && value.trim().length > 0)?.trim(); }
 function textFromMessage(message: z.infer<typeof MessageSchema>) { if (typeof message.content === "string") return message.content; if (Array.isArray(message.content)) return message.content.map((part) => part.text).join(""); return (message.parts ?? []).map((part) => part.text).join(""); }
-function systemPrompt(appContext: unknown) {
+function systemPrompt(appContext: unknown, intentText: string) {
   const ctx = appContext && typeof appContext === "object" ? appContext as Record<string, unknown> : {};
   const name = typeof ctx.name === "string" ? ctx.name : "friend";
   const xp = typeof ctx.xp === "number" ? ctx.xp : 0;
@@ -45,8 +46,12 @@ TOOLS
 - change_roadmap: safely modify an existing roadmap using the existing roadmap editor.
 - set_reminder: create a recurring reminder.
 
+REQUEST CLASSIFICATION
+${intentText}
+
 ACTION POLICY
 - You are an operator, not a chatbot-only advisor.
+- Use the classified intent as routing guidance, then use tools to execute the request safely.
 - When a user explicitly asks OUTSTAND to perform an action and a tool supports it, call the tool.
 - Do not tell the user how to do an available action manually.
 - Never invent ids. Get ids from get_today, get_progress, or current context.
@@ -55,18 +60,10 @@ ACTION POLICY
 - Only complete or undo a habit when the user explicitly asks.
 - Only change or create a roadmap when the user explicitly asks.
 - Creating a roadmap requires enough information. If the generator reports missing information, ask the returned question rather than guessing.
-- Completing a task means setting its progress to completed. "I finished it" counts as an explicit completion request when clearly referring to the named task.
-- "Undo", "uncomplete", or "mark as not done" means reopening a completed task only when clearly requested.
-- If a requested operation is not yet supported by tools, do not pretend it happened. State the limitation briefly.
+- Completing a task means setting its progress to completed when the user clearly refers to an existing task.
+- Reopening a task is consequential. Do it only when clearly requested.
 - For combined requests, execute the necessary tools in sequence rather than answering only one part.
 - Never claim a mutation succeeded unless the tool returned success.
-
-PLANNING
-- For "what should I do now/today" use get_today first when current state matters.
-- For progress or setback questions use get_progress.
-- For a new roadmap, create it with create_roadmap after collecting only materially necessary information.
-- For a roadmap adjustment, use change_roadmap with the user's exact request and current roadmap id.
-- For focus plans, use current roadmap state and make the next concrete action obvious. Keep the plan compact.
 
 RESPONSE STYLE
 - Concise, decisive, calm, friendly.
@@ -102,8 +99,12 @@ export const Route = createFileRoute("/api/chat")({ server: { handlers: {
       const rawBody = await request.json().catch(() => null); const parsed = RequestSchema.safeParse(rawBody); if (!parsed.success) return json({ error: "Invalid AI request payload.", code: "INVALID_PAYLOAD" }, 400);
       const uiMessages: UIMessage[] = parsed.data.messages.flatMap((raw) => { const parsedMessage = MessageSchema.safeParse(raw); if (!parsedMessage.success) return []; const text = textFromMessage(parsedMessage.data).trim(); if (!text) return []; return [{ id: parsedMessage.data.id ?? crypto.randomUUID(), role: parsedMessage.data.role, parts: [{ type: "text", text }] } as UIMessage]; });
       if (!uiMessages.some((message) => message.role === "user")) return json({ error: "At least one user message is required.", code: "NO_USER_MESSAGE" }, 400);
+      const latestUser = [...uiMessages].reverse().find((message) => message.role === "user");
+      const latestText = latestUser ? textFromMessage(latestUser).trim() : "";
+      const intent = classifyIntent(latestText);
+      const intentText = `intent=${intent.intent}; confidence=${intent.confidence.toFixed(2)}; needsFreshState=${intent.needsFreshState}; requiresConfirmation=${intent.requiresConfirmation}; target=${intent.target || "none"}; guidance=${intentGuidance(intent)}`;
       const provider = getProvider(); const modelMessages = uiMessages.slice(-12);
-      const result = streamText({ model: provider.model, system: systemPrompt(parsed.data.appContext), messages: await convertToModelMessages(modelMessages), tools: createProductivityTools(auth.client as any, auth.userId, auth.token), stopWhen: stepCountIs(6), maxOutputTokens: 700, maxRetries: 0, abortSignal: request.signal, onError: (error) => { if (isQuotaError(error)) console.warn(`[AI] ${provider.name} quota/rate limit reached.`); else console.error(`[AI] ${provider.name} stream error:`, error); } });
+      const result = streamText({ model: provider.model, system: systemPrompt(parsed.data.appContext, intentText), messages: await convertToModelMessages(modelMessages), tools: createProductivityTools(auth.client as any, auth.userId, auth.token), stopWhen: stepCountIs(6), maxOutputTokens: 700, maxRetries: 0, abortSignal: request.signal, onError: (error) => { if (isQuotaError(error)) console.warn(`[AI] ${provider.name} quota/rate limit reached.`); else console.error(`[AI] ${provider.name} stream error:`, error); } });
       return result.toUIMessageStreamResponse({
         originalMessages: modelMessages,
         generateMessageId: createIdGenerator({ prefix: "msg", size: 16 }),
@@ -113,8 +114,8 @@ export const Route = createFileRoute("/api/chat")({ server: { handlers: {
             const { data: conversation, error: lookupError } = await auth.client.from("chat_conversations").select("id").eq("user_id", auth.userId).order("updated_at", { ascending: false }).limit(1).maybeSingle(); if (lookupError) throw lookupError;
             let conversationId = conversation?.id;
             if (!conversationId) { const created = await auth.client.from("chat_conversations").insert({ user_id: auth.userId }).select("id").single(); if (created.error || !created.data) throw created.error ?? new Error("Conversation creation failed"); conversationId = created.data.id; }
-            const latestUser = [...uiMessages].reverse().find((message) => message.role === "user"); const latestText = latestUser?.parts.filter((part) => part.type === "text").map((part) => part.text).join("").trim() ?? "";
-            if (latestText) { const duplicate = await auth.client.from("chat_messages").select("id").eq("conversation_id", conversationId).eq("user_id", auth.userId).eq("role", "user").eq("content", latestText).limit(1).maybeSingle(); if (duplicate.error) throw duplicate.error; if (!duplicate.data) { const inserted = await auth.client.from("chat_messages").insert({ conversation_id: conversationId, user_id: auth.userId, role: "user", content: latestText }); if (inserted.error) throw inserted.error; } }
+            const latestUserMessage = [...uiMessages].reverse().find((message) => message.role === "user"); const latestUserText = latestUserMessage?.parts.filter((part) => part.type === "text").map((part) => part.text).join("").trim() ?? "";
+            if (latestUserText) { const duplicate = await auth.client.from("chat_messages").select("id").eq("conversation_id", conversationId).eq("user_id", auth.userId).eq("role", "user").eq("content", latestUserText).limit(1).maybeSingle(); if (duplicate.error) throw duplicate.error; if (!duplicate.data) { const inserted = await auth.client.from("chat_messages").insert({ conversation_id: conversationId, user_id: auth.userId, role: "user", content: latestUserText }); if (inserted.error) throw inserted.error; } }
             const assistantText = responseMessage.parts.filter((part) => part.type === "text").map((part) => part.text).join("").trim(); if (assistantText) { const saved = await auth.client.from("chat_messages").insert({ conversation_id: conversationId, user_id: auth.userId, role: "assistant", content: assistantText }); if (saved.error) throw saved.error; }
           } catch (error) { console.error("AI assistant persistence failed:", error); }
         },
