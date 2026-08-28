@@ -21,8 +21,9 @@ serve(async (req) => {
     if (roadmapError) throw roadmapError;
     if (!roadmap) return Response.json({ error: "Roadmap not found." }, { status: 404, headers: corsHeaders });
 
-    const { error: deleteError } = await supabase.from("roadmaps").delete().eq("id", roadmapId).eq("user_id", user.id);
+    const { data: deleted, error: deleteError } = await supabase.rpc("delete_roadmap", { p_roadmap_id: roadmapId });
     if (deleteError) throw deleteError;
+    if (deleted !== true) throw new Error("Roadmap deletion could not be completed.");
     const { data: verify, error: verifyError } = await supabase.from("roadmaps").select("id").eq("id", roadmapId).eq("user_id", user.id).maybeSingle();
     if (verifyError) throw verifyError;
     if (verify) throw new Error("Roadmap deletion could not be verified.");
