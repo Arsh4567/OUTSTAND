@@ -30,7 +30,6 @@ export function createProductivityTools(client: Db, userId: string, accessToken:
         return { memories: filtered };
       },
     }),
-
     save_memory: tool({
       description: "Save one explicit, useful, non-sensitive long-term fact that can improve future OUTSTAND assistance. Prefer stable preferences, constraints, goals, strategies, or recurring patterns. Never store secrets, passwords, authentication data, highly sensitive personal information, or temporary chat details. Use a stable memoryKey so the fact can be updated later.",
       inputSchema: jsonSchema<{ memoryType: "preference" | "goal" | "constraint" | "strategy" | "pattern"; memoryKey: string; memoryValue: string; confidence?: number }>({ type: "object", properties: { memoryType: { type: "string", enum: ["preference", "goal", "constraint", "strategy", "pattern"] }, memoryKey: { type: "string", minLength: 3, maxLength: 80 }, memoryValue: { type: "string", minLength: 3, maxLength: 500 }, confidence: { type: "number", minimum: 0, maximum: 1 } }, required: ["memoryType", "memoryKey", "memoryValue"], additionalProperties: false }),
@@ -46,7 +45,6 @@ export function createProductivityTools(client: Db, userId: string, accessToken:
         return { saved: true, updated: Boolean(existing), memory: data };
       },
     }),
-
     delete_memory: tool({
       description: "Delete one saved AI memory when the user explicitly asks to forget or remove it. Never delete memory merely because it is inconvenient.",
       inputSchema: jsonSchema<{ memoryKey: string }>({ type: "object", properties: { memoryKey: { type: "string" } }, required: ["memoryKey"], additionalProperties: false }),
@@ -56,7 +54,6 @@ export function createProductivityTools(client: Db, userId: string, accessToken:
         return { deleted: Boolean(data), memoryKey: memoryKey.trim() };
       },
     }),
-
     get_today: tool({
       description: "Read the user's authoritative current OUTSTAND state: active roadmap, today's tasks, task progress, habits, and completion counts. Use before current-state questions or mutations when fresh data matters.",
       inputSchema: jsonSchema({ type: "object", properties: {}, additionalProperties: false }),
@@ -84,7 +81,6 @@ export function createProductivityTools(client: Db, userId: string, accessToken:
         return { date: today(), roadmap: roadmap ? { ...roadmap, currentDay: dayNumber(roadmap.start_date) } : null, todayTasks: tasks, taskProgressCount: `${tasks.filter((task: any) => task.progress === "completed").length}/${tasks.length}`, habits: habitList, habitProgressCount: `${habitList.filter((habit: any) => Array.isArray(habit?.history) && habit.history.includes(today())).length}/${habitList.length}` };
       },
     }),
-
     get_progress: tool({
       description: "Read authoritative roadmap and habit progress for progress, performance, setback, and adaptation questions.",
       inputSchema: jsonSchema<{ roadmapId?: string }>({ type: "object", properties: { roadmapId: { type: "string" } }, additionalProperties: false }),
@@ -102,7 +98,6 @@ export function createProductivityTools(client: Db, userId: string, accessToken:
         return { roadmap: roadmap ? { id: roadmap.id, title: roadmap.title, currentDay: dayNumber(roadmap.start_date), durationDays: roadmap.duration_days, status: roadmap.status } : null, tasks: { total: progress.length, completed: progress.filter((row: any) => row.status === "completed").length, inProgress: progress.filter((row: any) => row.status === "in_progress").length, skipped: progress.filter((row: any) => row.status === "skipped").length }, recentDays: logs || [], habits: Array.isArray(state?.habits) ? state.habits.map((habit: any) => ({ id: habit.id, name: habit.name, completedToday: Array.isArray(habit.history) && habit.history.includes(today()), streak: Array.isArray(habit.history) ? habit.history.length : 0 })) : [], xp: typeof state?.xp === "number" ? state.xp : null };
       },
     }),
-
     mark_habit: tool({
       description: "Mark one of the user's existing habits done or undone for today. Never invent a habit.",
       inputSchema: jsonSchema<{ habitId: string; completed: boolean }>({ type: "object", properties: { habitId: { type: "string" }, completed: { type: "boolean" } }, required: ["habitId", "completed"], additionalProperties: false }),
@@ -113,12 +108,11 @@ export function createProductivityTools(client: Db, userId: string, accessToken:
         const next = current.map((habit: any, i: number) => i === index ? { ...habit, history: nextHistory } : habit);
         const { error: updateError } = await client.from("user_productivity_state").update({ habits: next, updated_at: new Date().toISOString() }).eq("user_id", userId); if (updateError) throw updateError;
         const { data: verify, error: verifyError } = await client.from("user_productivity_state").select("habits").eq("user_id", userId).maybeSingle(); if (verifyError) throw verifyError;
-        const verified = Array.isArray(verify?.habits) && Array.isArray(verify.habits[index]?.history) && verify.habits[index].history.includes(today()) === completed;
+        const verified = Array.isArray(verify?.habits) && Array.isArray(verify?.habits[index]?.history) && verify.habits[index].history.includes(today()) === completed;
         if (!verified) throw new Error("Habit update could not be verified.");
         return { changed: true, habitId, completed, date: today(), habitName: current[index].name, verified: true };
       },
     }),
-
     set_task_progress: tool({
       description: "Update an existing roadmap task to pending, in_progress, completed, or skipped. Never invent a task. Never reopen a completed task unless the user explicitly asks.",
       inputSchema: jsonSchema<{ taskId: string; status: "pending" | "in_progress" | "completed" | "skipped" }>({ type: "object", properties: { taskId: { type: "string" }, status: { type: "string", enum: ["pending", "in_progress", "completed", "skipped"] } }, required: ["taskId", "status"], additionalProperties: false }),
@@ -133,19 +127,24 @@ export function createProductivityTools(client: Db, userId: string, accessToken:
         return { changed: true, taskId, title: task.title, status, verified: true };
       },
     }),
-
     create_roadmap: tool({
-      description: "Create and persist a real OUTSTAND roadmap when the user explicitly asks for one and enough planning information is available.",
-      inputSchema: jsonSchema<{ category: string; goal: string; durationDays?: number; answers?: Record<string, unknown> }>({ type: "object", properties: { category: { type: "string" }, goal: { type: "string" }, durationDays: { type: "integer", minimum: 7, maximum: 180 }, answers: { type: "object", additionalProperties: true } }, required: ["category", "goal"], additionalProperties: false }),
+      description: "Create a real roadmap. Required arguments: category and goal. If either is missing from the user's request, do not call this tool; ask a brief follow-up question or use the roadmap questionnaire first. Never invent category or goal.",
+      inputSchema: jsonSchema<{ category: string; goal: string; durationDays?: number; answers?: Record<string, unknown> }>({ type: "object", properties: { category: { type: "string", minLength: 2, description: "Roadmap category, such as academics, exam_preparation, chess, skill_learning, fitness, business, or productivity." }, goal: { type: "string", minLength: 5, description: "The concrete outcome the user wants to achieve." }, durationDays: { type: "integer", minimum: 7, maximum: 180, description: "Optional roadmap duration in days." }, answers: { type: "object", additionalProperties: true, description: "Optional supporting intake answers." } }, required: ["category", "goal"], additionalProperties: false }),
       execute: async ({ category, goal, durationDays, answers }) => {
-        const normalizedAnswers = { ...(answers || {}), goal, durationDays: durationDays || (answers as any)?.durationDays || 30 }; const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
-        const response = await fetch(`${base}/api/roadmap`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ mode: "plan", category, answers: normalizedAnswers, context: { source: "ai_action" } }) });
-        const result = await response.json(); if (!response.ok) throw new Error(result.error || "Could not create the roadmap."); if (result.needsMoreInfo) return { created: false, needsMoreInfo: true, questions: result.questions || [], message: "More information is required before safely creating the roadmap." }; if (!result.roadmapId) throw new Error("The roadmap generator did not return a saved roadmap id.");
-        const { data: verify, error: verifyError } = await client.from("roadmaps").select("id,title,duration_days,status").eq("id", result.roadmapId).eq("user_id", userId).maybeSingle(); if (verifyError) throw verifyError; if (!verify) throw new Error("Created roadmap could not be verified.");
+        const cleanCategory = category.trim(); const cleanGoal = goal.trim(); if (cleanCategory.length < 2) throw new Error("Roadmap category is required."); if (cleanGoal.length < 5) throw new Error("Roadmap goal is required.");
+        const normalizedAnswers = { ...(answers || {}), goal: cleanGoal, durationDays: Math.max(7, Math.min(180, Number(durationDays) || Number((answers as any)?.durationDays) || 30)) };
+        const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
+        const response = await fetch(`${base}/api/roadmap`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ mode: "plan", category: cleanCategory, answers: normalizedAnswers, context: { source: "ai_action" } }) });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Could not create the roadmap.");
+        if (result.needsMoreInfo) return { created: false, needsMoreInfo: true, questions: result.questions || [], message: "More information is required before safely creating the roadmap." };
+        if (!result.roadmapId) throw new Error("The roadmap generator did not return a saved roadmap id.");
+        const { data: verify, error: verifyError } = await client.from("roadmaps").select("id,title,duration_days,status").eq("id", result.roadmapId).eq("user_id", userId).maybeSingle();
+        if (verifyError) throw verifyError;
+        if (!verify) throw new Error("Created roadmap could not be verified.");
         return { created: true, roadmapId: verify.id, message: "Roadmap created successfully.", verified: true, plan: result.plan ? { title: result.plan.title, durationDays: result.plan.durationDays, today: result.plan.today } : undefined };
       },
     }),
-
     change_roadmap: tool({
       description: "Apply a safe AI-directed change to an existing roadmap when the user explicitly asks to move, retime, rename, simplify, or otherwise change it.",
       inputSchema: jsonSchema<{ roadmapId: string; request: string }>({ type: "object", properties: { roadmapId: { type: "string" }, request: { type: "string" } }, required: ["roadmapId", "request"], additionalProperties: false }),
@@ -156,10 +155,9 @@ export function createProductivityTools(client: Db, userId: string, accessToken:
         return { ...result, verified: true, verifiedTasks: verify || [] };
       },
     }),
-
     set_reminder: tool({
       description: "Create a recurring OUTSTAND reminder when the user explicitly asks for a reminder.",
-      inputSchema: jsonSchema<{ title: string; body: string; time: string; category: "habit" | "goal" | "motivation" | "update" | "system"; daysOfWeek?: number[] }>({ type: "object", properties: { title: { type: "string" }, body: { type: "string" }, time: { type: "string" }, category: { type: "string", enum: ["habit", "goal", "motivation", "update", "system"] }, daysOfWeek: { type: "array", items: { type: "integer", minimum: 0, maximum: 6 } } }, required: ["title", "body", "time", "category"], additionalProperties: false }),
+      inputSchema: jsonSchema<{ title: string; body: string; time: string; category: "habit" | "goal" | "motivation" | "update" | "system"; daysOfWeek?: number[] }>({ type: "object", properties: { title: { type: "string" }, body: { type: "string" }, time: { type: "string" }, category: { type: "string", enum: ["habit", "goal", "motivation", "update", "system"] }, daysOfWeek: { type: "array", items: { type: "integer", minimum: 0, maximum: 6 } } }, required: ["title", "body", "time" ,"category"], additionalProperties: false }),
       execute: async ({ title, body, time, category, daysOfWeek }) => {
         if (!hhmm(time)) throw new Error("Reminder time must use HH:MM format.");
         const { data: prefs } = await client.from("notification_preferences").select("timezone").eq("user_id", userId).maybeSingle(); const timezone = prefs?.timezone || "UTC";
