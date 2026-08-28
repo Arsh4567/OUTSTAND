@@ -1,4 +1,3 @@
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { createGoogleGenerativeAI } from "https://esm.sh/@ai-sdk/google@2";
 import { createGroq } from "https://esm.sh/@ai-sdk/groq@2";
@@ -57,7 +56,6 @@ async function listRoadmaps(client: any, userId: string) {
 async function roadmapAction(auth: any, action: string, body: any) {
   const client = auth.client;
   if (action === "list_roadmaps") return { roadmaps: await listRoadmaps(client, auth.userId) };
-
   if (action === "roadmap_questions") {
     const category = typeof body.category === "string" ? body.category : "skill_learning";
     const presets: Record<string, any[]> = {
@@ -85,7 +83,6 @@ async function roadmapAction(auth: any, action: string, body: any) {
       { id: "time", question: "How much time can you commit most days?", type: "number", required: true },
     ] };
   }
-
   if (action === "delete_roadmap") {
     const roadmapId = typeof body.roadmapId === "string" ? body.roadmapId : "";
     if (!roadmapId) return { error: "roadmapId is required." };
@@ -97,7 +94,6 @@ async function roadmapAction(auth: any, action: string, body: any) {
     if (deleted !== true) throw new Error("Roadmap deletion could not be completed.");
     return { deleted: true, roadmapId, title: roadmap.title, verified: true };
   }
-
   if (action === "generate_roadmap") {
     const category = typeof body.category === "string" ? body.category : "skill_learning";
     const answers = body.answers && typeof body.answers === "object" ? body.answers : {};
@@ -106,11 +102,14 @@ async function roadmapAction(auth: any, action: string, body: any) {
     const { count, error: countError } = await client.from("roadmaps").select("id", { count: "exact", head: true }).eq("user_id", auth.userId).in("status", ["active", "paused"]);
     if (countError) throw countError;
     if ((count ?? 0) >= 4) return { error: "You can have a maximum of 4 active roadmaps." };
-    const { data, error } = await client.from("roadmaps").insert({ user_id: auth.userId, title: goal.slice(0, 60) || "My roadmap", goal, start_date: today(), target_date: null, duration_days: Number(answers.durationDays) || 30, status: "active", category }).select("id").single();
+    const durationDays = Math.max(7, Math.min(180, Number(answers.durationDays) || 30));
+    const title = typeof answers.title === "string" && answers.title.trim() ? answers.title.trim().slice(0, 60) : goal.slice(0, 60) || "My roadmap";
+    const startDate = typeof answers.start_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(answers.start_date) ? answers.start_date : today();
+    const targetDate = typeof answers.deadline === "string" && /^\d{4}-\d{2}-\d{2}$/.test(answers.deadline) ? answers.deadline : null;
+    const { data, error } = await client.from("roadmaps").insert({ user_id: auth.userId, title, goal, start_date: startDate, target_date: targetDate, duration_days: durationDays, status: "active", category }).select("id,title,goal,start_date,target_date,duration_days,status,category,created_at,user_id").single();
     if (error) throw error;
-    return { roadmapId: data.id, created: true };
+    return { roadmapId: data.id, roadmap: data, created: true, verified: true };
   }
-
   throw new Error(`Unsupported roadmap action: ${action}`);
 }
 
@@ -118,7 +117,6 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const auth = await authenticate(req);
   if ("error" in auth) return auth.error;
-
   try {
     if (req.method === "GET") {
       try { const provider = getModel(); return json({ ok: true, service: "outstand-ai", status: "ready", provider: provider.name }); }
@@ -130,18 +128,16 @@ serve(async (req) => {
       return new Response(null, { status: 204, headers: corsHeaders });
     }
     if (req.method !== "POST") return json({ error: "Method not allowed.", code: "METHOD_NOT_ALLOWED" }, 405);
-
     const body = await req.json().catch(() => null);
-    // Roadmap mutations use the hook's explicit `action` field. Older callers may
-    // put the action inside appContext; support both shapes so the API stays compatible.
     const internalAction = typeof body?.action === "string" ? body.action : (typeof body?.appContext?.internalAction === "string" ? body.appContext.internalAction : null);
-    if (internalAction) return json(await roadmapAction(auth, internalAction, body?.actionPayload || body?.appContext?.actionPayload || body));
-
+    if (internalAction) {
+      const actionBody = body && typeof body === "object" ? { ...body, ...(body.actionPayload || {}), ...(body.appContext?.actionPayload || {}) } : {};
+      return json(await roadmapAction(auth, internalAction, actionBody));
+    }
     const messages = Array.isArray(body?.messages) ? body.messages : [];
     if (!messages.length) return json({ error: "At least one chat message is required.", code: "EMPTY_MESSAGES" }, 400);
     const uiMessages = messages.map((message: any) => ({ id: typeof message?.id === "string" ? message.id : crypto.randomUUID(), role: message?.role === "assistant" ? "assistant" : "user", parts: [{ type: "text", text: textFromMessage(message).trim() }] })).filter((message: any) => message.parts[0].text.length > 0);
     if (!uiMessages.some((message: any) => message.role === "user")) return json({ error: "A user message is required.", code: "NO_USER_MESSAGE" }, 400);
-
     const provider = getModel();
     const modelMessages = uiMessages.slice(-12);
     const result = streamText({ model: provider.model, system: buildSystemPrompt(body?.appContext), messages: await convertToModelMessages(modelMessages), tools: createProductivityTools(auth.client as any, auth.userId, auth.token), stopWhen: stepCountIs(5), maxOutputTokens: 700, maxRetries: 0, abortSignal: req.signal, onError: (error) => console.error("[outstand-ai] provider error", error) });
