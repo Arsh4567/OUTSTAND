@@ -9,7 +9,7 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAppState } from "@/hooks/use-app-state";
-import { checkAiHealth, formatAiError } from "@/lib/ai-assistant";
+import { formatAiError } from "@/lib/ai-assistant";
 import { Button } from "@/components/ui/button";
 import { DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Conversation, ConversationContent, ConversationScrollButton } from "@/components/ai-elements/conversation";
@@ -49,8 +49,9 @@ export function OutstandChatPanel({ initialMessages, context, initialPrompt = ""
     try {
       const { data, error } = await supabase.auth.getSession();
       if (error || !data.session?.access_token) { setHealthy(false); setHealthMessage(error?.message || "Sign in to use OUTSTAND AI."); return false; }
-      const result = await checkAiHealth();
-      setHealthy(result.ok); setHealthMessage(result.ok ? null : result.message); return result.ok;
+      const response = await fetch(aiEndpoint, { method: "GET", headers: { Authorization: `Bearer ${data.session.access_token}` }, credentials: "include" });
+      if (!response.ok) { setHealthy(false); setHealthMessage(await response.text()); return false; }
+      setHealthy(true); setHealthMessage(null); return true;
     } catch (error) {
       setHealthy(false); setHealthMessage(formatAiError(error)); return false;
     }
@@ -90,7 +91,7 @@ export function OutstandChatPanel({ initialMessages, context, initialPrompt = ""
     if (sessionError || !data.session?.access_token) { toast.error(sessionError?.message || "Please sign in again."); return; }
     try {
       const response = await fetch(aiEndpoint, { method: "DELETE", headers: { Authorization: `Bearer ${data.session.access_token}` }, credentials: "include" });
-      if (!response.ok) throw new Error(await response.text());
+      if (!response.ok) throw new Error((await response.text()) || "Could not clear AI memory.");
       onClear(); toast.success("AI memory cleared");
     } catch (err) { toast.error(formatAiError(err)); }
   };
