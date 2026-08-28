@@ -1,21 +1,7 @@
-import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getOwnedRoadmap, listOwnedRoadmaps, updateOwnedRoadmap, deleteOwnedRoadmap, createBasicRoadmap } from "../../../api/roadmap-service.ts";
 
-const today = () => new Date().toISOString().slice(0, 10);
-const activeStatuses = ["active", "paused"];
-
-async function getOwnedRoadmap(client: SupabaseClient, userId: string, roadmapId: string) {
-  const { data, error } = await client.from("roadmaps").select("id,title,goal,start_date,target_date,duration_days,status,category,created_at,user_id").eq("id", roadmapId).eq("user_id", userId).maybeSingle();
-  if (error) throw error;
-  if (!data) throw new Error("Roadmap not found.");
-  return data;
-}
-
-export async function handleRoadmapAction(client: SupabaseClient, userId: string, action: string, body: any) {
-  if (action === "list_roadmaps") {
-    const { data, error } = await client.from("roadmaps").select("id,title,goal,start_date,target_date,duration_days,status,category,created_at,user_id").eq("user_id", userId).in("status", activeStatuses).order("created_at", { ascending: false }).limit(4);
-    if (error) throw error;
-    return { roadmaps: data || [], verified: true };
-  }
+export async function handleRoadmapAction(client: any, userId: string, action: string, body: any) {
+  if (action === "list_roadmaps") return { roadmaps: await listOwnedRoadmaps(client, userId), verified: true };
 
   if (action === "roadmap_questions") {
     const category = typeof body.category === "string" ? body.category : "skill_learning";
@@ -48,45 +34,25 @@ export async function handleRoadmapAction(client: SupabaseClient, userId: string
   if (action === "update_roadmap") {
     const roadmapId = typeof body.roadmapId === "string" ? body.roadmapId : "";
     if (!roadmapId) throw new Error("roadmapId is required.");
-    const current = await getOwnedRoadmap(client, userId, roadmapId);
-    const title = typeof body.title === "string" ? body.title.trim().slice(0, 120) : current.title;
-    const goal = typeof body.goal === "string" ? body.goal.trim().slice(0, 2000) : current.goal;
-    if (title.length < 2) throw new Error("Roadmap title is too short.");
-    if (goal.length < 5) throw new Error("Roadmap goal is too short.");
-    const { error } = await client.from("roadmaps").update({ title, goal }).eq("id", roadmapId).eq("user_id", userId);
-    if (error) throw error;
-    const updated = await getOwnedRoadmap(client, userId, roadmapId);
-    return { updated: true, roadmapId, roadmap: updated, verified: true };
+    return await updateOwnedRoadmap(client, userId, roadmapId, { title: body.title, goal: body.goal });
   }
 
   if (action === "delete_roadmap") {
     const roadmapId = typeof body.roadmapId === "string" ? body.roadmapId : "";
     if (!roadmapId) throw new Error("roadmapId is required.");
-    const roadmap = await getOwnedRoadmap(client, userId, roadmapId);
-    const { data: deleted, error: deleteError } = await client.rpc("delete_roadmap", { p_roadmap_id: roadmapId });
-    if (deleteError) throw deleteError;
-    if (deleted !== true) throw new Error("Roadmap deletion could not be completed.");
-    const { data: remaining, error: verifyError } = await client.from("roadmaps").select("id").eq("id", roadmapId).eq("user_id", userId).maybeSingle();
-    if (verifyError) throw verifyError;
-    if (remaining) throw new Error("Roadmap deletion could not be verified.");
-    return { deleted: true, roadmapId, title: roadmap.title, verified: true };
+    return await deleteOwnedRoadmap(client, userId, roadmapId);
   }
 
   if (action === "generate_roadmap") {
     const category = typeof body.category === "string" ? body.category : "skill_learning";
     const answers = body.answers && typeof body.answers === "object" ? body.answers : {};
-    const goal = typeof answers.goal === "string" ? answers.goal.trim() : "";
-    if (!goal) return { needsMoreInfo: true, questions: [{ id: "goal", question: "What result are you aiming for?", type: "multiline", required: true }] };
-    const { count, error: countError } = await client.from("roadmaps").select("id", { count: "exact", head: true }).eq("user_id", userId).in("status", activeStatuses);
-    if (countError) throw countError;
-    if ((count ?? 0) >= 4) return { error: "You can have a maximum of 4 active roadmaps." };
-    const durationDays = Math.max(7, Math.min(180, Number(answers.durationDays) || 30));
-    const title = typeof answers.title === "string" && answers.title.trim() ? answers.title.trim().slice(0, 60) : goal.slice(0, 60) || "My roadmap";
-    const startDate = typeof answers.start_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(answers.start_date) ? answers.start_date : today();
-    const targetDate = typeof answers.deadline === "string" && /^\d{4}-\d{2}-\d{2}$/.test(answers.deadline) ? answers.deadline : null;
-    const { data, error } = await client.from("roadmaps").insert({ user_id: userId, title, goal, start_date: startDate, target_date: targetDate, duration_days: durationDays, status: "active", category }).select("id,title,goal,start_date,target_date,duration_days,status,category,created_at,user_id").single();
-    if (error) throw error;
-    return { roadmapId: data.id, roadmap: data, created: true, verified: true };
+    return await createBasicRoadmap(client, userId, category, answers);
+  }
+
+  if (action === "get_roadmap") {
+    const roadmapId = typeof body.roadmapId === "string" ? body.roadmapId : "";
+    if (!roadmapId) throw new Error("roadmapId is required.");
+    return { roadmap: await getOwnedRoadmap(client, userId, roadmapId), verified: true };
   }
 
   throw new Error(`Unsupported roadmap action: ${action}`);
