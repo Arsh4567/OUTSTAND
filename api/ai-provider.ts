@@ -2,17 +2,12 @@ const env = (...names: string[]) => names.map((name) => process.env[name]).find(
 
 export type AIProviderName = "groq" | "gemini";
 
-type ProviderResult = {
-  name: AIProviderName;
-  provider: any;
-};
+type ProviderResult = { name: AIProviderName; provider: any };
 
 export async function getAIProvider(preferred?: AIProviderName): Promise<ProviderResult> {
   const groqKey = env("GROQ_API_KEY");
   const geminiKey = env("GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY");
-  const order: AIProviderName[] = preferred
-    ? [preferred, preferred === "groq" ? "gemini" : "groq"]
-    : ["groq", "gemini"];
+  const order: AIProviderName[] = preferred ? [preferred, preferred === "groq" ? "gemini" : "groq"] : ["groq", "gemini"];
 
   for (const providerName of order) {
     if (providerName === "groq" && groqKey) {
@@ -24,10 +19,7 @@ export async function getAIProvider(preferred?: AIProviderName): Promise<Provide
             if (!init?.body || typeof init.body !== "string") return fetch(input, init);
             try {
               const body = JSON.parse(init.body);
-              if (body.model === "openai/gpt-oss-20b") {
-                body.reasoning_effort = body.reasoning_effort || "low";
-                body.service_tier = body.service_tier || "auto";
-              }
+              if (body.model === "openai/gpt-oss-20b") body.reasoning_effort = body.reasoning_effort || "low";
               return fetch(input, { ...init, body: JSON.stringify(body) });
             } catch {
               return fetch(input, init);
