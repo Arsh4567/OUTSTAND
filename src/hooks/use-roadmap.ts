@@ -80,6 +80,11 @@ export function useRoadmap() {
     setTasks([]);
   }, []);
 
+  const resetIntake = useCallback(() => {
+    setQuestions([]);
+    setAnswers({});
+  }, []);
+
   const invoke = useCallback(async <T = ActionResponse>(action: string, body: Record<string, unknown> = {}): Promise<T> => {
     const session = await getSessionOrThrow();
     const { data, error } = await supabase.functions.invoke("outstand-ai", {
@@ -263,6 +268,7 @@ export function useRoadmap() {
     selectRoadmap,
     generate,
     askQuestions,
+    resetIntake,
     updateRoadmap,
     smartChange,
     deleteRoadmap,
