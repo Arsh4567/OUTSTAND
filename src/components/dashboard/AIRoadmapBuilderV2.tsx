@@ -56,10 +56,26 @@ export function AIRoadmapBuilderV2({ habits, name, level, xp, streak, onClose, o
       } else {
         const nextPlan = data.plan as AIRoadmapPlan;
         if (!nextPlan?.title || !nextPlan?.durationDays || !Array.isArray(nextPlan.milestones)) throw new Error("The AI returned an incomplete roadmap. Please try building it again.");
-        const { error: deactivateError } = await supabase.from("ai_roadmaps").update({ is_active: false }).eq("user_id", session.user.id).eq("is_active", true);
-        if (deactivateError) throw new Error(`Could not update your saved roadmap: ${deactivateError.message}`);
-        const { error: saveError } = await supabase.from("ai_roadmaps").insert({ user_id: session.user.id, category, title: nextPlan.title, summary: nextPlan.summary, duration_days: nextPlan.durationDays, difficulty: nextPlan.difficulty, answers, plan: nextPlan, habits_snapshot: habits.map((h) => ({ id: h.id, name: h.name, emoji: h.emoji })), is_active: true });
-        if (saveError) throw new Error(`Could not save your roadmap: ${saveError.message}`);
+
+        const { data: roadmapId, error: saveError } = await supabase.rpc("create_canonical_roadmap_from_plan", {
+          p_category: category,
+          p_title: nextPlan.title,
+          p_goal: nextPlan.summary || nextPlan.title,
+          p_questionnaire: answers,
+          p_generation_metadata: {
+            source: "ai_roadmap_builder_v2",
+            difficulty: nextPlan.difficulty,
+            assumptions: nextPlan.assumptions,
+            metrics: nextPlan.metrics,
+            adaptationRule: nextPlan.adaptationRule,
+            habits: habits.map((h) => ({ id: h.id, name: h.name, emoji: h.emoji })),
+          },
+          p_duration_days: nextPlan.durationDays,
+          p_start_date: new Date().toISOString().slice(0, 10),
+          p_plan: nextPlan,
+        });
+        if (saveError || !roadmapId) throw new Error(`Could not save your roadmap: ${saveError?.message || "The roadmap was not created."}`);
+
         setPlan(nextPlan); setStep("plan"); onPlanCreated(nextPlan);
       }
     } catch (e) { setError(e instanceof Error ? e.message : "Something went wrong."); }
@@ -106,6 +122,8 @@ export function AIRoadmapBuilderV2({ habits, name, level, xp, streak, onClose, o
 }
 
 function QuestionField({ question, value, onChange }: { question: Question; value: string; onChange: (value: string) => void }) {
-  const common = "mt-2 w-full rounded-2xl border border-white/[0.08] bg-black/20 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-700 focus:border-cyan-300/25";
-  return <div className="block rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4"><span className="text-sm font-black text-white">{question.question}{question.required && <span className="ml-1 text-cyan-300">*</span>}</span>{question.type === "choice" ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{(question.options ?? []).map((option) => <button key={option} type="button" onClick={() => onChange(option)} className={`rounded-xl border px-3 py-2.5 text-left text-sm font-bold ${value === option ? "border-cyan-300/25 bg-cyan-300/[0.08] text-cyan-100" : "border-white/[0.07] text-slate-400 hover:text-white"}`}>{option}</button>)}</div> : question.type === "multiline" ? <textarea className={`${common} min-h-24 resize-y`} value={value} onChange={(e) => onChange(e.target.value)} placeholder={question.placeholder} /> : <input className={common} type={question.type === "number" ? "number" : "text"} value={value} onChange={(e) => onChange(e.target.value)} placeholder={question.placeholder} />}</div>;
+  const base = "w-full rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-700 focus:border-cyan-300/30";
+  if (question.type === "multiline") return <label className="block"><span className="mb-2 block text-sm font-bold text-slate-300">{question.question}{question.required ? " *" : ""}</span><textarea className={`${base} min-h-28 resize-y`} value={value} placeholder={question.placeholder} onChange={(e) => onChange(e.target.value)} /></label>;
+  if (question.type === "choice") return <label className="block"><span className="mb-2 block text-sm font-bold text-slate-300">{question.question}{question.required ? " *" : ""}</span><select className={base} value={value} onChange={(e) => onChange(e.target.value)}><option value="">Select an option</option>{(question.options ?? []).map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
+  return <label className="block"><span className="mb-2 block text-sm font-bold text-slate-300">{question.question}{question.required ? " *" : ""}</span><input className={base} type={question.type === "number" ? "number" : "text"} value={value} placeholder={question.placeholder} onChange={(e) => onChange(e.target.value)} /></label>;
 }
