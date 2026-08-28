@@ -33,8 +33,8 @@ export function classifyIntent(text: string): AIIntent {
   if (mentionsHabit && complete) return { intent: "complete_habit", confidence: 0.98, needsFreshState: true, requiresConfirmation: false, target: "habit" };
   if (mentionsTask && undo) return { intent: "update_task", confidence: 0.9, needsFreshState: true, requiresConfirmation: true, target: "task" };
   if (mentionsTask && complete) return { intent: "complete_task", confidence: 0.96, needsFreshState: true, requiresConfirmation: false, target: "task" };
-  if (progress) return { intent: "read_progress", confidence: 0.94, needsFreshState: true };
-  if (mentionsTask || has("what should i do", "what do i do now", "what's next")) return { intent: "read_today", confidence: 0.9, needsFreshState: true };
+  if (progress) return { intent: "read_progress", confidence: 0.94, needsFreshState: true, requiresConfirmation: false };
+  if (mentionsTask || has("what should i do", "what do i do now", "what's next")) return { intent: "read_today", confidence: 0.9, needsFreshState: true, requiresConfirmation: false };
   return { intent: "chat", confidence: 0.65, needsFreshState: false, requiresConfirmation: false };
 }
 
