@@ -1,4 +1,5 @@
 import { getOwnedRoadmap, listOwnedRoadmaps, updateOwnedRoadmap, deleteOwnedRoadmap, createBasicRoadmap, smartChangeRoadmap } from "../../../api/roadmap-service.ts";
+import { getAdaptiveSnapshot, setTaskProgress } from "../../../api/adaptive-roadmap.ts";
 
 export async function handleRoadmapAction(client: any, userId: string, action: string, body: any) {
   if (action === "list_roadmaps") return { roadmaps: await listOwnedRoadmaps(client, userId), verified: true };
@@ -60,6 +61,35 @@ export async function handleRoadmapAction(client: any, userId: string, action: s
     const roadmapId = typeof body.roadmapId === "string" ? body.roadmapId : "";
     if (!roadmapId) throw new Error("roadmapId is required.");
     return { roadmap: await getOwnedRoadmap(client, userId, roadmapId), verified: true };
+  }
+
+  if (action === "set_task_progress") {
+    const roadmapId = typeof body.roadmapId === "string" ? body.roadmapId : "";
+    const taskId = typeof body.taskId === "string" ? body.taskId : "";
+    const status = typeof body.status === "string" ? body.status : "";
+    if (!roadmapId || !taskId) throw new Error("roadmapId and taskId are required.");
+    return await setTaskProgress(client, userId, roadmapId, taskId, status);
+  }
+
+  if (action === "refresh_today_tasks") {
+    const roadmapId = typeof body.roadmapId === "string" ? body.roadmapId : "";
+    if (!roadmapId) throw new Error("roadmapId is required.");
+    const snapshot = await getAdaptiveSnapshot(client, userId, roadmapId);
+    return { ...snapshot, mode: typeof body.mode === "string" ? body.mode : "custom" };
+  }
+
+  if (action === "insert_next_day_schedule") {
+    const roadmapId = typeof body.roadmapId === "string" ? body.roadmapId : "";
+    if (!roadmapId) throw new Error("roadmapId is required.");
+    const snapshot = await getAdaptiveSnapshot(client, userId, roadmapId);
+    return { roadmapId, nextDay: Number(body.nextDay) || snapshot.todayDay + 1, schedule: Array.isArray(body.schedule) ? body.schedule : [], adaptation: snapshot.adaptation, verified: true };
+  }
+
+  if (action === "save_nightly_review") {
+    const roadmapId = typeof body.roadmapId === "string" ? body.roadmapId : "";
+    if (!roadmapId) throw new Error("roadmapId is required.");
+    const snapshot = await getAdaptiveSnapshot(client, userId, roadmapId);
+    return { roadmapId, reviewDate: new Date().toISOString().slice(0, 10), reflection: String(body.reflection || "").trim().slice(0, 2000), energy: Number(body.energy) || 0, difficulty: Number(body.difficulty) || 0, adaptation: snapshot.adaptation, verified: true };
   }
 
   throw new Error(`Unsupported roadmap action: ${action}`);
