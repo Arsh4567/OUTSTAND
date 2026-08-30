@@ -1,45 +1,90 @@
 import { jsonSchema, tool, type ToolSet } from "ai";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createBasicRoadmap, getOwnedRoadmap, smartChangeRoadmap, deleteOwnedRoadmap, listOwnedRoadmaps } from "./roadmap-service.js";
+import {
+  createBasicRoadmap,
+  getOwnedRoadmap,
+  smartChangeRoadmap,
+  deleteOwnedRoadmap,
+  listOwnedRoadmaps,
+} from "./roadmap-service.js";
 
 type Db = SupabaseClient<any, "public", any>;
 type ProductivityState = { habits: any[]; sessions: any[]; outstand: any[] };
-const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
-const dayNumber = (start: string, duration: number) => Math.min(Math.max(1, Math.floor((Date.now() - new Date(`${start}T00:00:00`).getTime()) / 86400000) + 1), Math.max(1, Number(duration) || 1));
-const timePattern = "^([01]\\d|2[0-3]):[0-5]\\d$";
+
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+const dayNumber = (start: string, duration: number) =>
+  Math.min(
+    Math.max(1, Math.floor((Date.now() - new Date(`${start}T00:00:00`).getTime()) / 86400000) + 1),
+    Math.max(1, Number(duration) || 1),
+  );
+
+const timePattern = "^([01]\\\\d|2[0-3]):[0-5]\\\\d$";
 
 async function resolveRoadmap(client: Db, userId: string, roadmapId?: string, title?: string) {
   if (roadmapId) return getOwnedRoadmap(client, userId, roadmapId);
+
   const roadmaps = await listOwnedRoadmaps(client, userId);
   if (title?.trim()) {
     const needle = title.trim().toLowerCase();
-    const matches = roadmaps.filter((r: any) => String(r.title || "").toLowerCase() === needle || String(r.title || "").toLowerCase().includes(needle));
+    const matches = roadmaps.filter(
+      (r: any) =>
+        String(r.title || "").toLowerCase() === needle ||
+        String(r.title || "").toLowerCase().includes(needle),
+    );
     if (matches.length === 1) return matches[0];
-    if (matches.length > 1) throw new Error(`Multiple roadmaps match “${title}”. Please specify the exact title.`);
+    if (matches.length > 1) {
+      throw new Error(`Multiple roadmaps match “${title}”. Please specify the exact title.`);
+    }
     throw new Error(`No roadmap matched “${title}”.`);
   }
+
   if (roadmaps.length === 1) return roadmaps[0];
   if (!roadmaps.length) throw new Error("You do not have an active roadmap yet.");
   throw new Error("You have multiple active roadmaps. Specify which roadmap you want to use by title.");
 }
 
 async function readState(client: Db, userId: string): Promise<ProductivityState> {
-  const { data, error } = await client.from("user_productivity_state").select("habits,sessions,outstand").eq("user_id", userId).maybeSingle();
+  const { data, error } = await client
+    .from("user_productivity_state")
+    .select("habits,sessions,outstand")
+    .eq("user_id", userId)
+    .maybeSingle();
   if (error) throw error;
-  return { habits: Array.isArray(data?.habits) ? data.habits : [], sessions: Array.isArray(data?.sessions) ? data.sessions : [], outstand: Array.isArray(data?.outstand) ? data.outstand : [] };
+  return {
+    habits: Array.isArray(data?.habits) ? data.habits : [],
+    sessions: Array.isArray(data?.sessions) ? data.sessions : [],
+    outstand: Array.isArray(data?.outstand) ? data.outstand : [],
+  };
 }
+
 async function writeState(client: Db, state: ProductivityState) {
-  const { data, error } = await client.rpc("upsert_user_productivity_state", { p_habits: state.habits, p_sessions: state.sessions, p_outstand: state.outstand });
+  const { data, error } = await client.rpc("upsert_user_productivity_state", {
+    p_habits: state.habits,
+    p_sessions: state.sessions,
+    p_outstand: state.outstand,
+  });
   if (error) throw error;
   if (!data) throw new Error("Productivity state update could not be verified.");
   return data;
 }
+
 async function findHabit(client: Db, userId: string, id?: string, name?: string) {
   const state = await readState(client, userId);
-  if (id) { const habit = state.habits.find((h: any) => h?.id === id); if (!habit) throw new Error("Habit not found."); return { state, habit }; }
+  if (id) {
+    const habit = state.habits.find((h: any) => h?.id === id);
+    if (!habit) throw new Error("Habit not found.");
+    return { state, habit };
+  }
+
   const needle = String(name || "").trim().toLocaleLowerCase();
   if (!needle) throw new Error("Specify a habit by id or exact name.");
-  const matches = state.habits.filter((h: any) => String(h?.name || "").trim().toLocaleLowerCase() === needle);
+  const matches = state.habits.filter(
+    (h: any) => String(h?.name || "").trim().toLocaleLowerCase() === needle,
+  );
   if (matches.length === 1) return { state, habit: matches[0] };
   if (matches.length > 1) throw new Error(`Multiple habits match “${name}”. Please specify the exact name.`);
   throw new Error(`No habit matched “${name}”.`);
@@ -47,18 +92,340 @@ async function findHabit(client: Db, userId: string, id?: string, name?: string)
 
 export function createProductivityTools(client: Db, userId: string, _accessToken: string): ToolSet {
   const tools = {} as ToolSet;
-  tools.list_roadmaps = tool({ description: "List the user's active or paused canonical roadmaps.", inputSchema: jsonSchema({ type: "object", properties: {}, additionalProperties: false }), execute: async () => ({ roadmaps: await listOwnedRoadmaps(client, userId), verified: true }) });
-  tools.change_roadmap = tool({ description: "Apply a real roadmap change. Use roadmapId or roadmapTitle. Supports roadmap and task/schedule changes.", inputSchema: jsonSchema({ type: "object", properties: { roadmapId: { type: "string" }, roadmapTitle: { type: "string" }, request: { type: "string", minLength: 5, maxLength: 500 } }, required: ["request"], additionalProperties: false }), execute: async (args: any) => { const roadmap = await resolveRoadmap(client, userId, args.roadmapId, args.roadmapTitle); const result = await smartChangeRoadmap(client, userId, roadmap.id, args.request); const changed = "changed" in result ? result.changed : "updated" in result ? result.updated === true : false; return { ...result, changed, roadmapId: roadmap.id, message: changed ? "Roadmap changed successfully." : "No roadmap changes were made." }; } });
-  tools.delete_roadmap = tool({ description: "Permanently delete a roadmap only after an explicit user request.", inputSchema: jsonSchema({ type: "object", properties: { roadmapId: { type: "string" }, roadmapTitle: { type: "string" } }, additionalProperties: false }), execute: async (args: any) => { const roadmap = await resolveRoadmap(client, userId, args.roadmapId, args.roadmapTitle); const result = await deleteOwnedRoadmap(client, userId, roadmap.id); return { ...result, deleted: true, message: `Roadmap “${result.title}” was deleted successfully.` }; } });
-  tools.create_roadmap = tool({ description: "Create a real canonical roadmap. A goal is required. Optionally provide a structured milestone plan.", inputSchema: jsonSchema({ type: "object", properties: { category: { type: "string", minLength: 2 }, goal: { type: "string", minLength: 5 }, title: { type: "string", maxLength: 120 }, durationDays: { type: "integer", minimum: 7, maximum: 180 }, answers: { type: "object", additionalProperties: true }, plan: { type: "object", properties: { milestones: { type: "array", items: { type: "object", properties: { day: { type: "integer", minimum: 1 }, title: { type: "string", minLength: 2 }, outcome: { type: "string" }, actions: { type: "array", items: { type: "string", minLength: 1 } } }, required: ["title", "actions"], additionalProperties: false } } }, required: ["milestones"], additionalProperties: false } }, required: ["goal"], additionalProperties: false }), execute: async (args: any) => { const category = String(args.category || "custom").trim() || "custom"; const goal = String(args.goal || "").trim(); if (goal.length < 5) throw new Error("A roadmap goal is required."); const duration = Math.max(7, Math.min(180, Number(args.durationDays) || Number(args.answers?.durationDays) || 30)); if (args.plan?.milestones?.length) { const { data, error } = await client.rpc("create_canonical_roadmap_from_plan", { p_category: category, p_title: String(args.title || goal.slice(0, 60) || "My roadmap").trim().slice(0, 120), p_goal: goal, p_questionnaire: args.answers || {}, p_generation_metadata: { source: "assistant" }, p_duration_days: duration, p_start_date: typeof args.answers?.start_date === "string" ? args.answers.start_date : today(), p_plan: args.plan }); if (error) throw error; if (!data) throw new Error("Roadmap creation did not return an id."); return { created: true, roadmapId: data, verified: true, message: "Roadmap created successfully." }; } const result = await createBasicRoadmap(client, userId, category, { ...(args.answers || {}), goal, title: args.title, durationDays: duration }); if (result.error) throw new Error(String(result.error)); return { ...result, created: result.created === true, verified: result.verified === true, message: result.created ? "Roadmap created successfully." : "More information is required before creating the roadmap." }; } });
-  tools.get_today = tool({ description: "Read today's roadmap tasks. Never guess a roadmap when multiple roadmaps exist.", inputSchema: jsonSchema({ type: "object", properties: { roadmapId: { type: "string" }, roadmapTitle: { type: "string" } }, additionalProperties: false }), execute: async (args: any) => { const roadmaps = await listOwnedRoadmaps(client, userId); if (!roadmaps.length) return { date: today(), roadmap: null, todayTasks: [], availableRoadmaps: [] }; const roadmap = args.roadmapId || args.roadmapTitle ? await resolveRoadmap(client, userId, args.roadmapId, args.roadmapTitle) : roadmaps.length === 1 ? roadmaps[0] : null; if (!roadmap) return { date: today(), roadmap: null, todayTasks: [], availableRoadmaps: roadmaps.map((r: any) => ({ id: r.id, title: r.title, status: r.status })), needsRoadmapSelection: true }; const day = dayNumber(roadmap.start_date, Number(roadmap.duration_days)); const { data, error } = await client.from("roadmap_tasks").select("id,title,instructions,estimated_minutes,start_time,end_time,is_required,success_criteria,task_type,day_number,task_order").eq("roadmap_id", roadmap.id).eq("user_id", userId).eq("day_number", day).order("start_time").order("task_order"); if (error) throw error; return { date: today(), roadmap: { ...roadmap, currentDay: day }, todayTasks: data || [], availableRoadmaps: roadmaps.map((r: any) => ({ id: r.id, title: r.title, status: r.status })), verified: true }; } });
-  tools.list_habits = tool({ description: "Read the user's synchronized habits and whether each is complete today.", inputSchema: jsonSchema({ type: "object", properties: {}, additionalProperties: false }), execute: async () => { const state = await readState(client, userId); const date = today(); return { date, habits: state.habits.map((h: any) => ({ ...h, completedToday: Array.isArray(h.history) && h.history.includes(date) })), verified: true }; } });
-  tools.mark_habit = tool({ description: "Mark a habit complete or incomplete for a specific date. Only use when explicitly requested.", inputSchema: jsonSchema({ type: "object", properties: { habitId: { type: "string" }, habitName: { type: "string" }, completed: { type: "boolean" }, date: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" } }, required: ["completed"], additionalProperties: false }), execute: async (args: any) => { const targetDate = args.date || today(); const { state, habit } = await findHabit(client, userId, args.habitId, args.habitName); const history = Array.isArray(habit.history) ? [...new Set(habit.history)] : []; const nextHistory = args.completed ? (history.includes(targetDate) ? history : [...history, targetDate]).sort() : history.filter((d: string) => d !== targetDate); await writeState(client, { ...state, habits: state.habits.map((h: any) => h.id === habit.id ? { ...habit, history: nextHistory } : h) }); return { changed: true, habitId: habit.id, habitName: habit.name, date: targetDate, completed: Boolean(args.completed), verified: true, message: `${habit.name} marked ${args.completed ? "complete" : "incomplete"} for ${targetDate}.` }; } });
-  tools.update_habit = tool({ description: "Update an existing habit's name, icon, color, or notification time without changing its history.", inputSchema: jsonSchema({ type: "object", properties: { habitId: { type: "string" }, habitName: { type: "string" }, name: { type: "string", minLength: 1, maxLength: 120 }, emoji: { type: "string", maxLength: 16 }, color: { type: "string", minLength: 1, maxLength: 40 }, notificationTime: { anyOf: [{ type: "string", pattern: timePattern }, { type: "null" }] } }, additionalProperties: false }), execute: async (args: any) => { const { state, habit } = await findHabit(client, userId, args.habitId, args.habitName); const name = args.name === undefined ? habit.name : String(args.name).trim(); if (!name) throw new Error("Habit name cannot be empty."); if (state.habits.some((h: any) => h.id !== habit.id && String(h.name || "").trim().toLocaleLowerCase() === name.toLocaleLowerCase())) throw new Error(`A habit named “${name}” already exists.`); if (args.notificationTime !== undefined && !validTime(args.notificationTime)) throw new Error("Notification time must use HH:MM format."); const next = { ...habit, ...(args.emoji === undefined ? {} : { emoji: args.emoji }), ...(args.color === undefined ? {} : { color: args.color }), ...(args.notificationTime === undefined ? {} : { notificationTime: args.notificationTime }), name }; await writeState(client, { ...state, habits: state.habits.map((h: any) => h.id === habit.id ? next : h) }); return { changed: true, habitId: habit.id, habit: next, verified: true, message: `Habit “${name}” updated successfully.` }; } });
-  tools.delete_habit = tool({ description: "Delete an existing habit only after an explicit user request.", inputSchema: jsonSchema({ type: "object", properties: { habitId: { type: "string" }, habitName: { type: "string" } }, additionalProperties: false }), execute: async (args: any) => { const { state, habit } = await findHabit(client, userId, args.habitId, args.habitName); await writeState(client, { ...state, habits: state.habits.filter((h: any) => h.id !== habit.id) }); return { deleted: true, habitId: habit.id, habitName: habit.name, verified: true, message: `Habit “${habit.name}” was deleted.` }; } });
-  tools.set_reminder = tool({ description: "Set or clear a daily reminder time for an existing habit.", inputSchema: jsonSchema({ type: "object", properties: { habitId: { type: "string" }, habitName: { type: "string" }, time: { anyOf: [{ type: "string", pattern: timePattern }, { type: "null" }] } }, required: ["time"], additionalProperties: false }), execute: async (args: any) => { if (args.time !== null && !validTime(args.time)) throw new Error("Reminder time must use HH:MM format."); const { state, habit } = await findHabit(client, userId, args.habitId, args.habitName); await writeState(client, { ...state, habits: state.habits.map((h: any) => h.id === habit.id ? { ...h, notificationTime: args.time } : h) }); return { changed: true, habitId: habit.id, habitName: habit.name, time: args.time, verified: true, message: args.time ? `Reminder for “${habit.name}” set to ${args.time}.` : `Reminder for “${habit.name}” cleared.` }; } });
-  tools.log_outstand = tool({ description: "Record a completed OUTSTAND item when the user explicitly asks to log it.", inputSchema: jsonSchema({ type: "object", properties: { title: { type: "string", minLength: 1, maxLength: 200 }, xp: { type: "number", minimum: 0, maximum: 10000 } }, required: ["title"], additionalProperties: false }), execute: async (args: any) => { const title = String(args.title).trim(); const state = await readState(client, userId); const item = { id: crypto.randomUUID(), title, xp: Math.max(0, Math.round(Number(args.xp) || 0)), completedAt: new Date().toISOString() }; await writeState(client, { ...state, outstand: [item, ...state.outstand].slice(0, 200) }); return { created: true, item, verified: true, message: `Logged “${title}” successfully.` }; } });
+
+  tools.list_roadmaps = tool({
+    description: "List the user's active or paused canonical roadmaps.",
+    inputSchema: jsonSchema({ type: "object", properties: {}, additionalProperties: false }),
+    execute: async () => ({ roadmaps: await listOwnedRoadmaps(client, userId), verified: true }),
+  });
+
+  tools.change_roadmap = tool({
+    description: "Apply a real roadmap change. Use roadmapId or roadmapTitle. Supports roadmap and task/schedule changes.",
+    inputSchema: jsonSchema({
+      type: "object",
+      properties: {
+        roadmapId: { type: "string" },
+        roadmapTitle: { type: "string" },
+        request: { type: "string", minLength: 5, maxLength: 500 },
+      },
+      required: ["request"],
+      additionalProperties: false,
+    }),
+    execute: async (args: any) => {
+      const roadmap = await resolveRoadmap(client, userId, args.roadmapId, args.roadmapTitle);
+      const result = await smartChangeRoadmap(client, userId, roadmap.id, args.request);
+      const changed = "changed" in result ? result.changed : "updated" in result ? result.updated === true : false;
+      return {
+        ...result,
+        changed,
+        roadmapId: roadmap.id,
+        message: changed ? "Roadmap changed successfully." : "No roadmap changes were made.",
+      };
+    },
+  });
+
+  tools.delete_roadmap = tool({
+    description: "Permanently delete a roadmap only after an explicit user request.",
+    inputSchema: jsonSchema({
+      type: "object",
+      properties: { roadmapId: { type: "string" }, roadmapTitle: { type: "string" } },
+      additionalProperties: false,
+    }),
+    execute: async (args: any) => {
+      const roadmap = await resolveRoadmap(client, userId, args.roadmapId, args.roadmapTitle);
+      const result = await deleteOwnedRoadmap(client, userId, roadmap.id);
+      return { ...result, deleted: true, message: `Roadmap “${result.title}” was deleted successfully.` };
+    },
+  });
+
+  tools.create_roadmap = tool({
+    description: "Create a real canonical roadmap. A goal is required. Optionally provide a structured milestone plan.",
+    inputSchema: jsonSchema({
+      type: "object",
+      properties: {
+        category: { type: "string", minLength: 2 },
+        goal: { type: "string", minLength: 5 },
+        title: { type: "string", maxLength: 120 },
+        durationDays: { type: "integer", minimum: 7, maximum: 180 },
+        answers: { type: "object", additionalProperties: true },
+        plan: {
+          type: "object",
+          properties: {
+            milestones: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  day: { type: "integer", minimum: 1 },
+                  title: { type: "string", minLength: 2 },
+                  outcome: { type: "string" },
+                  actions: { type: "array", items: { type: "string", minLength: 1 } },
+                },
+                required: ["title", "actions"],
+                additionalProperties: false,
+              },
+            },
+          },
+          required: ["milestones"],
+          additionalProperties: false,
+        },
+      },
+      required: ["goal"],
+      additionalProperties: false,
+    }),
+    execute: async (args: any) => {
+      const category = String(args.category || "custom").trim() || "custom";
+      const goal = String(args.goal || "").trim();
+      if (goal.length < 5) throw new Error("A roadmap goal is required.");
+      const duration = Math.max(
+        7,
+        Math.min(180, Number(args.durationDays) || Number(args.answers?.durationDays) || 30),
+      );
+
+      if (args.plan?.milestones?.length) {
+        const { data, error } = await client.rpc("create_canonical_roadmap_from_plan", {
+          p_category: category,
+          p_title: String(args.title || goal.slice(0, 60) || "My roadmap").trim().slice(0, 120),
+          p_goal: goal,
+          p_questionnaire: args.answers || {},
+          p_generation_metadata: { source: "assistant" },
+          p_duration_days: duration,
+          p_start_date: typeof args.answers?.start_date === "string" ? args.answers.start_date : today(),
+          p_plan: args.plan,
+        });
+        if (error) throw error;
+        if (!data) throw new Error("Roadmap creation did not return an id.");
+        return { created: true, roadmapId: data, verified: true, message: "Roadmap created successfully." };
+      }
+
+      const result = await createBasicRoadmap(client, userId, category, {
+        ...(args.answers || {}),
+        goal,
+        title: args.title,
+        durationDays: duration,
+      });
+      if (result.error) throw new Error(String(result.error));
+      return {
+        ...result,
+        created: result.created === true,
+        verified: result.verified === true,
+        message: result.created
+          ? "Roadmap created successfully."
+          : "More information is required before creating the roadmap.",
+      };
+    },
+  });
+
+  tools.get_today = tool({
+    description: "Read today's roadmap tasks. Never guess a roadmap when multiple roadmaps exist.",
+    inputSchema: jsonSchema({
+      type: "object",
+      properties: { roadmapId: { type: "string" }, roadmapTitle: { type: "string" } },
+      additionalProperties: false,
+    }),
+    execute: async (args: any) => {
+      const roadmaps = await listOwnedRoadmaps(client, userId);
+      if (!roadmaps.length) return { date: today(), roadmap: null, todayTasks: [], availableRoadmaps: [] };
+      const roadmap = args.roadmapId || args.roadmapTitle
+        ? await resolveRoadmap(client, userId, args.roadmapId, args.roadmapTitle)
+        : roadmaps.length === 1
+          ? roadmaps[0]
+          : null;
+      if (!roadmap) {
+        return {
+          date: today(),
+          roadmap: null,
+          todayTasks: [],
+          availableRoadmaps: roadmaps.map((r: any) => ({ id: r.id, title: r.title, status: r.status })),
+          needsRoadmapSelection: true,
+        };
+      }
+
+      const day = dayNumber(roadmap.start_date, Number(roadmap.duration_days));
+      const { data, error } = await client
+        .from("roadmap_tasks")
+        .select("id,title,instructions,estimated_minutes,start_time,end_time,is_required,success_criteria,task_type,day_number,task_order")
+        .eq("roadmap_id", roadmap.id)
+        .eq("user_id", userId)
+        .eq("day_number", day)
+        .order("start_time")
+        .order("task_order");
+      if (error) throw error;
+
+      return {
+        date: today(),
+        roadmap: { ...roadmap, currentDay: day },
+        todayTasks: data || [],
+        availableRoadmaps: roadmaps.map((r: any) => ({ id: r.id, title: r.title, status: r.status })),
+        verified: true,
+      };
+    },
+  });
+
+  tools.list_habits = tool({
+    description: "Read the user's synchronized habits and whether each is complete today.",
+    inputSchema: jsonSchema({ type: "object", properties: {}, additionalProperties: false }),
+    execute: async () => {
+      const state = await readState(client, userId);
+      const date = today();
+      return {
+        date,
+        habits: state.habits.map((h: any) => ({
+          ...h,
+          completedToday: Array.isArray(h.history) && h.history.includes(date),
+        })),
+        verified: true,
+      };
+    },
+  });
+
+  tools.mark_habit = tool({
+    description: "Mark a habit complete or incomplete for a specific date. Only use when explicitly requested.",
+    inputSchema: jsonSchema({
+      type: "object",
+      properties: {
+        habitId: { type: "string" },
+        habitName: { type: "string" },
+        completed: { type: "boolean" },
+        date: { type: "string", pattern: "^\\\\d{4}-\\\\d{2}-\\\\d{2}$" },
+      },
+      required: ["completed"],
+      additionalProperties: false,
+    }),
+    execute: async (args: any) => {
+      const targetDate = args.date || today();
+      const { state, habit } = await findHabit(client, userId, args.habitId, args.habitName);
+      const history = Array.isArray(habit.history) ? [...new Set(habit.history)] : [];
+      const nextHistory = args.completed
+        ? (history.includes(targetDate) ? history : [...history, targetDate]).sort()
+        : history.filter((d: string) => d !== targetDate);
+      await writeState(client, {
+        ...state,
+        habits: state.habits.map((h: any) => h.id === habit.id ? { ...habit, history: nextHistory } : h),
+      });
+      return {
+        changed: true,
+        habitId: habit.id,
+        habitName: habit.name,
+        date: targetDate,
+        completed: Boolean(args.completed),
+        verified: true,
+        message: `${habit.name} marked ${args.completed ? "complete" : "incomplete"} for ${targetDate}.`,
+      };
+    },
+  });
+
+  tools.update_habit = tool({
+    description: "Update an existing habit's name, icon, color, or notification time without changing its history.",
+    inputSchema: jsonSchema({
+      type: "object",
+      properties: {
+        habitId: { type: "string" },
+        habitName: { type: "string" },
+        name: { type: "string", minLength: 1, maxLength: 120 },
+        emoji: { type: "string", maxLength: 16 },
+        color: { type: "string", minLength: 1, maxLength: 40 },
+        notificationTime: { anyOf: [{ type: "string", pattern: timePattern }, { type: "null" }] },
+      },
+      additionalProperties: false,
+    }),
+    execute: async (args: any) => {
+      const { state, habit } = await findHabit(client, userId, args.habitId, args.habitName);
+      const name = args.name === undefined ? habit.name : String(args.name).trim();
+      if (!name) throw new Error("Habit name cannot be empty.");
+      if (state.habits.some(
+        (h: any) => h.id !== habit.id && String(h.name || "").trim().toLocaleLowerCase() === name.toLocaleLowerCase(),
+      )) throw new Error(`A habit named “${name}” already exists.`);
+      if (args.notificationTime !== undefined && !validTime(args.notificationTime)) {
+        throw new Error("Notification time must use HH:MM format.");
+      }
+      const next = {
+        ...habit,
+        ...(args.emoji === undefined ? {} : { emoji: args.emoji }),
+        ...(args.color === undefined ? {} : { color: args.color }),
+        ...(args.notificationTime === undefined ? {} : { notificationTime: args.notificationTime }),
+        name,
+      };
+      await writeState(client, {
+        ...state,
+        habits: state.habits.map((h: any) => h.id === habit.id ? next : h),
+      });
+      return { changed: true, habitId: habit.id, habit: next, verified: true, message: `Habit “${name}” updated successfully.` };
+    },
+  });
+
+  tools.delete_habit = tool({
+    description: "Delete an existing habit only after an explicit user request.",
+    inputSchema: jsonSchema({
+      type: "object",
+      properties: { habitId: { type: "string" }, habitName: { type: "string" } },
+      additionalProperties: false,
+    }),
+    execute: async (args: any) => {
+      const { state, habit } = await findHabit(client, userId, args.habitId, args.habitName);
+      await writeState(client, { ...state, habits: state.habits.filter((h: any) => h.id !== habit.id) });
+      return { deleted: true, habitId: habit.id, habitName: habit.name, verified: true, message: `Habit “${habit.name}” was deleted.` };
+    },
+  });
+
+  tools.set_reminder = tool({
+    description: "Set or clear a daily reminder time for an existing habit.",
+    inputSchema: jsonSchema({
+      type: "object",
+      properties: {
+        habitId: { type: "string" },
+        habitName: { type: "string" },
+        time: { anyOf: [{ type: "string", pattern: timePattern }, { type: "null" }] },
+      },
+      required: ["time"],
+      additionalProperties: false,
+    }),
+    execute: async (args: any) => {
+      if (args.time !== null && !validTime(args.time)) throw new Error("Reminder time must use HH:MM format.");
+      const { state, habit } = await findHabit(client, userId, args.habitId, args.habitName);
+      await writeState(client, {
+        ...state,
+        habits: state.habits.map((h: any) => h.id === habit.id ? { ...h, notificationTime: args.time } : h),
+      });
+      return {
+        changed: true,
+        habitId: habit.id,
+        habitName: habit.name,
+        time: args.time,
+        verified: true,
+        message: args.time ? `Reminder for “${habit.name}” set to ${args.time}.` : `Reminder for “${habit.name}” cleared.`,
+      };
+    },
+  });
+
+  tools.log_outstand = tool({
+    description: "Record a completed OUTSTAND item when the user explicitly asks to log it.",
+    inputSchema: jsonSchema({
+      type: "object",
+      properties: {
+        title: { type: "string", minLength: 1, maxLength: 200 },
+        xp: { type: "number", minimum: 0, maximum: 10000 },
+      },
+      required: ["title"],
+      additionalProperties: false,
+    }),
+    execute: async (args: any) => {
+      const title = String(args.title).trim();
+      const state = await readState(client, userId);
+      const item = {
+        id: crypto.randomUUID(),
+        title,
+        xp: Math.max(0, Math.round(Number(args.xp) || 0)),
+        completedAt: new Date().toISOString(),
+      };
+      await writeState(client, { ...state, outstand: [item, ...state.outstand].slice(0, 200) });
+      return { created: true, item, verified: true, message: `Logged “${title}” successfully.` };
+    },
+  });
+
   return tools;
 }
 
-function validTime(value: unknown) { return value == null || (typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value)); }
+function validTime(value: unknown) {
+  return value == null || (typeof value === "string" && /^([01]\\d|2[0-3]):[0-5]\\d$/.test(value));
+}
