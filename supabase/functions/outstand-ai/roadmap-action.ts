@@ -89,7 +89,21 @@ export async function handleRoadmapAction(client: any, userId: string, action: s
     const roadmapId = typeof body.roadmapId === "string" ? body.roadmapId : "";
     if (!roadmapId) throw new Error("roadmapId is required.");
     const snapshot = await getAdaptiveSnapshot(client, userId, roadmapId);
-    return { roadmapId, reviewDate: new Date().toISOString().slice(0, 10), reflection: String(body.reflection || "").trim().slice(0, 2000), energy: Number(body.energy) || 0, difficulty: Number(body.difficulty) || 0, adaptation: snapshot.adaptation, verified: true };
+    const reviewDate = new Date().toISOString().slice(0, 10);
+    const payload = {
+      user_id: userId,
+      roadmap_id: roadmapId,
+      roadmap_day: snapshot.todayDay,
+      event_date: reviewDate,
+      reflection: String(body.reflection || "").trim().slice(0, 2000),
+      energy: Math.max(1, Math.min(5, Number(body.energy) || 1)),
+      difficulty: Math.max(1, Math.min(5, Number(body.difficulty) || 1)),
+      adaptation: snapshot.adaptation,
+    };
+    const { data, error } = await client.from("roadmap_adaptation_events").upsert(payload, { onConflict: "user_id,roadmap_id,event_date" }).select("id,roadmap_day,event_date,adaptation").maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error("Nightly review could not be saved.");
+    return { roadmapId, reviewDate, adaptation: snapshot.adaptation, review: data, verified: true };
   }
 
   throw new Error(`Unsupported roadmap action: ${action}`);
