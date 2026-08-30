@@ -2,6 +2,7 @@ import { jsonSchema, tool, type ToolSet } from "ai";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createBasicRoadmap, getOwnedRoadmap, smartChangeRoadmap, deleteOwnedRoadmap, listOwnedRoadmaps } from "./roadmap-service.js";
 import { buildBackwardPlanningInstructions, validateBackwardPlan } from "./backward-planner.js";
+import { buildDailyWorkloadInstructions, validateDailyWorkload } from "./daily-workload-planner.js";
 
 type Db = SupabaseClient<any, "public", any>;
 type ProductivityState = { habits: any[]; sessions: any[]; outstand: any[] };
@@ -93,6 +94,13 @@ const backwardPlanSchema = {
   }, required:["outcome","capabilities","milestones"], additionalProperties:false
 };
 
+const dailyWorkloadSchema = {
+  type:"object", properties:{
+    availableMinutes:{type:"integer",minimum:15,maximum:720},
+    reason:{type:"string",minLength:5,maxLength:300}
+  }, required:["availableMinutes"], additionalProperties:false
+};
+
 export function createProductivityTools(client: Db, userId: string, _accessToken: string): ToolSet {
   const tools = {} as ToolSet;
 
@@ -107,15 +115,16 @@ export function createProductivityTools(client: Db, userId: string, _accessToken
   tools.delete_roadmap = tool({ description:"Permanently delete a roadmap only after an explicit user request.", inputSchema:jsonSchema({type:"object",properties:{roadmapId:{type:"string"},roadmapTitle:{type:"string"}},additionalProperties:false}), execute:async(args:any)=>{const roadmap=await resolveRoadmap(client,userId,args.roadmapId,args.roadmapTitle);const result=await deleteOwnedRoadmap(client,userId,roadmap.id);return {...result,deleted:true,message:`Roadmap “${result.title}” was deleted successfully.`};} });
 
   tools.create_roadmap = tool({
-    description: `Create a canonical roadmap by planning backward from a measurable outcome. ${buildBackwardPlanningInstructions()} Return a complete backwardPlan before creating the roadmap. Every milestone must lead toward the target and include task focus.`,
+    description: `Create a canonical roadmap by planning backward from a measurable outcome. ${buildBackwardPlanningInstructions()} ${buildDailyWorkloadInstructions()} Return a complete backwardPlan and dailyWorkload before creating the roadmap. Every milestone must lead toward the target, include task focus, and fit within the user's daily capacity.`,
     inputSchema: jsonSchema({
       type:"object", properties:{
         category:{type:"string",minLength:2}, goal:{type:"string",minLength:5}, title:{type:"string",maxLength:120}, durationDays:{type:"integer",minimum:7,maximum:180}, answers:{type:"object",additionalProperties:true},
         goalSpec:goalSpecSchema,
         strategy:strategySchema,
         backwardPlan:backwardPlanSchema,
+        dailyWorkload:dailyWorkloadSchema,
         plan:{type:"object",properties:{milestones:{type:"array",items:{type:"object",properties:{day:{type:"integer",minimum:1},title:{type:"string",minLength:2},outcome:{type:"string",minLength:5},description:{type:"string"},methodologyTags:{type:"array",items:{type:"string",minLength:2,maxLength:80},maxItems:8},tasks:{type:"array",items:taskSchema,minItems:1,maxItems:8},actions:{type:"array",items:{type:"string",minLength:1}}},required:["title"],additionalProperties:false}},strategy:strategySchema},required:["milestones"],additionalProperties:false},
-      }, required:["goal","goalSpec","strategy","backwardPlan"], additionalProperties:false
+      }, required:["goal","goalSpec","strategy","backwardPlan","dailyWorkload"], additionalProperties:false
     }),
     execute:async(args:any)=>{
       const goal=String(args.goal||"").trim(); if(goal.length<5) throw new Error("A roadmap goal is required.");
@@ -124,8 +133,9 @@ export function createProductivityTools(client: Db, userId: string, _accessToken
       const strategy=args.strategy; if(!strategy?.primaryMethod||!Array.isArray(strategy.methods)||!strategy.methods.length) throw new Error("An evidence-informed strategy is required before creating the roadmap.");
       const duration=Math.max(7,Math.min(180,Number(args.durationDays)||Number(args.answers?.durationDays)||30));
       const backwardPlan=validateBackwardPlan(args.backwardPlan,duration);
-      const questionnaire={...(args.answers||{}),goalSpec};
-      const generationMetadata={source:"assistant",phase:"backward-planning",goalSpec,strategy,backwardPlan};
+      const availableMinutes=Math.max(15,Math.min(720,Number(args.dailyWorkload?.availableMinutes)||Number(args.answers?.dailyTimeMinutes)||Number(args.answers?.availableMinutes)||60));
+      const questionnaire={...(args.answers||{}),goalSpec,dailyWorkload:{availableMinutes}};
+      const generationMetadata={source:"assistant",phase:"daily-workload",goalSpec,strategy,backwardPlan,dailyWorkload:{availableMinutes}};
       const derivedMilestones=backwardPlan.milestones.map((milestone)=>({
         day:milestone.day,title:milestone.title,outcome:milestone.outcome,description:milestone.taskFocus,methodologyTags:strategy.methods,tasks:[],actions:[milestone.taskFocus]
       }));
@@ -135,9 +145,11 @@ export function createProductivityTools(client: Db, userId: string, _accessToken
         const planDays=new Set(suppliedMilestones.map((m:any)=>Number(m?.day)).filter((d:number)=>Number.isFinite(d)));
         for(const milestone of backwardPlan.milestones) if(!planDays.has(milestone.day)) throw new Error(`The executable plan is missing backward-planned milestone day ${milestone.day}.`);
       }
+      const workloadTasks=plan.milestones.flatMap((milestone:any)=>Array.isArray(milestone.tasks)&&milestone.tasks.length?milestone.tasks.map((task:any)=>({day:Number(milestone.day)||1,estimatedMinutes:Number(task.estimatedMinutes)||30})):Array.isArray(milestone.actions)?milestone.actions.map(()=>({day:Number(milestone.day)||1,estimatedMinutes:30})):[]);
+      const dailyWorkload=validateDailyWorkload(workloadTasks,duration,availableMinutes);
       const {data,error}=await client.rpc("create_canonical_roadmap_from_plan",{p_category:String(args.category||"custom").trim()||"custom",p_title:String(args.title||goal.slice(0,60)||"My roadmap").trim().slice(0,120),p_goal:goal,p_questionnaire:questionnaire,p_generation_metadata:generationMetadata,p_duration_days:duration,p_start_date:typeof args.answers?.start_date==="string"?args.answers.start_date:today(),p_plan:plan});
       if(error) throw error; if(!data) throw new Error("Roadmap creation did not return an id.");
-      return {created:true,roadmapId:data,verified:true,goalSpec,strategy,backwardPlan,message:"Roadmap created from a measurable outcome using backward planning."};
+      return {created:true,roadmapId:data,verified:true,goalSpec,strategy,backwardPlan,dailyWorkload,message:"Roadmap created with a measurable outcome, backward plan, and daily workload limit."};
     },
   });
 
