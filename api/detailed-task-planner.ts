@@ -46,5 +46,7 @@ export function buildDetailedTaskInstructions(): string {
     "Use evidence-informed methodology only when appropriate to the domain; never apply learning techniques mechanically.",
     "Avoid vague verbs such as learn, study, improve, or practice unless followed by a concrete observable action and result.",
     "Do not invent resources, citations, scientific claims, or prerequisites that are not justified by the goal context.",
+    "For exam-preparation roadmaps for Class 10, when recommending external marathon/video resources, prefer official educator channels and real published video URLs supplied by trusted current-source data; never fabricate or guess a video URL.",
+    "For Class 10 exam-preparation roadmaps, when a verified current marathon URL is available, include it in the task's resources and make the task explicitly about watching that marathon plus a short active-recall output, rather than passive watching alone.",
   ].join(" ");
 }
