@@ -31,7 +31,7 @@ export async function checkAiHealth(): Promise<AiHealth> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return { ok: false, status: 401, message: "Sign in to use OUTSTAND AI." };
-    const { data, error } = await supabase.functions.invoke("outstand-ai", { body: {} });
+    const { data, error } = await supabase.functions.invoke("outstand-ai", { body: { action: "health" }, headers: { Authorization: `Bearer ${session.access_token}` } });
     if (error) return { ok: false, status: 500, message: error.message || "AI service could not be reached." };
     if (data?.ok === false) return { ok: false, status: 503, message: data?.error || "AI service is not ready." };
     return { ok: true, status: 200, message: "Outstand AI is online." };
