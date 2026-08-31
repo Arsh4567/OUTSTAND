@@ -1,17 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type AiHealth = {
-  ok: boolean;
-  status: number;
-  message: string;
-  details?: string;
-};
-
-export type AiErrorPayload = {
-  error?: string;
-  details?: string;
-  code?: string;
-};
+export type AiHealth = { ok: boolean; status: number; message: string; details?: string };
+export type AiErrorPayload = { error?: string; details?: string; code?: string };
 
 export async function readAiResponseError(response: Response): Promise<string> {
   const raw = await response.text().catch(() => "");
@@ -22,18 +12,30 @@ export async function readAiResponseError(response: Response): Promise<string> {
   return details ? `${message} — ${details}` : message;
 }
 
+export async function invokeOutstandAi<T = unknown>(body: Record<string, unknown>): Promise<T> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error("Please sign in to use OUTSTAND AI.");
+  const { data, error } = await supabase.functions.invoke("outstand-ai", { body, headers: { Authorization: `Bearer ${session.access_token}` } });
+  if (error) {
+    const response = (error as any)?.context;
+    if (response && typeof response.json === "function") {
+      try { const payload = await response.json(); if (payload?.error) throw new Error(String(payload.error)); } catch (nested) { if (nested instanceof Error) throw nested; }
+    }
+    throw new Error((error as any)?.message || "OUTSTAND AI request failed.");
+  }
+  if ((data as any)?.error) throw new Error(String((data as any).error));
+  return data as T;
+}
+
 export async function checkAiHealth(): Promise<AiHealth> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return { ok: false, status: 401, message: "Sign in to use OUTSTAND AI." };
-    const response = await fetch("/api/chat", { method: "GET", headers: { Authorization: `Bearer ${session.access_token}` }, credentials: "include" });
-    if (!response.ok) return { ok: false, status: response.status, message: await readAiResponseError(response) };
-    const payload = await response.json().catch(() => ({}));
-    if (payload?.ok === false) return { ok: false, status: response.status, message: payload?.error || "AI service is not ready." };
-    return { ok: true, status: response.status, message: "Outstand AI is online." };
-  } catch (error) {
-    return { ok: false, status: 0, message: error instanceof Error ? error.message : "Unable to reach the AI service." };
-  }
+    const { data, error } = await supabase.functions.invoke("outstand-ai", { body: {} });
+    if (error) return { ok: false, status: 500, message: error.message || "AI service could not be reached." };
+    if (data?.ok === false) return { ok: false, status: 503, message: data?.error || "AI service is not ready." };
+    return { ok: true, status: 200, message: "Outstand AI is online." };
+  } catch (error) { return { ok: false, status: 0, message: error instanceof Error ? error.message : "Unable to reach the AI service." }; }
 }
 
 export function formatAiError(error: unknown): string {
