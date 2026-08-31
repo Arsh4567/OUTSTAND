@@ -1,73 +1,21 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export type NotificationCategory = "habit" | "goal" | "motivation" | "update" | "system" | "coaching";
-
-export type NotificationPreferences = {
-  push_enabled: boolean;
-  habits_enabled: boolean;
-  goals_enabled: boolean;
-  motivational_enabled: boolean;
-  updates_enabled: boolean;
-  coaching_enabled: boolean;
-  quiet_hours_enabled: boolean;
-  quiet_start: string;
-  quiet_end: string;
-  max_daily: number;
-  timezone: string;
-};
-
-const DEFAULTS: NotificationPreferences = { push_enabled: false, habits_enabled: true, goals_enabled: true, motivational_enabled: true, updates_enabled: true, coaching_enabled: true, quiet_hours_enabled: true, quiet_start: "22:00", quiet_end: "07:00", max_daily: 3, timezone: "UTC" };
-const QUOTES = ["Small wins compound. Just take the next step. 🔵", "You don't need a perfect day. You need one good decision.", "Momentum starts with something small enough to do right now. ⚡", "Progress is still progress when nobody else sees it.", "Make today a little better than yesterday. 🎯"];
-
-export function motivationalMessage(seed = Date.now()) { return QUOTES[Math.abs(seed) % QUOTES.length]; }
-export function isWithinQuietHours(now = new Date(), preferences: NotificationPreferences = DEFAULTS) {
-  if (!preferences.quiet_hours_enabled) return false;
-  const [startH, startM] = preferences.quiet_start.split(":").map(Number);
-  const [endH, endM] = preferences.quiet_end.split(":").map(Number);
-  const timezone = preferences.timezone || "UTC";
-  let current: number;
-  try {
-    const parts = new Intl.DateTimeFormat("en-US", { timeZone: timezone, hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(now);
-    const hour = Number(parts.find((part) => part.type === "hour")?.value ?? 0);
-    const minute = Number(parts.find((part) => part.type === "minute")?.value ?? 0);
-    current = hour * 60 + minute;
-  } catch {
-    current = now.getHours() * 60 + now.getMinutes();
-  }
-  const start = startH * 60 + startM;
-  const end = endH * 60 + endM;
-  return start > end ? current >= start || current < end : current >= start && current < end;
-}
-export function canNotify(category: NotificationCategory, preferences: NotificationPreferences, now = new Date()) { if (!preferences.push_enabled || isWithinQuietHours(now, preferences)) return false; if (category === "habit" && !preferences.habits_enabled) return false; if (category === "goal" && !preferences.goals_enabled) return false; if (category === "motivation" && !preferences.motivational_enabled) return false; if (category === "update" && !preferences.updates_enabled) return false; if (category === "coaching" && !preferences.coaching_enabled) return false; return true; }
-export async function getNotificationPreferences(): Promise<NotificationPreferences> { const { data: { user } } = await supabase.auth.getUser(); if (!user) return DEFAULTS; const { data, error } = await supabase.from("notification_preferences").select("*").eq("user_id", user.id).maybeSingle(); if (error || !data) return { ...DEFAULTS, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" }; return { ...DEFAULTS, ...data } as NotificationPreferences; }
-export async function saveNotificationPreferences(patch: Partial<NotificationPreferences>) { const { data: { user } } = await supabase.auth.getUser(); if (!user) throw new Error("Please sign in to change notification settings."); const current = await getNotificationPreferences(); const next = { ...current, ...patch, user_id: user.id }; const { error } = await supabase.from("notification_preferences").upsert(next, { onConflict: "user_id" }); if (error) throw error; return next; }
-export async function getNotificationHistory(limit = 30) { const { data, error } = await supabase.from("notification_events").select("id,category,title,body,url,delivered_at,created_at").order("created_at", { ascending: false }).limit(limit); if (error) throw error; return data ?? []; }
-function base64UrlToUint8Array(value: string) { const cleaned = value.trim().replace(/^['"]|['"]$/g, "").replace(/\s+/g, ""); if (!cleaned) throw new Error("VAPID public key is empty."); if (!/^[A-Za-z0-9+/_-]+={0,2}$/.test(cleaned)) throw new Error("VAPID public key contains invalid characters."); const base64 = cleaned.replace(/-/g, "+").replace(/_/g, "/"); const remainder = base64.length % 4; if (remainder === 1) throw new Error("VAPID public key has an invalid length."); const padded = base64 + "=".repeat((4 - remainder) % 4); let binary: string; try { binary = atob(padded); } catch { throw new Error("VAPID public key is not valid base64/base64url. Check VITE_VAPID_PUBLIC_KEY in your deployment settings."); } const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0)); if (bytes.length !== 65 || bytes[0] !== 4) throw new Error("VAPID public key is invalid. It must be the 65-byte uncompressed public key generated for Web Push."); return bytes; }
-export async function requestPushPermission() {
-  if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) throw new Error("Push notifications aren't supported by this browser.");
-  const permission = Notification.permission;
-  if (permission === "denied") throw new Error("Notifications are blocked in your browser settings.");
-  if (permission === "default") {
-    const requested = await Notification.requestPermission();
-    if (requested !== "granted") throw new Error("Notification permission was not granted.");
-  } else if (permission !== "granted") {
-    throw new Error("Notification permission was not granted.");
-  }
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error("Please sign in first.");
-  const registration = await navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).then(() => navigator.serviceWorker.ready);
-  await registration.update().catch(() => undefined);
-  const vapid = import.meta.env.VITE_VAPID_PUBLIC_KEY;
-  if (!vapid) throw new Error("Push notifications are not configured yet.");
-  const applicationServerKey = base64UrlToUint8Array(vapid);
-  const existing = await registration.pushManager.getSubscription();
-  const subscription = existing ?? await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
-  const json = subscription.toJSON();
-  if (!json.endpoint || !json.keys?.auth || !json.keys?.p256dh) throw new Error("The browser returned an invalid push subscription.");
-  const { error: subscriptionError } = await supabase.from("push_subscriptions").upsert({ user_id: session.user.id, endpoint: json.endpoint, auth_key: json.keys.auth, p256dh_key: json.keys.p256dh }, { onConflict: "user_id,endpoint" });
-  if (subscriptionError) { if (!existing) await subscription.unsubscribe().catch(() => undefined); throw new Error(`Could not save your push subscription: ${subscriptionError.message}`); }
-  await saveNotificationPreferences({ push_enabled: true, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" });
-  return subscription;
-}
-export async function disablePushNotifications() { const registration = await navigator.serviceWorker.getRegistration("/sw.js"); const subscription = await registration?.pushManager.getSubscription(); if (subscription) { const endpoint = subscription.endpoint; await subscription.unsubscribe(); await supabase.from("push_subscriptions").delete().eq("endpoint", endpoint); } await saveNotificationPreferences({ push_enabled: false }); }
-export function notifyWhileAppIsOpen(title: string, body: string, url = "/") { if (!("Notification" in window) || Notification.permission !== "granted") return; const notification = new Notification(title, { body, icon: "/outstand-logo.png", badge: "/outstand-logo.png" }); notification.onclick = () => { window.location.assign(url); }; }
+export type NotificationPreferences = { push_enabled:boolean; habits_enabled:boolean; goals_enabled:boolean; motivational_enabled:boolean; updates_enabled:boolean; coaching_enabled:boolean; quiet_hours_enabled:boolean; quiet_start:string; quiet_end:string; max_daily:number; timezone:string; };
+export type NotificationJob = { id:string; category:NotificationCategory; title:string; body:string; url:string; local_time:string; timezone:string; enabled:boolean; days_of_week:number[]; habit_id?:string|null; last_scheduled_date?:string|null; };
+const DEFAULTS: NotificationPreferences = { push_enabled:false, habits_enabled:true, goals_enabled:true, motivational_enabled:true, updates_enabled:true, coaching_enabled:true, quiet_hours_enabled:true, quiet_start:"22:00", quiet_end:"07:00", max_daily:3, timezone:"UTC" };
+const QUOTES = ["Small wins compound. Just take the next step. 🔵","You don't need a perfect day. You need one good decision.","Momentum starts with something small enough to do right now. ⚡","Progress is still progress when nobody else sees it.","Make today a little better than yesterday. 🎯"];
+export function motivationalMessage(seed=Date.now()){return QUOTES[Math.abs(seed)%QUOTES.length];}
+export function isWithinQuietHours(now=new Date(),preferences:NotificationPreferences=DEFAULTS){if(!preferences.quiet_hours_enabled)return false;const[startH,startM]=preferences.quiet_start.split(":").map(Number),[endH,endM]=preferences.quiet_end.split(":").map(Number);let current:number;try{const parts=new Intl.DateTimeFormat("en-US",{timeZone:preferences.timezone||"UTC",hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(now);current=Number(parts.find(p=>p.type==="hour")?.value??0)*60+Number(parts.find(p=>p.type==="minute")?.value??0);}catch{current=now.getHours()*60+now.getMinutes();}const start=startH*60+startM,end=endH*60+endM;return start>end?current>=start||current<end:current>=start&&current<end;}
+export function canNotify(category:NotificationCategory,preferences:NotificationPreferences,now=new Date()){if(!preferences.push_enabled||isWithinQuietHours(now,preferences))return false;if(category==="habit"&&!preferences.habits_enabled)return false;if(category==="goal"&&!preferences.goals_enabled)return false;if(category==="motivation"&&!preferences.motivational_enabled)return false;if(category==="update"&&!preferences.updates_enabled)return false;if(category==="coaching"&&!preferences.coaching_enabled)return false;return true;}
+export async function getNotificationPreferences():Promise<NotificationPreferences>{const{data:{user}}=await supabase.auth.getUser();if(!user)return DEFAULTS;const{data,error}=await supabase.from("notification_preferences").select("*").eq("user_id",user.id).maybeSingle();if(error||!data)return{...DEFAULTS,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC"};return{...DEFAULTS,...data}as NotificationPreferences;}
+export async function saveNotificationPreferences(patch:Partial<NotificationPreferences>){const{data:{user}}=await supabase.auth.getUser();if(!user)throw new Error("Please sign in to change notification settings.");const current=await getNotificationPreferences();const next={...current,...patch,user_id:user.id};const{error}=await supabase.from("notification_preferences").upsert(next,{onConflict:"user_id"});if(error)throw error;return next;}
+export async function getNotificationHistory(limit=30){const{data,error}=await supabase.from("notification_events").select("id,category,title,body,url,delivered_at,created_at").order("created_at",{ascending:false}).limit(limit);if(error)throw error;return data??[];}
+export async function getNotificationJobs():Promise<NotificationJob[]>{const{data:{user}}=await supabase.auth.getUser();if(!user)throw new Error("Please sign in first.");const{data,error}=await supabase.from("notification_jobs").select("id,category,title,body,url,local_time,timezone,enabled,days_of_week,habit_id,last_scheduled_date").eq("user_id",user.id).order("local_time",{ascending:true});if(error)throw error;return(data??[])as NotificationJob[];}
+export async function createNotificationJob(input:{category:NotificationCategory;title:string;body:string;local_time:string;days_of_week?:number[];url?:string;habit_id?:string|null}){const{data:{user}}=await supabase.auth.getUser();if(!user)throw new Error("Please sign in first.");const timezone=Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC";const{data,error}=await supabase.from("notification_jobs").insert({...input,user_id:user.id,timezone,days_of_week:input.days_of_week??[0,1,2,3,4,5,6],url:input.url??"/"}).select("*").single();if(error)throw error;return data as NotificationJob;}
+export async function updateNotificationJob(id:string,patch:Partial<Pick<NotificationJob,"local_time"|"days_of_week"|"enabled"|"title"|"body"|"url"|"category">>){const{data,error}=await supabase.from("notification_jobs").update(patch).eq("id",id).select("*").single();if(error)throw error;return data as NotificationJob;}
+export async function deleteNotificationJob(id:string){const{error}=await supabase.from("notification_jobs").delete().eq("id",id);if(error)throw error;}
+function base64UrlToUint8Array(value:string){const cleaned=value.trim().replace(/^['"]|['"]$/g,"").replace(/\s+/g,"");if(!cleaned)throw new Error("VAPID public key is empty.");if(!/^[A-Za-z0-9+/_-]+={0,2}$/.test(cleaned))throw new Error("VAPID public key contains invalid characters.");const base64=cleaned.replace(/-/g,"+").replace(/_/g,"/");const remainder=base64.length%4;if(remainder===1)throw new Error("VAPID public key has an invalid length.");const padded=base64+"=".repeat((4-remainder)%4);let binary:string;try{binary=atob(padded);}catch{throw new Error("VAPID public key is not valid base64/base64url.");}const bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));if(bytes.length!==65||bytes[0]!==4)throw new Error("VAPID public key is invalid.");return bytes;}
+export async function requestPushPermission(){if(!(typeof window!=="undefined"&&"Notification"in window)&&!(typeof navigator!=="undefined"&&"serviceWorker"in navigator&&"PushManager"in window))throw new Error("Push notifications aren't supported by this browser.");const permission=Notification.permission;if(permission==="denied")throw new Error("Notifications are blocked in your browser settings.");if(permission==="default"&&await Notification.requestPermission()!=="granted")throw new Error("Notification permission was not granted.");if(Notification.permission!=="granted")throw new Error("Notification permission was not granted.");const{data:{session}}=await supabase.auth.getSession();if(!session)throw new Error("Please sign in first.");const registration=await navigator.serviceWorker.register("/sw.js",{updateViaCache:"none"}).then(()=>navigator.serviceWorker.ready);await registration.update().catch(()=>undefined);const vapid=import.meta.env.VITE_VAPID_PUBLIC_KEY;if(!vapid)throw new Error("Push notifications are not configured yet.");const applicationServerKey=base64UrlToUint8Array(vapid);const existing=await registration.pushManager.getSubscription();const subscription=existing??await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey});const json=subscription.toJSON();if(!json.endpoint||!json.keys?.auth||!json.keys?.p256dh)throw new Error("The browser returned an invalid push subscription.");const{error:subscriptionError}=await supabase.from("push_subscriptions").upsert({user_id:session.user.id,endpoint:json.endpoint,auth_key:json.keys.auth,p256dh_key:json.keys.p256dh},{onConflict:"user_id,endpoint"});if(subscriptionError){if(!existing)await subscription.unsubscribe().catch(()=>undefined);throw new Error(`Could not save your push subscription: ${subscriptionError.message}`);}await saveNotificationPreferences({push_enabled:true,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC"});return subscription;}
+export async function disablePushNotifications(){const registration=await navigator.serviceWorker.getRegistration("/sw.js");const subscription=await registration?.pushManager.getSubscription();if(subscription){const endpoint=subscription.endpoint;await subscription.unsubscribe();await supabase.from("push_subscriptions").delete().eq("endpoint",endpoint);}await saveNotificationPreferences({push_enabled:false});}
+export function notifyWhileAppIsOpen(title:string,body:string,url="/"){if(!(typeof Notification!=="undefined")||Notification.permission!=="granted")return;const notification=new Notification(title,{body,icon:"/outstand-logo.png",badge:"/outstand-logo.png"});notification.onclick=()=>window.location.assign(url);}
