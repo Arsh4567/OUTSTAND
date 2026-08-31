@@ -1,110 +1,65 @@
-import { getOwnedRoadmap, listOwnedRoadmaps, updateOwnedRoadmap, deleteOwnedRoadmap, createBasicRoadmap, smartChangeRoadmap } from "../../../api/roadmap-service.ts";
-import { getAdaptiveSnapshot, setTaskProgress } from "../../../api/adaptive-roadmap.ts";
+const activeStatuses = ["active", "paused"];
+const today = () => new Date().toISOString().slice(0, 10);
+
+async function getOwnedRoadmap(client: any, userId: string, roadmapId: string) {
+  const { data, error } = await client.from("roadmaps").select("id,title,goal,start_date,target_date,duration_days,status,category,created_at,user_id").eq("id", roadmapId).eq("user_id", userId).maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("Roadmap not found.");
+  return data;
+}
+
+async function listOwnedRoadmaps(client: any, userId: string) {
+  const { data, error } = await client.from("roadmaps").select("id,title,goal,start_date,target_date,duration_days,status,category,created_at,user_id").eq("user_id", userId).in("status", activeStatuses).order("created_at", { ascending: false }).limit(4);
+  if (error) throw error;
+  return data || [];
+}
+
+async function createBasicRoadmap(client: any, userId: string, category: string, answers: Record<string, unknown>) {
+  const goal = typeof answers.goal === "string" ? answers.goal.trim() : "";
+  if (!goal) return { needsMoreInfo: true, questions: [{ id: "goal", question: "What result are you aiming for?", type: "multiline", required: true }] };
+  const { count, error: countError } = await client.from("roadmaps").select("id", { count: "exact", head: true }).eq("user_id", userId).in("status", activeStatuses);
+  if (countError) throw countError;
+  if ((count || 0) >= 4) throw new Error("You can have a maximum of 4 active or paused roadmaps.");
+  const durationDays = Math.max(7, Math.min(180, Number(answers.durationDays) || 30));
+  const title = (typeof answers.title === "string" && answers.title.trim() ? answers.title.trim() : goal.slice(0, 60)).slice(0, 120);
+  const startDate = typeof answers.start_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(answers.start_date) ? answers.start_date : today();
+  const targetDate = typeof answers.deadline === "string" && /^\d{4}-\d{2}-\d{2}$/.test(answers.deadline) ? answers.deadline : null;
+  const { data, error } = await client.from("roadmaps").insert({ user_id: userId, title, goal, start_date: startDate, target_date: targetDate, duration_days: durationDays, status: "active", category }).select("id,title,goal,start_date,target_date,duration_days,status,category,created_at,user_id").single();
+  if (error) throw error;
+  return { roadmapId: data.id, roadmap: data, created: true, verified: true };
+}
+
+function dayFor(startDate: string, dayNumber: number) { const date = new Date(`${startDate}T00:00:00`); date.setDate(date.getDate() + Math.max(1, dayNumber) - 1); return date.toLocaleDateString("en-US", { weekday: "long" }).toLowerCase(); }
+function taskMatches(task: any, subject: string) { const needle = subject.trim().toLowerCase(); const hay = `${task.title || ""} ${task.instructions || ""} ${task.success_criteria || ""}`.toLowerCase(); return Boolean(needle) && (hay.includes(needle) || needle.split(/\s+/).filter((t) => t.length > 2).every((t) => hay.includes(t))); }
+
+async function smartChange(client: any, userId: string, roadmapId: string, request: string) {
+  const roadmap = await getOwnedRoadmap(client, userId, roadmapId);
+  const text = request.trim();
+  if (text.length < 5) throw new Error("Describe the change you want to make.");
+  const rename = text.match(/^(?:rename|name)\s+(?:the\s+)?roadmap\s+(?:to\s+)?["“]?(.+?)["”]?$/i);
+  const goal = text.match(/^(?:change|update|set)\s+(?:the\s+)?goal\s+(?:to\s+)?["“]?(.+?)["”]?$/i);
+  if (rename || goal) { const patch = rename ? { title: rename[1].trim().slice(0, 120) } : { goal: goal![1].trim().slice(0, 2000) }; const { error } = await client.from("roadmaps").update(patch).eq("id", roadmapId).eq("user_id", userId); if (error) throw error; return { changed: true, roadmapId, action: rename ? "rename_roadmap" : "update_goal", verified: true }; }
+  const { data: tasks, error } = await client.from("roadmap_tasks").select("id,title,day_number,instructions,success_criteria").eq("roadmap_id", roadmapId).eq("user_id", userId).order("day_number").order("task_order");
+  if (error) throw error;
+  const weekday = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].find((d) => new RegExp(`\\b${d}s?\\b`, "i").test(text));
+  const remove = text.match(/^(?:remove|delete|drop|cancel)\s+(.+?)(?:\s+on\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)s?)?(?:\s+from\s+the\s+roadmap)?$/i);
+  if (remove) { const matches = (tasks || []).filter((t: any) => taskMatches(t, remove[1]) && (!weekday || dayFor(roadmap.start_date, Number(t.day_number)) === weekday)); if (!matches.length) throw new Error(`No roadmap tasks matched “${remove[1].trim()}”.`); for (const task of matches) { const { error: deleteError } = await client.from("roadmap_tasks").delete().eq("id", task.id).eq("roadmap_id", roadmapId).eq("user_id", userId); if (deleteError) throw deleteError; } return { changed: true, roadmapId, action: "delete_tasks", affectedTasks: matches.length, verified: true }; }
+  const replace = text.match(/^(?:replace|swap)\s+(.+?)\s+with\s+(.+?)(?:\s+on\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)s?)?$/i);
+  if (replace) { const matches = (tasks || []).filter((t: any) => taskMatches(t, replace[1]) && (!weekday || dayFor(roadmap.start_date, Number(t.day_number)) === weekday)); if (!matches.length) throw new Error(`No roadmap tasks matched “${replace[1].trim()}”.`); for (const task of matches) { const { error: updateError } = await client.from("roadmap_tasks").update({ title: replace[2].trim().slice(0, 200) }).eq("id", task.id).eq("roadmap_id", roadmapId).eq("user_id", userId); if (updateError) throw updateError; } return { changed: true, roadmapId, action: "replace_tasks", affectedTasks: matches.length, verified: true }; }
+  throw new Error("I could not identify a safe roadmap change. Try renaming the roadmap, changing its goal, or naming a specific task.");
+}
 
 export async function handleRoadmapAction(client: any, userId: string, action: string, body: any) {
   if (action === "list_roadmaps") return { roadmaps: await listOwnedRoadmaps(client, userId), verified: true };
-
-  if (action === "roadmap_questions") {
-    const category = typeof body.category === "string" ? body.category : "skill_learning";
-    const presets: Record<string, any[]> = {
-      exam_preparation: [
-        { id: "goal", question: "What result are you aiming for?", type: "multiline", required: true, placeholder: "Example: 90%+ in my half-yearly exam." },
-        { id: "deadline", question: "When is the exam?", type: "text", required: true, placeholder: "Example: 20 September" },
-        { id: "baseline", question: "What is your current level?", type: "multiline", required: true },
-        { id: "time", question: "How much time can you study on a normal day?", type: "number", required: true },
-      ],
-      chess: [
-        { id: "goal", question: "What chess result are you targeting?", type: "multiline", required: true, placeholder: "Example: reach 1500 rapid." },
-        { id: "baseline", question: "What is your current rating and biggest weakness?", type: "multiline", required: true },
-        { id: "time", question: "How many minutes can you train per day?", type: "number", required: true },
-      ],
-      academics: [
-        { id: "goal", question: "What academic result do you want?", type: "multiline", required: true },
-        { id: "deadline", question: "When is the deadline or exam?", type: "text", required: true },
-        { id: "baseline", question: "Where are you starting from?", type: "multiline", required: true },
-      ],
-    };
-    return { questions: presets[category] || [
-      { id: "goal", question: "What result are you aiming for?", type: "multiline", required: true, placeholder: "Describe the destination in concrete terms." },
-      { id: "deadline", question: "What deadline are you working toward?", type: "text", required: true },
-      { id: "baseline", question: "What is your current starting point?", type: "multiline", required: true },
-      { id: "time", question: "How much time can you commit most days?", type: "number", required: true },
-    ] };
-  }
-
-  if (action === "update_roadmap") {
-    const roadmapId = typeof body.roadmapId === "string" ? body.roadmapId : "";
-    if (!roadmapId) throw new Error("roadmapId is required.");
-    return await updateOwnedRoadmap(client, userId, roadmapId, { title: body.title, goal: body.goal });
-  }
-
-  if (action === "smart_change") {
-    const roadmapId = typeof body.roadmapId === "string" ? body.roadmapId : "";
-    const request = typeof body.request === "string" ? body.request : "";
-    if (!roadmapId) throw new Error("roadmapId is required.");
-    return await smartChangeRoadmap(client, userId, roadmapId, request);
-  }
-
-  if (action === "delete_roadmap") {
-    const roadmapId = typeof body.roadmapId === "string" ? body.roadmapId : "";
-    if (!roadmapId) throw new Error("roadmapId is required.");
-    return await deleteOwnedRoadmap(client, userId, roadmapId);
-  }
-
-  if (action === "generate_roadmap") {
-    const category = typeof body.category === "string" ? body.category : "skill_learning";
-    const answers = body.answers && typeof body.answers === "object" ? body.answers : {};
-    return await createBasicRoadmap(client, userId, category, answers);
-  }
-
-  if (action === "get_roadmap") {
-    const roadmapId = typeof body.roadmapId === "string" ? body.roadmapId : "";
-    if (!roadmapId) throw new Error("roadmapId is required.");
-    return { roadmap: await getOwnedRoadmap(client, userId, roadmapId), verified: true };
-  }
-
-  if (action === "set_task_progress") {
-    const roadmapId = typeof body.roadmapId === "string" ? body.roadmapId : "";
-    const taskId = typeof body.taskId === "string" ? body.taskId : "";
-    const status = typeof body.status === "string" ? body.status : "";
-    if (!roadmapId || !taskId) throw new Error("roadmapId and taskId are required.");
-    return await setTaskProgress(client, userId, roadmapId, taskId, status);
-  }
-
-  if (action === "refresh_today_tasks") {
-    const roadmapId = typeof body.roadmapId === "string" ? body.roadmapId : "";
-    if (!roadmapId) throw new Error("roadmapId is required.");
-    const snapshot = await getAdaptiveSnapshot(client, userId, roadmapId);
-    return { ...snapshot, mode: typeof body.mode === "string" ? body.mode : "custom" };
-  }
-
-  if (action === "insert_next_day_schedule") {
-    const roadmapId = typeof body.roadmapId === "string" ? body.roadmapId : "";
-    if (!roadmapId) throw new Error("roadmapId is required.");
-    const snapshot = await getAdaptiveSnapshot(client, userId, roadmapId);
-    return { roadmapId, nextDay: Number(body.nextDay) || snapshot.todayDay + 1, schedule: Array.isArray(body.schedule) ? body.schedule : [], adaptation: snapshot.adaptation, verified: true };
-  }
-
-  if (action === "save_nightly_review") {
-    const roadmapId = typeof body.roadmapId === "string" ? body.roadmapId : "";
-    if (!roadmapId) throw new Error("roadmapId is required.");
-    const snapshot = await getAdaptiveSnapshot(client, userId, roadmapId);
-    const reviewDate = new Date().toISOString().slice(0, 10);
-    const payload = {
-      user_id: userId,
-      roadmap_id: roadmapId,
-      roadmap_day: snapshot.todayDay,
-      event_date: reviewDate,
-      reflection: String(body.reflection || "").trim().slice(0, 2000),
-      energy: Math.max(1, Math.min(5, Number(body.energy) || 1)),
-      difficulty: Math.max(1, Math.min(5, Number(body.difficulty) || 1)),
-      adaptation: snapshot.adaptation,
-    };
-    const { data, error } = await client.from("roadmap_adaptation_events").upsert(payload, { onConflict: "user_id,roadmap_id,event_date" }).select("id,roadmap_day,event_date,adaptation").maybeSingle();
-    if (error) throw error;
-    if (!data) throw new Error("Nightly review could not be saved.");
-    return { roadmapId, reviewDate, adaptation: snapshot.adaptation, review: data, verified: true };
-  }
-
+  if (action === "roadmap_questions") { const category = typeof body.category === "string" ? body.category : "skill_learning"; const presets: Record<string, any[]> = { exam_preparation: [{ id: "goal", question: "What result are you aiming for?", type: "multiline", required: true }, { id: "deadline", question: "When is the exam?", type: "text", required: true }, { id: "baseline", question: "What is your current level?", type: "multiline", required: true }, { id: "time", question: "How much time can you study on a normal day?", type: "number", required: true }], chess: [{ id: "goal", question: "What chess result are you targeting?", type: "multiline", required: true }, { id: "baseline", question: "What is your current rating and biggest weakness?", type: "multiline", required: true }, { id: "time", question: "How many minutes can you train per day?", type: "number", required: true }], academics: [{ id: "goal", question: "What academic result do you want?", type: "multiline", required: true }, { id: "deadline", question: "When is the deadline or exam?", type: "text", required: true }, { id: "baseline", question: "Where are you starting from?", type: "multiline", required: true }] }; return { questions: presets[category] || [{ id: "goal", question: "What result are you aiming for?", type: "multiline", required: true }, { id: "deadline", question: "What deadline are you working toward?", type: "text", required: true }, { id: "baseline", question: "What is your current starting point?", type: "multiline", required: true }, { id: "time", question: "How much time can you commit most days?", type: "number", required: true }] }; }
+  if (action === "update_roadmap") { const roadmapId = String(body.roadmapId || ""); if (!roadmapId) throw new Error("roadmapId is required."); const current = await getOwnedRoadmap(client, userId, roadmapId); const patch = { title: typeof body.title === "string" ? body.title.trim().slice(0, 120) : current.title, goal: typeof body.goal === "string" ? body.goal.trim().slice(0, 2000) : current.goal }; const { error } = await client.from("roadmaps").update(patch).eq("id", roadmapId).eq("user_id", userId); if (error) throw error; return { roadmapId, roadmap: await getOwnedRoadmap(client, userId, roadmapId), updated: true, verified: true }; }
+  if (action === "smart_change") return smartChange(client, userId, String(body.roadmapId || ""), String(body.request || ""));
+  if (action === "delete_roadmap") { const roadmapId = String(body.roadmapId || ""); if (!roadmapId) throw new Error("roadmapId is required."); const roadmap = await getOwnedRoadmap(client, userId, roadmapId); const { data, error } = await client.rpc("delete_roadmap", { p_roadmap_id: roadmapId }); if (error) throw error; if (data !== true) throw new Error("Roadmap deletion could not be verified."); return { deleted: true, roadmapId, title: roadmap.title, verified: true }; }
+  if (action === "generate_roadmap") return createBasicRoadmap(client, userId, typeof body.category === "string" ? body.category : "custom", body.answers && typeof body.answers === "object" ? body.answers : {});
+  if (action === "get_roadmap") return { roadmap: await getOwnedRoadmap(client, userId, String(body.roadmapId || "")), verified: true };
+  if (action === "set_task_progress") { const roadmapId = String(body.roadmapId || ""); const taskId = String(body.taskId || ""); const status = String(body.status || ""); if (!["pending", "in_progress", "completed", "skipped"].includes(status)) throw new Error("Invalid task status."); const { data: task, error: taskError } = await client.from("roadmap_tasks").select("id,roadmap_id,user_id").eq("id", taskId).eq("roadmap_id", roadmapId).eq("user_id", userId).maybeSingle(); if (taskError) throw taskError; if (!task) throw new Error("Task not found."); const { error } = await client.from("roadmap_task_progress").upsert({ task_id: taskId, roadmap_id: roadmapId, user_id: userId, status, completed_at: status === "completed" ? new Date().toISOString() : null }, { onConflict: "task_id,roadmap_id,user_id" }); if (error) throw error; const { data: verified, error: verifyError } = await client.from("roadmap_task_progress").select("task_id,status,completed_at").eq("task_id", taskId).eq("roadmap_id", roadmapId).eq("user_id", userId).maybeSingle(); if (verifyError) throw verifyError; if (!verified || verified.status !== status) throw new Error("Task progress could not be verified."); return { task, progress: verified, verified: true }; }
+  if (action === "refresh_today_tasks") { const roadmap = await getOwnedRoadmap(client, userId, String(body.roadmapId || "")); const day = Math.max(1, Math.min(Number(roadmap.duration_days) || 1, Math.floor((Date.now() - new Date(`${roadmap.start_date}T00:00:00`).getTime()) / 86400000) + 1)); const { data: tasks, error } = await client.from("roadmap_tasks").select("id,day_number,task_order,title,estimated_minutes,is_required,task_type").eq("roadmap_id", roadmap.id).eq("user_id", userId).eq("day_number", day).order("task_order"); if (error) throw error; const { data: progress, error: progressError } = await client.from("roadmap_task_progress").select("task_id,status,completed_at").eq("roadmap_id", roadmap.id).eq("user_id", userId); if (progressError) throw progressError; const map = new Map((progress || []).map((p: any) => [p.task_id, p])); const todayTasks = tasks || []; const completed = todayTasks.filter((t: any) => map.get(t.id)?.status === "completed"); const rate = todayTasks.length ? completed.length / todayTasks.length : 0; const required = todayTasks.filter((t: any) => t.is_required !== false && map.get(t.id)?.status !== "completed").map((t: any) => t.id); const adaptation = { day, completionRate: rate, completedMinutes: completed.reduce((s: number, t: any) => s + Number(t.estimated_minutes || 0), 0), plannedMinutes: todayTasks.reduce((s: number, t: any) => s + Number(t.estimated_minutes || 0), 0), remainingMinutes: Math.max(0, todayTasks.reduce((s: number, t: any) => s + Number(t.estimated_minutes || 0), 0) - completed.reduce((s: number, t: any) => s + Number(t.estimated_minutes || 0), 0)), action: rate < 0.5 ? "recover" : rate < 0.8 ? "lighten" : rate === 1 && todayTasks.length >= 2 ? "progress" : "maintain", reason: rate < 0.5 ? "Recover the highest-value unfinished required work." : rate < 0.8 ? "Keep progression steady without adding extra workload." : "Today's workload is progressing normally.", carryForwardTaskIds: required.slice(0, 2) }; return { roadmap, todayDay: day, todayTasks, progress: progress || [], adaptation, verified: true }; }
+  if (action === "insert_next_day_schedule") return { roadmapId: String(body.roadmapId || ""), nextDay: Number(body.nextDay) || 1, schedule: Array.isArray(body.schedule) ? body.schedule : [], verified: true };
+  if (action === "save_nightly_review") { const roadmapId = String(body.roadmapId || ""); const reviewDate = today(); const { data, error } = await client.from("roadmap_adaptation_events").upsert({ user_id: userId, roadmap_id: roadmapId, roadmap_day: Number(body.roadmapDay) || 1, event_date: reviewDate, reflection: String(body.reflection || "").trim().slice(0, 2000), energy: Math.max(1, Math.min(5, Number(body.energy) || 1)), difficulty: Math.max(1, Math.min(5, Number(body.difficulty) || 1)) }, { onConflict: "user_id,roadmap_id,event_date" }).select("id,roadmap_day,event_date,reflection,energy,difficulty").maybeSingle(); if (error) throw error; if (!data) throw new Error("Nightly review could not be saved."); return { roadmapId, review: data, verified: true }; }
   throw new Error(`Unsupported roadmap action: ${action}`);
 }
