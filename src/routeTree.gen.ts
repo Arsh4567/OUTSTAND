@@ -13,6 +13,7 @@ import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RoadmapRouteImport } from './routes/roadmap'
+import { Route as ComebackRouteImport } from './routes/comeback'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiRoadmapRouteImport } from './routes/api/roadmap'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
@@ -35,6 +36,7 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({ id: '/callback', path
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({ id: '/_authenticated', getParentRoute: () => rootRouteImport } as any)
 const IndexRoute = IndexRouteImport.update({ id: '/', path: '/', getParentRoute: () => rootRouteImport } as any)
 const RoadmapRoute = RoadmapRouteImport.update({ id: '/roadmap', path: '/roadmap', getParentRoute: () => rootRouteImport } as any)
+const ComebackRoute = ComebackRouteImport.update({ id: '/comeback', path: '/comeback', getParentRoute: () => rootRouteImport } as any)
 const ApiChatRoute = ApiChatRouteImport.update({ id: '/api/chat', path: '/api/chat', getParentRoute: () => rootRouteImport } as any)
 const ApiRoadmapRoute = ApiRoadmapRouteImport.update({ id: '/api/roadmap', path: '/api/roadmap', getParentRoute: () => rootRouteImport } as any)
 const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({ id: '/profile', path: '/profile', getParentRoute: () => AuthenticatedRouteRoute } as any)
@@ -57,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/auth/callback': typeof AuthCallbackRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/roadmap': typeof RoadmapRoute
+  '/comeback': typeof ComebackRoute
   '/api/chat': typeof ApiChatRoute
   '/api/roadmap': typeof ApiRoadmapRoute
   '/chat': typeof AuthenticatedChatRoute
@@ -82,6 +85,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/roadmap': typeof RoadmapRoute
+  '/comeback': typeof ComebackRoute
   '/api/chat': typeof ApiChatRoute
   '/api/roadmap': typeof ApiRoadmapRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
@@ -115,6 +119,7 @@ declare module '@tanstack/react-router' {
     '/_authenticated': { id: '/_authenticated'; path: ''; fullPath: '/'; preLoaderRoute: typeof AuthenticatedRouteRouteImport; parentRoute: typeof rootRouteImport }
     '/': { id: '/'; path: '/'; fullPath: '/'; preLoaderRoute: typeof IndexRouteImport; parentRoute: typeof rootRouteImport }
     '/roadmap': { id: '/roadmap'; path: '/roadmap'; fullPath: '/roadmap'; preLoaderRoute: typeof RoadmapRouteImport; parentRoute: typeof rootRouteImport }
+    '/comeback': { id: '/comeback'; path: '/comeback'; fullPath: '/comeback'; preLoaderRoute: typeof ComebackRouteImport; parentRoute: typeof rootRouteImport }
     '/api/chat': { id: '/api/chat'; path: '/api/chat'; fullPath: '/api/chat'; preLoaderRoute: typeof ApiChatRouteImport; parentRoute: typeof rootRouteImport }
     '/api/roadmap': { id: '/api/roadmap'; path: '/api/roadmap'; fullPath: '/api/roadmap'; preLoaderRoute: typeof ApiRoadmapRouteImport; parentRoute: typeof rootRouteImport }
     '/_authenticated/chat': { id: '/_authenticated/chat'; path: '/chat'; fullPath: '/chat'; preLoaderRoute: typeof AuthenticatedChatRouteImport; parentRoute: typeof AuthenticatedRouteRoute }
@@ -175,6 +180,7 @@ interface RootRouteChildren {
   AuthRoute: typeof AuthRouteWithChildren
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   RoadmapRoute: typeof RoadmapRoute
+  ComebackRoute: typeof ComebackRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiRoadmapRoute: typeof ApiRoadmapRoute
 }
@@ -184,6 +190,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRouteWithChildren,
   SitemapDotxmlRoute,
   RoadmapRoute,
+  ComebackRoute,
   ApiChatRoute,
   ApiRoadmapRoute,
 }
