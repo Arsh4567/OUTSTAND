@@ -2,10 +2,15 @@
   "name": "OUTSTAND — Your goals. Your system. Your momentum.",
   "short_name": "OUTSTAND",
   "description": "AI guidance, goals, habits, focus sessions, roadmaps, progress tracking and friends in one connected personal growth system.",
-  "start_url": "/",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#050508",
-  "theme_color": "#050508",
+  "orientation": "portrait-primary",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "prefer_related_applications": false,
+  "categories": ["productivity", "education", "lifestyle"],
   "icons": [
     {
       "src": "/outstand-logo.png",
