@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
   try {
     webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
 
-    const { event_id, subscription_id } = await req.json();
+    const { event_id } = await req.json();
     if (!event_id) return response({ error: "event_id is required" }, 400);
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -76,13 +76,14 @@ Deno.serve(async (req) => {
       if ((count ?? 0) >= Number(preferences.max_daily ?? 3)) return response({ sent: false, reason: "daily_limit" });
     }
 
-    // A test initiated on a specific device must only be delivered to that device.
-    // Scheduled notifications intentionally fan out to all valid devices belonging to the user.
-    let subscriptionsQuery = admin.from("push_subscriptions").select("id,endpoint,auth_key,p256dh_key").eq("user_id", event.user_id);
-    if (isTest && subscription_id) subscriptionsQuery = subscriptionsQuery.eq("id", subscription_id);
+    // Test notifications are device diagnostics. Send only to the newest subscription,
+    // which is the subscription created/refreshed by the device that just enabled push.
+    // Scheduled notifications continue to fan out to every valid device.
+    let subscriptionsQuery = admin.from("push_subscriptions").select("id,endpoint,auth_key,p256dh_key,created_at").eq("user_id", event.user_id);
+    if (isTest) subscriptionsQuery = subscriptionsQuery.order("created_at", { ascending: false }).limit(1);
     const { data: subscriptions, error: subError } = await subscriptionsQuery;
     if (subError) return response({ error: subError.message }, 500);
-    if (!subscriptions?.length) return response({ sent: false, reason: isTest && subscription_id ? "subscription_not_found" : "no_subscription" });
+    if (!subscriptions?.length) return response({ sent: false, reason: "no_subscription" });
 
     const payload = JSON.stringify({ title: event.title, body: event.body, icon: "/outstand-logo.png", badge: "/outstand-logo.png", url: event.url, tag: isTest ? "outstand-test" : event.id, renotify: false });
     let delivered = 0;
