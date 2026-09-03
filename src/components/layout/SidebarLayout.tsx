@@ -127,7 +127,7 @@ export default function SidebarLayout({ children }: { children: ReactNode }) {
             </>
           ) : null}
         </AnimatePresence>
-        <AppSettingsSheet theme={theme} onThemeChange={setTheme} open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
+        <AppSettingsSheet isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} theme={theme} onThemeChange={setTheme} />
       </div>
     </MotionConfig>
   );
