@@ -1,0 +1,32 @@
+{
+  "mode": "observe-and-pr",
+  "repository": "Arsh4567/OUTSTAND",
+  "baseBranch": "main",
+  "workBranchPrefix": "agent/",
+  "maxRunMinutes": 20,
+  "maxFilesChanged": 12,
+  "maxConsecutiveFailures": 2,
+  "schedule": {
+    "enabled": false,
+    "cadenceHours": 3
+  },
+  "quality": {
+    "commands": [
+      "bun install --frozen-lockfile",
+      "bunx tsc --noEmit",
+      "bun run lint",
+      "bun run build"
+    ]
+  },
+  "safety": {
+    "allowMainWrites": false,
+    "allowProductionDeploy": false,
+    "allowDestructiveDatabase": false,
+    "requireHumanApprovalForSecrets": true,
+    "requireHumanApprovalForAuthChanges": true
+  },
+  "targets": {
+    "supabaseProjectRef": "zgihqwuzsxpzefhxdxtr",
+    "productionUrl": "https://outstand-by-arsh.vercel.app"
+  }
+}
