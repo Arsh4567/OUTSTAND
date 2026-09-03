@@ -88,7 +88,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { name: "theme-color", content: "#05070d" },
+      { name: "theme-color", content: "#020617" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
@@ -174,6 +174,49 @@ function RootComponent() {
     applyTheme();
     window.addEventListener("storage", applyTheme);
     return () => window.removeEventListener("storage", applyTheme);
+  }, []);
+
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+
+    let cancelled = false;
+    let registration: ServiceWorkerRegistration | undefined;
+
+    const register = async () => {
+      try {
+        registration = await navigator.serviceWorker.register("/sw.js", {
+          scope: "/",
+          updateViaCache: "none",
+        });
+        if (cancelled) return;
+        await registration.update().catch(() => undefined);
+
+        const applyController = () => {
+          if (!cancelled) window.dispatchEvent(new CustomEvent("outstand:service-worker-ready"));
+        };
+        if (navigator.serviceWorker.controller) applyController();
+        navigator.serviceWorker.addEventListener("controllerchange", applyController);
+      } catch (error) {
+        console.warn("OUTSTAND service worker registration failed.", error);
+      }
+    };
+
+    const idleWindow = window as Window & { requestIdleCallback?: (callback: () => void) => number };
+    if (typeof idleWindow.requestIdleCallback === "function") {
+      const id = idleWindow.requestIdleCallback(register);
+      return () => {
+        cancelled = true;
+        navigator.serviceWorker.removeEventListener("controllerchange", () => undefined);
+        if (typeof window.cancelIdleCallback === "function") window.cancelIdleCallback(id);
+        void registration;
+      };
+    }
+
+    const timeout = window.setTimeout(register, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
   }, []);
 
   const usesAppChrome =
