@@ -11,8 +11,6 @@ const corsHeaders = {
 const env = (...names: string[]) => names.map((name) => Deno.env.get(name)?.trim()).find(Boolean);
 const SUPABASE_URL = env("SUPABASE_URL");
 const SERVICE_ROLE = env("SUPABASE_SERVICE_ROLE_KEY");
-// Keep the existing secret names. Prefer the public key name already used by the frontend
-// so a stale VAPID_PUBLIC_KEY secret cannot silently override the active key pair.
 const VAPID_PUBLIC = env("VITE_VAPID_PUBLIC_KEY", "VAPID_PUBLIC_KEY");
 const VAPID_PRIVATE = env("VAPID_PRIVATE_KEY");
 const VAPID_SUBJECT = env("VAPID_SUBJECT") || "mailto:notifications@outstand.app";
@@ -44,10 +42,8 @@ Deno.serve(async (req) => {
 
   if (!SUPABASE_URL || !SERVICE_ROLE || !VAPID_PUBLIC || !VAPID_PRIVATE) {
     console.error("[send-notification] Missing notification configuration", {
-      supabase_url: Boolean(SUPABASE_URL),
-      service_role: Boolean(SERVICE_ROLE),
-      vapid_public: Boolean(VAPID_PUBLIC),
-      vapid_private: Boolean(VAPID_PRIVATE),
+      supabase_url: Boolean(SUPABASE_URL), service_role: Boolean(SERVICE_ROLE),
+      vapid_public: Boolean(VAPID_PUBLIC), vapid_private: Boolean(VAPID_PRIVATE),
     });
     return response({ error: "Notification configuration incomplete." }, 503);
   }
@@ -55,7 +51,7 @@ Deno.serve(async (req) => {
   try {
     webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
 
-    const { event_id } = await req.json();
+    const { event_id, subscription_id } = await req.json();
     if (!event_id) return response({ error: "event_id is required" }, 400);
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -69,12 +65,9 @@ Deno.serve(async (req) => {
     const preferences = prefs ?? { push_enabled: false, quiet_hours_enabled: true, quiet_start: "22:00", quiet_end: "07:00", max_daily: 3, timezone: "UTC" };
     if (!preferences.push_enabled) return response({ sent: false, reason: "push_disabled" });
 
-    // A manually-triggered test event should never be blocked just because it was
-    // clicked during quiet hours. Scheduled notifications still respect the user's window.
     const isTest = event.category === "system" && String(event.title || "").toLowerCase().includes("test notification");
     if (!isTest && withinQuietHours(new Date(), preferences)) return response({ sent: false, reason: "blocked_by_quiet_hours" });
 
-    // Test notifications are diagnostics, not a daily quota item.
     if (!isTest) {
       const dayStart = new Date();
       dayStart.setUTCHours(0, 0, 0, 0);
@@ -83,11 +76,15 @@ Deno.serve(async (req) => {
       if ((count ?? 0) >= Number(preferences.max_daily ?? 3)) return response({ sent: false, reason: "daily_limit" });
     }
 
-    const { data: subscriptions, error: subError } = await admin.from("push_subscriptions").select("id,endpoint,auth_key,p256dh_key").eq("user_id", event.user_id);
+    // A test initiated on a specific device must only be delivered to that device.
+    // Scheduled notifications intentionally fan out to all valid devices belonging to the user.
+    let subscriptionsQuery = admin.from("push_subscriptions").select("id,endpoint,auth_key,p256dh_key").eq("user_id", event.user_id);
+    if (isTest && subscription_id) subscriptionsQuery = subscriptionsQuery.eq("id", subscription_id);
+    const { data: subscriptions, error: subError } = await subscriptionsQuery;
     if (subError) return response({ error: subError.message }, 500);
-    if (!subscriptions?.length) return response({ sent: false, reason: "no_subscription" });
+    if (!subscriptions?.length) return response({ sent: false, reason: isTest && subscription_id ? "subscription_not_found" : "no_subscription" });
 
-    const payload = JSON.stringify({ title: event.title, body: event.body, icon: "/outstand-logo.png", badge: "/outstand-logo.png", url: event.url, tag: event.id, renotify: true });
+    const payload = JSON.stringify({ title: event.title, body: event.body, icon: "/outstand-logo.png", badge: "/outstand-logo.png", url: event.url, tag: isTest ? "outstand-test" : event.id, renotify: false });
     let delivered = 0;
     const failures: Array<{ status?: number; message: string }> = [];
 
@@ -103,7 +100,6 @@ Deno.serve(async (req) => {
         const providerBody = typeof (error as any)?.body === "string" ? String((error as any).body).slice(0, 300) : "";
         const message = providerBody || ((error as any)?.message ? String((error as any).message).slice(0, 300) : "Push provider rejected the subscription.");
         failures.push({ status: statusCode, message });
-
         if (statusCode === 404 || statusCode === 410) {
           const { error: deleteError } = await admin.from("push_subscriptions").delete().eq("id", subscription.id);
           if (deleteError) console.error("[send-notification] Failed to remove expired subscription", deleteError.message);
@@ -117,16 +113,8 @@ Deno.serve(async (req) => {
       return response({ sent: true, devices: delivered, failed_devices: failures.length });
     }
 
-    console.error("[send-notification] All push deliveries failed", {
-      event_id: event.id,
-      failures: failures.slice(0, 3),
-    });
-    return response({
-      sent: false,
-      devices: 0,
-      reason: "push_provider_rejected",
-      error: failures[0]?.message || "Push provider rejected every subscription.",
-    }, 502);
+    console.error("[send-notification] All push deliveries failed", { event_id: event.id, failures: failures.slice(0, 3) });
+    return response({ sent: false, devices: 0, reason: "push_provider_rejected", error: failures[0]?.message || "Push provider rejected every subscription." }, 502);
   } catch (error) {
     console.error("[send-notification]", error);
     return response({ error: error instanceof Error ? error.message : "Unexpected notification delivery error" }, 500);
