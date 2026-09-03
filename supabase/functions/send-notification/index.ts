@@ -8,10 +8,12 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const env = (...names: string[]) => names.map((name) => Deno.env.get(name)).find((value) => value?.trim());
+const env = (...names: string[]) => names.map((name) => Deno.env.get(name)?.trim()).find(Boolean);
 const SUPABASE_URL = env("SUPABASE_URL");
 const SERVICE_ROLE = env("SUPABASE_SERVICE_ROLE_KEY");
-const VAPID_PUBLIC = env("VAPID_PUBLIC_KEY", "VITE_VAPID_PUBLIC_KEY");
+// Keep the existing secret names. Prefer the public key name already used by the frontend
+// so a stale VAPID_PUBLIC_KEY secret cannot silently override the active key pair.
+const VAPID_PUBLIC = env("VITE_VAPID_PUBLIC_KEY", "VAPID_PUBLIC_KEY");
 const VAPID_PRIVATE = env("VAPID_PRIVATE_KEY");
 const VAPID_SUBJECT = env("VAPID_SUBJECT") || "mailto:notifications@outstand.app";
 
@@ -39,11 +41,20 @@ function withinQuietHours(now: Date, preferences: any) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return response({ error: "Method not allowed" }, 405);
+
   if (!SUPABASE_URL || !SERVICE_ROLE || !VAPID_PUBLIC || !VAPID_PRIVATE) {
+    console.error("[send-notification] Missing notification configuration", {
+      supabase_url: Boolean(SUPABASE_URL),
+      service_role: Boolean(SERVICE_ROLE),
+      vapid_public: Boolean(VAPID_PUBLIC),
+      vapid_private: Boolean(VAPID_PRIVATE),
+    });
     return response({ error: "Notification configuration incomplete." }, 503);
   }
 
   try {
+    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
+
     const { event_id } = await req.json();
     if (!event_id) return response({ error: "event_id is required" }, 400);
 
@@ -57,13 +68,20 @@ Deno.serve(async (req) => {
     if (prefsError) return response({ error: prefsError.message }, 500);
     const preferences = prefs ?? { push_enabled: false, quiet_hours_enabled: true, quiet_start: "22:00", quiet_end: "07:00", max_daily: 3, timezone: "UTC" };
     if (!preferences.push_enabled) return response({ sent: false, reason: "push_disabled" });
-    if (withinQuietHours(new Date(), preferences)) return response({ sent: false, reason: "blocked_by_quiet_hours" });
 
-    const dayStart = new Date();
-    dayStart.setUTCHours(0, 0, 0, 0);
-    const { count, error: countError } = await admin.from("notification_events").select("id", { count: "exact", head: true }).eq("user_id", event.user_id).gte("created_at", dayStart.toISOString()).not("delivered_at", "is", null);
-    if (countError) return response({ error: countError.message }, 500);
-    if ((count ?? 0) >= Number(preferences.max_daily ?? 3)) return response({ sent: false, reason: "daily_limit" });
+    // A manually-triggered test event should never be blocked just because it was
+    // clicked during quiet hours. Scheduled notifications still respect the user's window.
+    const isTest = event.category === "system" && String(event.title || "").toLowerCase().includes("test notification");
+    if (!isTest && withinQuietHours(new Date(), preferences)) return response({ sent: false, reason: "blocked_by_quiet_hours" });
+
+    // Test notifications are diagnostics, not a daily quota item.
+    if (!isTest) {
+      const dayStart = new Date();
+      dayStart.setUTCHours(0, 0, 0, 0);
+      const { count, error: countError } = await admin.from("notification_events").select("id", { count: "exact", head: true }).eq("user_id", event.user_id).gte("created_at", dayStart.toISOString()).not("delivered_at", "is", null);
+      if (countError) return response({ error: countError.message }, 500);
+      if ((count ?? 0) >= Number(preferences.max_daily ?? 3)) return response({ sent: false, reason: "daily_limit" });
+    }
 
     const { data: subscriptions, error: subError } = await admin.from("push_subscriptions").select("id,endpoint,auth_key,p256dh_key").eq("user_id", event.user_id);
     if (subError) return response({ error: subError.message }, 500);
@@ -71,21 +89,44 @@ Deno.serve(async (req) => {
 
     const payload = JSON.stringify({ title: event.title, body: event.body, icon: "/outstand-logo.png", badge: "/outstand-logo.png", url: event.url, tag: event.id, renotify: true });
     let delivered = 0;
+    const failures: Array<{ status?: number; message: string }> = [];
+
     for (const subscription of subscriptions) {
       try {
-        await webpush.sendNotification({ endpoint: subscription.endpoint, keys: { auth: subscription.auth_key, p256dh: subscription.p256dh_key } }, payload);
+        await webpush.sendNotification(
+          { endpoint: subscription.endpoint, keys: { auth: subscription.auth_key, p256dh: subscription.p256dh_key } },
+          payload,
+        );
         delivered += 1;
       } catch (error) {
-        const statusCode = Number((error as any)?.statusCode || 0);
-        if (statusCode === 404 || statusCode === 410) await admin.from("push_subscriptions").delete().eq("id", subscription.id);
+        const statusCode = Number((error as any)?.statusCode || 0) || undefined;
+        const providerBody = typeof (error as any)?.body === "string" ? String((error as any).body).slice(0, 300) : "";
+        const message = providerBody || ((error as any)?.message ? String((error as any).message).slice(0, 300) : "Push provider rejected the subscription.");
+        failures.push({ status: statusCode, message });
+
+        if (statusCode === 404 || statusCode === 410) {
+          const { error: deleteError } = await admin.from("push_subscriptions").delete().eq("id", subscription.id);
+          if (deleteError) console.error("[send-notification] Failed to remove expired subscription", deleteError.message);
+        }
       }
     }
 
     if (delivered > 0) {
       const { error: deliveredError } = await admin.from("notification_events").update({ delivered_at: new Date().toISOString() }).eq("id", event.id).is("delivered_at", null);
       if (deliveredError) return response({ error: deliveredError.message }, 500);
+      return response({ sent: true, devices: delivered, failed_devices: failures.length });
     }
-    return response({ sent: delivered > 0, devices: delivered });
+
+    console.error("[send-notification] All push deliveries failed", {
+      event_id: event.id,
+      failures: failures.slice(0, 3),
+    });
+    return response({
+      sent: false,
+      devices: 0,
+      reason: "push_provider_rejected",
+      error: failures[0]?.message || "Push provider rejected every subscription.",
+    }, 502);
   } catch (error) {
     console.error("[send-notification]", error);
     return response({ error: error instanceof Error ? error.message : "Unexpected notification delivery error" }, 500);
