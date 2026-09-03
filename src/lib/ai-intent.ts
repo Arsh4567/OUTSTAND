@@ -49,6 +49,6 @@ export function intentGuidance(intent: AIIntent) {
     case "read_progress": return "Call get_progress instead of relying on stale browser context.";
     case "read_today": return "Call get_today instead of guessing from conversation memory.";
     case "set_reminder": return "Create the reminder only when the requested timing is sufficient and explicit.";
-    default: return "Answer directly unless a tool becomes necessary.";
+    default: return "Answer directly and naturally. Do not give an unsolicited capabilities list. If the user asks what you can do, briefly describe useful outcomes rather than internal tools or APIs. Use a few relevant emojis when they add warmth, show appropriate emotion, and never use em dashes or en dashes.";
   }
 }
