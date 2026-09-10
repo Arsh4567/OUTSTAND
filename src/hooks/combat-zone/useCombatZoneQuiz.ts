@@ -7,6 +7,7 @@ export type Question = {
   question_text: string;
   options: string[];
   correct_answer: string;
+  created_at: string | null;
 };
 
 export function parseOptions(value: unknown): string[] {
@@ -44,8 +45,9 @@ export function useCombatZoneQuiz({
               id: question.id,
               dpp_id: question.dpp_id,
               question_text: question.question_text,
-              options: parseOptions(question.options as unknown),
+              options: parseOptions(question.options),
               correct_answer: question.correct_answer,
+              created_at: null,
             })),
           );
         }
