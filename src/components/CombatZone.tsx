@@ -44,12 +44,12 @@ function useCombatZone(dppId: string, onComplete: () => Promise<void>) {
         if (error) throw error;
         if (!cancelled) {
           setQuestions(
-            (data ?? []).map((question: Record<string, unknown>) => ({
-              id: question.id as string,
-              dpp_id: question.dpp_id as string | null,
-              question_text: question.question_text as string,
+            (data ?? []).map((question) => ({
+              id: question.id,
+              dpp_id: question.dpp_id,
+              question_text: question.question_text,
               options: parseOptions(question.options),
-              correct_answer: question.correct_answer as string,
+              correct_answer: question.correct_answer,
             })),
           );
         }
