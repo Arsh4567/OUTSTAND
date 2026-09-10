@@ -52,7 +52,7 @@ type RoadmapContext = {
 };
 
 async function loadRoadmapContext(userId: string): Promise<RoadmapContext | null> {
-  const { data: roadmapData, error } = await supabase
+  const { data: roadmap, error } = await supabase
     .from("roadmaps")
     .select("id,title,goal,category,duration_days,start_date")
     .eq("user_id", userId)
@@ -60,13 +60,11 @@ async function loadRoadmapContext(userId: string): Promise<RoadmapContext | null
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-
-  const roadmap = roadmapData as any;
   if (error || !roadmap) return null;
   const start = new Date(`${roadmap.start_date}T00:00:00`);
   const today = new Date();
   const todayDay = Math.max(1, Math.floor((today.getTime() - start.getTime()) / 86400000) + 1);
-  const [{ data: milestonesData }, { data: tasks }] = await Promise.all([
+  const [{ data: milestones }, { data: tasks }] = await Promise.all([
     supabase
       .from("roadmap_milestones")
       .select("title,outcome,day_start,day_end")
@@ -110,7 +108,7 @@ async function loadRoadmapContext(userId: string): Promise<RoadmapContext | null
     durationDays: Number(roadmap.duration_days) || 1,
     startDate: String(roadmap.start_date),
     todayDay,
-    milestones: ((milestonesData as any[]) ?? []).map((milestone) => ({
+    milestones: (milestones ?? []).map((milestone) => ({
       title: String(milestone.title || "Milestone"),
       outcome: milestone.outcome ? String(milestone.outcome) : null,
       dayStart: Number(milestone.day_start) || 1,
@@ -173,7 +171,7 @@ export function ChatAssistant({ openSignal = false, onOpenSignalHandled }: ChatA
     const loadHistory = async () => {
       setHistoryLoading(true);
       try {
-        const { data: conversationData, error: conversationError } = await supabase
+        const { data: conversation, error: conversationError } = await supabase
           .from("chat_conversations")
           .select("id")
           .eq("user_id", user.id)
@@ -181,7 +179,6 @@ export function ChatAssistant({ openSignal = false, onOpenSignalHandled }: ChatA
           .limit(1)
           .maybeSingle();
         if (conversationError) throw conversationError;
-        const conversation = conversationData as any;
         if (!conversation?.id) {
           if (!cancelled) setMessages([]);
           return;
@@ -195,7 +192,7 @@ export function ChatAssistant({ openSignal = false, onOpenSignalHandled }: ChatA
           .order("created_at", { ascending: true })
           .limit(100);
         if (error) throw error;
-        const loaded: UIMessage[] = ((messageData as any[]) ?? []).map((message) => ({
+        const loaded: UIMessage[] = (messageData ?? []).map((message) => ({
           id: message.id || safeId(),
           role: message.role as "user" | "assistant",
           parts: [{ type: "text", text: message.content }],
