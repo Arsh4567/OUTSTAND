@@ -44,7 +44,7 @@ function useCombatZone(dppId: string, onComplete: () => Promise<void>) {
         if (error) throw error;
         if (!cancelled) {
           setQuestions(
-            (data ?? []).map((question) => ({
+            (data ?? []).map((question: any) => ({
               id: question.id,
               dpp_id: question.dpp_id,
               question_text: question.question_text,
