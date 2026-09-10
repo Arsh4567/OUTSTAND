@@ -123,6 +123,7 @@ const Shaders = {
         }
 
         vec2 normDir = normalize(dir);
+        normDir.x /= uAspect;
         
         // --- The Wave Mask ---
         // Creates a thick expanding ring. 
