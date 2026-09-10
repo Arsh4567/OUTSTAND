@@ -23,7 +23,8 @@ function parseOptions(value: unknown): string[] {
   return [];
 }
 
-export function CombatZone({ dppId, onClose, onComplete }: CombatZoneProps) {
+// --- Custom Hook for State Management ---
+function useCombatZone(dppId: string, onComplete: () => Promise<void>) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoadingQuiz, setIsLoadingQuiz] = useState(true);
   const [currentQuestionIndex, setCurrentIndex] = useState(0);
@@ -43,12 +44,12 @@ export function CombatZone({ dppId, onClose, onComplete }: CombatZoneProps) {
         if (error) throw error;
         if (!cancelled) {
           setQuestions(
-            (data ?? []).map((question) => ({
-              id: question.id,
-              dpp_id: question.dpp_id,
-              question_text: question.question_text,
+            (data ?? []).map((question: Record<string, unknown>) => ({
+              id: question.id as string,
+              dpp_id: question.dpp_id as string | null,
+              question_text: question.question_text as string,
               options: parseOptions(question.options),
-              correct_answer: question.correct_answer,
+              correct_answer: question.correct_answer as string,
             })),
           );
         }
@@ -89,8 +90,274 @@ export function CombatZone({ dppId, onClose, onComplete }: CombatZoneProps) {
     }
   };
 
-  const currentQuestion = questions[currentQuestionIndex];
+  return {
+    questions,
+    isLoadingQuiz,
+    currentQuestionIndex,
+    setCurrentIndex,
+    selectedAnswers,
+    markedForReview,
+    isSubmitting,
+    toggleMarkForReview,
+    handleSelectAnswer,
+    handleSubmit,
+    currentQuestion: questions[currentQuestionIndex],
+  };
+}
+
+// --- UI Sub-components ---
+
+function CombatZoneHeader({
+  onClose,
+  isSubmitting,
+}: {
+  onClose: () => void;
+  isSubmitting: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between border-b border-slate-800 bg-[#050810] p-4 lg:p-6">
+      <div className="flex items-center gap-3">
+        <Crosshair className="h-5 w-5 text-red-500" />
+        <h2 className="text-lg font-black uppercase tracking-tight text-white lg:text-xl">
+          Combat Zone
+        </h2>
+      </div>
+      <button
+        type="button"
+        onClick={onClose}
+        disabled={isSubmitting}
+        className="rounded-full bg-white/5 p-2 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
+        aria-label="Close combat zone"
+      >
+        <X className="h-5 w-5" />
+      </button>
+    </div>
+  );
+}
+
+function CombatZoneLoadingState() {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center">
+      <Crosshair className="mb-4 h-10 w-10 animate-spin text-red-500" />
+      <p className="font-mono text-slate-400">Loading targets...</p>
+    </div>
+  );
+}
+
+function CombatZoneEmptyState({
+  handleSubmit,
+  isSubmitting,
+}: {
+  handleSubmit: () => void;
+  isSubmitting: boolean;
+}) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center space-y-4 text-center">
+      <Shield className="h-12 w-12 text-slate-600" />
+      <div>
+        <h3 className="mb-2 text-xl font-bold text-white">No Intel Found</h3>
+        <p className="text-slate-400">Command hasn't loaded any questions for this sector yet.</p>
+      </div>
+      <button
+        type="button"
+        onClick={handleSubmit}
+        disabled={isSubmitting}
+        className="mt-4 rounded-lg bg-blue-600 px-6 py-2 font-bold text-white hover:bg-blue-500 disabled:opacity-50"
+      >
+        Force Complete Sector
+      </button>
+    </div>
+  );
+}
+
+interface CombatZoneQuestionProps {
+  questions: Question[];
+  currentQuestion: Question;
+  currentQuestionIndex: number;
+  markedForReview: Set<string>;
+  selectedAnswers: Record<string, string>;
+  setCurrentIndex: (idx: number) => void;
+  handleSelectAnswer: (questionId: string, answer: string) => void;
+}
+
+function CombatZoneQuestion({
+  questions,
+  currentQuestion,
+  currentQuestionIndex,
+  markedForReview,
+  selectedAnswers,
+  setCurrentIndex,
+  handleSelectAnswer,
+}: CombatZoneQuestionProps) {
   const labels = ["A", "B", "C", "D"];
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="mb-8">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-sm font-bold text-slate-400">
+            Target {currentQuestionIndex + 1} of {questions.length}
+          </span>
+          {markedForReview.has(currentQuestion.id) && (
+            <span className="flex items-center gap-1 rounded bg-amber-500/10 px-2 py-1 text-xs font-bold text-amber-500">
+              <Flag className="h-3 w-3" /> Marked for Review
+            </span>
+          )}
+        </div>
+        <div className="flex h-2 gap-1">
+          {questions.map((question, idx) => {
+            const isAnswered = Boolean(selectedAnswers[question.id]);
+            const isMarked = markedForReview.has(question.id);
+            const isCurrent = idx === currentQuestionIndex;
+            return (
+              <button
+                type="button"
+                key={question.id}
+                onClick={() => setCurrentIndex(idx)}
+                aria-label={`Go to question ${idx + 1}`}
+                className={cn(
+                  "flex-1 rounded-full transition-colors",
+                  isCurrent
+                    ? "bg-white"
+                    : isMarked
+                      ? "bg-amber-500"
+                      : isAnswered
+                        ? "bg-blue-500"
+                        : "bg-slate-800",
+                )}
+              />
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="flex-1 space-y-8">
+        <h3 className="text-xl font-bold leading-relaxed text-white lg:text-2xl">
+          {currentQuestion.question_text}
+        </h3>
+        <div className="space-y-3">
+          {currentQuestion.options.map((option, idx) => {
+            const isSelected = selectedAnswers[currentQuestion.id] === option;
+            return (
+              <button
+                type="button"
+                key={`${currentQuestion.id}-${option}`}
+                onClick={() => handleSelectAnswer(currentQuestion.id, option)}
+                className={cn(
+                  "flex w-full items-center gap-4 rounded-xl border p-4 text-left transition-all duration-200",
+                  isSelected
+                    ? "border-blue-500 bg-blue-600/20 shadow-[0_0_15px_rgba(59,130,246,0.2)]"
+                    : "border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10",
+                )}
+              >
+                <span
+                  className={cn(
+                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-bold",
+                    isSelected ? "bg-blue-500 text-white" : "bg-slate-800 text-slate-400",
+                  )}
+                >
+                  {labels[idx] ?? String(idx + 1)}
+                </span>
+                <span
+                  className={cn(
+                    "text-base font-medium",
+                    isSelected ? "text-white" : "text-slate-300",
+                  )}
+                >
+                  {option}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface CombatZoneFooterProps {
+  currentQuestion: Question;
+  currentQuestionIndex: number;
+  totalQuestions: number;
+  markedForReview: Set<string>;
+  isSubmitting: boolean;
+  setCurrentIndex: (updater: (prev: number) => number) => void;
+  toggleMarkForReview: (questionId: string) => void;
+  handleSubmit: () => void;
+}
+
+function CombatZoneFooter({
+  currentQuestion,
+  currentQuestionIndex,
+  totalQuestions,
+  markedForReview,
+  isSubmitting,
+  setCurrentIndex,
+  toggleMarkForReview,
+  handleSubmit,
+}: CombatZoneFooterProps) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-t border-slate-800 bg-[#050810] p-4 lg:p-6">
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
+          disabled={currentQuestionIndex === 0}
+          className="flex items-center gap-2 rounded-lg border border-white/10 px-4 py-2.5 font-semibold text-slate-300 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <ChevronLeft className="h-4 w-4" /> <span className="hidden sm:inline">Previous</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => toggleMarkForReview(currentQuestion.id)}
+          className={cn(
+            "flex items-center gap-2 rounded-lg border px-4 py-2.5 font-semibold transition-colors",
+            markedForReview.has(currentQuestion.id)
+              ? "border-amber-500/50 bg-amber-500/10 text-amber-500"
+              : "border-white/10 text-slate-300 hover:bg-white/5",
+          )}
+        >
+          <Flag className="h-4 w-4" /> <span className="hidden sm:inline">Mark</span>
+        </button>
+      </div>
+
+      {currentQuestionIndex === totalQuestions - 1 ? (
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+          className="flex items-center gap-2 rounded-lg bg-emerald-600 px-8 py-2.5 font-bold text-white shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all hover:bg-emerald-500 disabled:opacity-50"
+        >
+          <CheckCircle2 className="h-5 w-5" /> Submit Sector
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setCurrentIndex((prev) => Math.min(totalQuestions - 1, prev + 1))}
+          className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 font-bold text-white shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all hover:bg-blue-500"
+        >
+          <span className="hidden sm:inline">Next</span> <ChevronRight className="h-4 w-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// --- Main Component ---
+export function CombatZone({ dppId, onClose, onComplete }: CombatZoneProps) {
+  const {
+    questions,
+    isLoadingQuiz,
+    currentQuestionIndex,
+    setCurrentIndex,
+    selectedAnswers,
+    markedForReview,
+    isSubmitting,
+    toggleMarkForReview,
+    handleSelectAnswer,
+    handleSubmit,
+    currentQuestion,
+  } = useCombatZone(dppId, onComplete);
 
   return (
     <motion.div
@@ -105,120 +372,37 @@ export function CombatZone({ dppId, onClose, onComplete }: CombatZoneProps) {
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-800 bg-[#0a0f1a] shadow-2xl"
       >
-        <div className="flex items-center justify-between border-b border-slate-800 bg-[#050810] p-4 lg:p-6">
-          <div className="flex items-center gap-3">
-            <Crosshair className="h-5 w-5 text-red-500" />
-            <h2 className="text-lg font-black uppercase tracking-tight text-white lg:text-xl">Combat Zone</h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="rounded-full bg-white/5 p-2 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
-            aria-label="Close combat zone"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+        <CombatZoneHeader onClose={onClose} isSubmitting={isSubmitting} />
 
         <div className="flex flex-1 flex-col overflow-y-auto p-6 lg:p-8">
           {isLoadingQuiz ? (
-            <div className="flex flex-1 flex-col items-center justify-center">
-              <Crosshair className="mb-4 h-10 w-10 animate-spin text-red-500" />
-              <p className="font-mono text-slate-400">Loading targets...</p>
-            </div>
+            <CombatZoneLoadingState />
           ) : questions.length === 0 ? (
-            <div className="flex flex-1 flex-col items-center justify-center space-y-4 text-center">
-              <Shield className="h-12 w-12 text-slate-600" />
-              <div>
-                <h3 className="mb-2 text-xl font-bold text-white">No Intel Found</h3>
-                <p className="text-slate-400">Command hasn't loaded any questions for this sector yet.</p>
-              </div>
-              <button type="button" onClick={handleSubmit} disabled={isSubmitting} className="mt-4 rounded-lg bg-blue-600 px-6 py-2 font-bold text-white hover:bg-blue-500 disabled:opacity-50">
-                Force Complete Sector
-              </button>
-            </div>
+            <CombatZoneEmptyState handleSubmit={handleSubmit} isSubmitting={isSubmitting} />
           ) : currentQuestion ? (
-            <div className="flex h-full flex-col">
-              <div className="mb-8">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-sm font-bold text-slate-400">Target {currentQuestionIndex + 1} of {questions.length}</span>
-                  {markedForReview.has(currentQuestion.id) && (
-                    <span className="flex items-center gap-1 rounded bg-amber-500/10 px-2 py-1 text-xs font-bold text-amber-500">
-                      <Flag className="h-3 w-3" /> Marked for Review
-                    </span>
-                  )}
-                </div>
-                <div className="flex h-2 gap-1">
-                  {questions.map((question, idx) => {
-                    const isAnswered = Boolean(selectedAnswers[question.id]);
-                    const isMarked = markedForReview.has(question.id);
-                    const isCurrent = idx === currentQuestionIndex;
-                    return (
-                      <button
-                        type="button"
-                        key={question.id}
-                        onClick={() => setCurrentIndex(idx)}
-                        aria-label={`Go to question ${idx + 1}`}
-                        className={cn(
-                          "flex-1 rounded-full transition-colors",
-                          isCurrent ? "bg-white" : isMarked ? "bg-amber-500" : isAnswered ? "bg-blue-500" : "bg-slate-800",
-                        )}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="flex-1 space-y-8">
-                <h3 className="text-xl font-bold leading-relaxed text-white lg:text-2xl">{currentQuestion.question_text}</h3>
-                <div className="space-y-3">
-                  {currentQuestion.options.map((option, idx) => {
-                    const isSelected = selectedAnswers[currentQuestion.id] === option;
-                    return (
-                      <button
-                        type="button"
-                        key={`${currentQuestion.id}-${option}`}
-                        onClick={() => handleSelectAnswer(currentQuestion.id, option)}
-                        className={cn(
-                          "flex w-full items-center gap-4 rounded-xl border p-4 text-left transition-all duration-200",
-                          isSelected ? "border-blue-500 bg-blue-600/20 shadow-[0_0_15px_rgba(59,130,246,0.2)]" : "border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10",
-                        )}
-                      >
-                        <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-bold", isSelected ? "bg-blue-500 text-white" : "bg-slate-800 text-slate-400")}>
-                          {labels[idx] ?? String(idx + 1)}
-                        </span>
-                        <span className={cn("text-base font-medium", isSelected ? "text-white" : "text-slate-300")}>{option}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+            <CombatZoneQuestion
+              questions={questions}
+              currentQuestion={currentQuestion}
+              currentQuestionIndex={currentQuestionIndex}
+              markedForReview={markedForReview}
+              selectedAnswers={selectedAnswers}
+              setCurrentIndex={setCurrentIndex}
+              handleSelectAnswer={handleSelectAnswer}
+            />
           ) : null}
         </div>
 
         {questions.length > 0 && !isLoadingQuiz && currentQuestion && (
-          <div className="flex items-center justify-between gap-4 border-t border-slate-800 bg-[#050810] p-4 lg:p-6">
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))} disabled={currentQuestionIndex === 0} className="flex items-center gap-2 rounded-lg border border-white/10 px-4 py-2.5 font-semibold text-slate-300 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50">
-                <ChevronLeft className="h-4 w-4" /> <span className="hidden sm:inline">Previous</span>
-              </button>
-              <button type="button" onClick={() => toggleMarkForReview(currentQuestion.id)} className={cn("flex items-center gap-2 rounded-lg border px-4 py-2.5 font-semibold transition-colors", markedForReview.has(currentQuestion.id) ? "border-amber-500/50 bg-amber-500/10 text-amber-500" : "border-white/10 text-slate-300 hover:bg-white/5")}>
-                <Flag className="h-4 w-4" /> <span className="hidden sm:inline">Mark</span>
-              </button>
-            </div>
-
-            {currentQuestionIndex === questions.length - 1 ? (
-              <button type="button" onClick={handleSubmit} disabled={isSubmitting} className="flex items-center gap-2 rounded-lg bg-emerald-600 px-8 py-2.5 font-bold text-white shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all hover:bg-emerald-500 disabled:opacity-50">
-                <CheckCircle2 className="h-5 w-5" /> Submit Sector
-              </button>
-            ) : (
-              <button type="button" onClick={() => setCurrentIndex((prev) => Math.min(questions.length - 1, prev + 1))} className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 font-bold text-white shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all hover:bg-blue-500">
-                <span className="hidden sm:inline">Next</span> <ChevronRight className="h-4 w-4" />
-              </button>
-            )}
-          </div>
+          <CombatZoneFooter
+            currentQuestion={currentQuestion}
+            currentQuestionIndex={currentQuestionIndex}
+            totalQuestions={questions.length}
+            markedForReview={markedForReview}
+            isSubmitting={isSubmitting}
+            setCurrentIndex={setCurrentIndex}
+            toggleMarkForReview={toggleMarkForReview}
+            handleSubmit={handleSubmit}
+          />
         )}
       </motion.div>
     </motion.div>
