@@ -44,11 +44,11 @@ export function CombatZone({ dppId, onClose, onComplete }: CombatZoneProps) {
         if (!cancelled) {
           setQuestions(
             (data ?? []).map((question: Record<string, unknown>) => ({
-              id: question.id,
-              dpp_id: question.dpp_id,
-              question_text: question.question_text,
-              options: parseOptions(question.options),
-              correct_answer: question.correct_answer,
+              id: question.id as string,
+              dpp_id: question.dpp_id as string | null,
+              question_text: question.question_text as string,
+              options: parseOptions(question.options as unknown as string),
+              correct_answer: question.correct_answer as string,
             })),
           );
         }
