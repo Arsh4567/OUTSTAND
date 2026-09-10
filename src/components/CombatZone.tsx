@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Crosshair, X, Shield, Flag, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";

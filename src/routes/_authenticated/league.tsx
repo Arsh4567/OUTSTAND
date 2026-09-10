@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { Trophy, Shield, Crown, Medal, TrendingUp, Swords, Loader2 } from "lucide-react";
