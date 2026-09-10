@@ -101,8 +101,7 @@ export function useAuth() {
 
       const { data, error } = await supabase
         .from("profiles")
-        // @ts-expect-error Types expected to match database schema
-        .update(updates)
+        .update(updates as never)
         .eq("id", user.id)
         .select("*")
         .single();
