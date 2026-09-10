@@ -44,7 +44,7 @@ export function useCombatZoneQuiz({
               id: question.id,
               dpp_id: question.dpp_id,
               question_text: question.question_text,
-              options: parseOptions(question.options),
+              options: parseOptions(question.options as unknown),
               correct_answer: question.correct_answer,
             })),
           );
