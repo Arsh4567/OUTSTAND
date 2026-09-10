@@ -27,8 +27,10 @@ export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
   const fetchProfile = useCallback(async (currentUser: User | null) => {
+    setError(null);
     if (!currentUser?.id) {
       setUser(null);
       setProfile(null);
@@ -46,12 +48,14 @@ export function useAuth() {
 
       if (error) {
         console.error("Error fetching profile:", error);
+        setError(error instanceof Error ? error : new Error(String(error)));
         setProfile(fallbackProfile(currentUser.id));
       } else {
         setProfile(data ? (data as Profile) : fallbackProfile(currentUser.id));
       }
     } catch (error) {
       console.error("Unhandled profile fetch error:", error);
+      setError(error instanceof Error ? error : new Error(String(error)));
       setProfile(fallbackProfile(currentUser.id));
     } finally {
       setLoading(false);
@@ -61,13 +65,17 @@ export function useAuth() {
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession()
+    supabase.auth
+      .getSession()
       .then(({ data }) => {
         if (mounted) void fetchProfile(data.session?.user ?? null);
       })
       .catch((error) => {
         console.error("Failed to get session:", error);
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setError(error instanceof Error ? error : new Error(String(error)));
+          setLoading(false);
+        }
       });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -82,30 +90,36 @@ export function useAuth() {
     };
   }, [fetchProfile]);
 
-  const updateProfile = useCallback(async (updates: Partial<Profile>) => {
-    if (!user?.id) return { error: new Error("No authenticated user found.") };
+  const updateProfile = useCallback(
+    async (updates: Partial<Profile>) => {
+      if (!user?.id) return { error: new Error("No authenticated user found.") };
 
-    const previous = profile;
-    setProfile((current) => current ? { ...current, ...updates } : { ...fallbackProfile(user.id), ...updates });
+      const previous = profile;
+      setProfile((current) =>
+        current ? { ...current, ...updates } : { ...fallbackProfile(user.id), ...updates },
+      );
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .update(updates)
-      .eq("id", user.id)
-      .select("*")
-      .single();
+      const { data, error } = await supabase
+        .from("profiles")
+        .update(updates)
+        .eq("id", user.id)
+        .select("*")
+        .single();
 
-    if (error) {
-      setProfile(previous);
-      console.error("Failed to sync profile update:", error);
-      return { error };
-    }
+      if (error) {
+        setProfile(previous);
+        console.error("Failed to sync profile update:", error);
+        setError(error instanceof Error ? error : new Error(String(error)));
+        return { error };
+      }
 
-    setProfile(data as Profile);
-    return { data: data as Profile };
-  }, [profile, user?.id]);
+      setProfile(data as Profile);
+      return { data: data as Profile };
+    },
+    [profile, user?.id],
+  );
 
-  return { user, profile, loading, updateProfile, refreshProfile: () => fetchProfile(user) };
+  return { user, profile, loading, error, updateProfile, refreshProfile: () => fetchProfile(user) };
 }
 
 export function displayNameOf(user: User | null, profile: Profile | null): string {
@@ -113,8 +127,8 @@ export function displayNameOf(user: User | null, profile: Profile | null): strin
     profile?.full_name ||
     profile?.display_name ||
     profile?.username ||
-    (user?.user_metadata as Record<string, unknown> | undefined)?.full_name as string ||
-    (user?.user_metadata as Record<string, unknown> | undefined)?.display_name as string ||
+    ((user?.user_metadata as Record<string, unknown> | undefined)?.full_name as string) ||
+    ((user?.user_metadata as Record<string, unknown> | undefined)?.display_name as string) ||
     user?.email?.split("@")[0] ||
     "Friend"
   );
