@@ -27,91 +27,28 @@
 
 ---
 
-## What is OUTSTAND?
+## The System: Everything Connects
 
-OUTSTAND is built around one idea:
+OUTSTAND isn't just another to-do list. It's a complete personal growth system that guides you from setting a goal to achieving it through consistent daily action.
 
-> **Don't just plan your goals. Execute them every day.**
+### 01 · Decide: Turn a goal into a route
 
-Instead of another generic to-do list, OUTSTAND connects goals, schedules, focus sessions, habits, progress, reflection, and AI into one execution loop.
+- **AI Roadmaps:** Give OUTSTAND a goal, and it generates a structured path with milestones and daily execution blocks so you always know your next useful move.
+- **AI Assistant:** Get guidance tailored to your actual roadmap, tasks, focus history, and progress.
 
-The product takes a user's goal and turns it into **specific work for today**, then uses what actually happened to improve the plan for tomorrow.
+### 02 · Execute: Focus on the work
 
-```text
-Goal
-  ↓
-AI roadmap
-  ↓
-Timed daily blocks
-  ↓
-Focused execution
-  ↓
-Completion + real activity
-  ↓
-Nightly reflection
-  ↓
-A better tomorrow
-```
+- **Focus Timer:** Run distraction-free sessions to get deep work done. Earn 2 XP for every focused minute.
+- **Habits & Tasks:** Build repeatable routines, complete meaningful actions, and keep your day moving forward.
 
----
+### 03 · Compound: Make progress visible
 
-## Core experience
-
-### 🧠 AI Roadmaps
-
-Build a roadmap around what you're actually trying to achieve: skill learning, academics, exam preparation, chess, fitness, content creation, business, or productivity.
-
-OUTSTAND gathers context such as your starting point and availability, then generates a structured plan with milestones and daily execution blocks.
-
-Roadmaps are not static documents. Users can:
-
-- Edit their roadmap directly.
-- Ask AI to change the roadmap using natural-language requests.
-- See today's progress and the next task.
-- Review the day and let AI adapt the next schedule.
-- Work through learning milestones and quizzes when the generated roadmap includes them.
-
-### ⏱️ Daily execution
-
-The roadmap is designed around **time-boxed work**, not an endless list of vague tasks. Daily blocks can include start time, end time, estimated duration, instructions, and a clear completion state.
-
-### 🎯 Focus
-
-A dedicated focus experience gives users a place to protect attention and complete a work block without turning the whole product into a complicated dashboard.
-
-### 📊 A useful dashboard
-
-The dashboard is centered on what matters today: personalized context, habits, focus activity, progress, and a clear **Right now** action. Recent activity is derived from actual habits, focus sessions, Outstand activity, and the daily score.
-
-### 🌙 Nightly review
-
-At the end of the day, users can reflect on what happened, report energy and difficulty, and let OUTSTAND adapt tomorrow's schedule.
-
-### 🔁 Momentum loop
-
-OUTSTAND keeps progress visible through completion, XP, levels, streaks, and productivity signals while keeping the primary goal simple:
-
-**Make the next useful action obvious.**
-
----
-
-## Product surface
-
-| Experience | Purpose |
-| --- | --- |
-| **Dashboard** | Daily command center with real productivity signals, habits, focus activity, momentum, and the next best action |
-| **Roadmap** | Goal → milestones → timed daily execution plan |
-| **AI Roadmap Editing** | Change an existing roadmap by describing what should be different |
-| **Daily Focus** | See and complete today's planned work blocks |
-| **Focus** | Dedicated focused-work experience |
-| **Habits** | Repeatable daily actions and completion tracking |
-| **Progress & Momentum** | XP, levels, streaks, completion, and productivity signals |
-| **Nightly Review** | Reflect on the day and adapt tomorrow |
-| **Learning Milestones** | Structured milestone content and optional quizzes inside roadmaps |
-| **Authentication** | User accounts and persistent personal data via Supabase |
-| **AI Layer** | AI generation and assistant-oriented infrastructure |
-
----
+- **XP & Levels:** Turn real actions into persistent progress. The gamification system rewards actual execution.
+- **Streaks & Momentum:** See your consistency compound over time, building a feedback loop you want to keep improving.
+- **Friends & Social:** Find users by name or UID, build your circle, and stay accountable.
+- **Messaging:** Private conversations to coordinate with friends or share progress.
+- **Profiles:** Customize your identity while showing off your levels and achievements.
+- **Notifications:** Useful reminders and social updates delivered at the right time.
 
 ## Architecture
 
@@ -275,16 +212,16 @@ npm run dev
 
 ## Scripts
 
-| Command | Purpose |
-| --- | --- |
-| `bun run dev` | Start the development server |
-| `bun run build` | Production build |
-| `bun run build:vercel` | Vercel/Nitro production build |
-| `bun run build:dev` | Development-mode build |
-| `bun run preview` | Preview the production build locally |
-| `bun run lint` | Run ESLint |
-| `bun run typecheck` | Run TypeScript checks |
-| `bun run format` | Format the repository with Prettier |
+| Command                | Purpose                              |
+| ---------------------- | ------------------------------------ |
+| `bun run dev`          | Start the development server         |
+| `bun run build`        | Production build                     |
+| `bun run build:vercel` | Vercel/Nitro production build        |
+| `bun run build:dev`    | Development-mode build               |
+| `bun run preview`      | Preview the production build locally |
+| `bun run lint`         | Run ESLint                           |
+| `bun run typecheck`    | Run TypeScript checks                |
+| `bun run format`       | Format the repository with Prettier  |
 
 ---
 
