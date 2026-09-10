@@ -49,7 +49,7 @@ const MATH = {
   mat4: new THREE.Matrix4(),
   quat: new THREE.Quaternion(),
   color: new THREE.Color(),
-  screenPos: new THREE.Vector2(),
+  screenPos: new THREE.Vector3(),
 };
 
 // ============================================================================
