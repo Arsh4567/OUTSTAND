@@ -193,7 +193,6 @@ export function generateInsights(
   const safePos = Array.isArray(positives) ? positives : [];
   const safeNeg = Array.isArray(negatives) ? negatives : [];
   const safeScore = typeof score === "number" && !isNaN(score) ? score : 50;
-  const safeScore = (typeof score === 'number' && !isNaN(score)) ? score : 50;
 
   const has = (k: string, arr: string[]) => arr.includes(k);
 
@@ -218,36 +217,3 @@ export function generateInsights(
     out.push(
       "The algorithm stole your momentum today. Try a 20-minute phone lockdown tomorrow morning.",
     );
-  if (has("broke_focus", safeNeg))
-    out.push(
-      "Fractured focus teaches your brain that quitting is an option. Rebuild with a strict 15-minute sprint.",
-    );
-  if (has("snoozed", safeNeg))
-    out.push(
-      "Snoozing trains your brain to delay action. Tomorrow, put the alarm across the room.",
-    );
-  if (has("slept_late", safeNeg))
-    out.push("Late sleep tanks tomorrow's recovery. Set a hard wind-down alarm tonight.");
-  if (has("skipped_habits", safeNeg))
-    out.push(
-      "Zero momentum today. Don't aim for perfection tomorrow, just pick ONE habit and execute.",
-    );
-
-  // Global State Insights
-  if (safeScore >= 85)
-    out.push("🔥 You are in a rare flow state. Protect your momentum fiercely tomorrow morning.");
-  else if (safeScore >= 65)
-    out.push(
-      "Solid baseline established. One more high-leverage habit tomorrow pushes you into the elite zone.",
-    );
-  else if (safeScore >= 40)
-    out.push(
-      "You are in the middle ground. Pick just one vital action tomorrow: hit the bed on time, or do one deep work block.",
-    );
-  else
-    out.push(
-      "⚠️ System depleted. Tomorrow requires a hard reset. Focus on hydration, sleep, and just one Outstand challenge.",
-    );
-
-  return out.slice(0, 5);
-}
