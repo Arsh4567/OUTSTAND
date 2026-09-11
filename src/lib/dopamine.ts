@@ -160,8 +160,8 @@ export function computeScore(positives?: string[], negatives?: string[]): number
   const safeNeg = Array.isArray(negatives) ? negatives : [];
 
   let s = BASE;
-  for (const k of safePos) s += POSITIVE_POINTS_MAP.get(k as PositiveKey) ?? 0;
-  for (const k of safeNeg) s += NEGATIVE_POINTS_MAP.get(k as NegativeKey) ?? 0;
+  for (const k of safePos) s += POSITIVES.find((p) => p.key === k)?.points ?? 0;
+  for (const k of safeNeg) s += NEGATIVES.find((n) => n.key === k)?.points ?? 0;
 
   return Math.max(0, Math.min(100, s));
 }
@@ -193,6 +193,7 @@ export function generateInsights(
   const safePos = Array.isArray(positives) ? positives : [];
   const safeNeg = Array.isArray(negatives) ? negatives : [];
   const safeScore = typeof score === "number" && !isNaN(score) ? score : 50;
+  const safeScore = (typeof score === 'number' && !isNaN(score)) ? score : 50;
 
   const has = (k: string, arr: string[]) => arr.includes(k);
 
