@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { supabase } from '@/lib/supabase'; // Adjust this import to match your supabase client path
-import { Camera, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { useState } from "react";
+import { supabase } from "@/lib/supabase"; // Adjust this import to match your supabase client path
+import { Camera, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface AvatarUploadProps {
   uid: string;
@@ -17,17 +17,17 @@ export function AvatarUpload({ uid, url, onUpload }: AvatarUploadProps) {
       setUploading(true);
 
       if (!event.target.files || event.target.files.length === 0) {
-        throw new Error('You must select an image to upload.');
+        throw new Error("You must select an image to upload.");
       }
 
       const file = event.target.files[0];
-      const fileExt = file.name.split('.').pop();
-      // Create a unique file name based on the user's ID and current timestamp
-      const filePath = `${uid}-${Math.random()}.${fileExt}`;
+      const fileExt = file.name.split(".").pop();
+      // Create a unique file name based on the user's ID and a secure UUID
+      const filePath = `${uid}-${crypto.randomUUID()}.${fileExt}`;
 
       // 1. Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
-        .from('avatars')
+        .from("avatars")
         .upload(filePath, file, { upsert: true });
 
       if (uploadError) {
@@ -35,16 +35,15 @@ export function AvatarUpload({ uid, url, onUpload }: AvatarUploadProps) {
       }
 
       // 2. Get the Public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("avatars").getPublicUrl(filePath);
 
       // 3. Pass the URL back up to your profile form to save to the database
       onUpload(publicUrl);
-      toast.success('Avatar updated successfully.');
-
+      toast.success("Avatar updated successfully.");
     } catch (error: any) {
-      toast.error(error.message || 'Error uploading avatar');
+      toast.error(error.message || "Error uploading avatar");
     } finally {
       setUploading(false);
     }
@@ -54,21 +53,16 @@ export function AvatarUpload({ uid, url, onUpload }: AvatarUploadProps) {
     <div className="relative group inline-block">
       <div className="h-24 w-24 rounded-full overflow-hidden border-2 border-white/10 bg-slate-900 flex items-center justify-center">
         {url ? (
-          <img 
-            src={url} 
-            alt="Avatar" 
-            className="h-full w-full object-cover"
-          />
+          <img src={url} alt="Avatar" className="h-full w-full object-cover" />
         ) : (
           <span className="text-3xl text-slate-500 uppercase">
-             {/* Fallback initials could go here */}
-             ?
+            {/* Fallback initials could go here */}?
           </span>
         )}
       </div>
 
       {/* Hover Overlay */}
-      <label 
+      <label
         className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer backdrop-blur-sm"
         htmlFor="single"
       >
@@ -78,11 +72,11 @@ export function AvatarUpload({ uid, url, onUpload }: AvatarUploadProps) {
           <Camera className="h-6 w-6 text-white" />
         )}
       </label>
-      
+
       <input
         style={{
-          visibility: 'hidden',
-          position: 'absolute',
+          visibility: "hidden",
+          position: "absolute",
         }}
         type="file"
         id="single"
@@ -93,4 +87,3 @@ export function AvatarUpload({ uid, url, onUpload }: AvatarUploadProps) {
     </div>
   );
 }
-  

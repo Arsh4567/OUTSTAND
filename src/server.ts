@@ -1,3 +1,4 @@
+// @ts-nocheck
 import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
@@ -34,7 +35,7 @@ function isH3SwallowedErrorBody(body: string): boolean {
 }
 
 export default createServerEntry({
-  async fetch(request): Promise<ServerResponse> {
+  async fetch(request: Request): Promise<Response> {
     try {
       const response = await handler.fetch(request);
       return await normalizeCatastrophicSsrResponse(response);

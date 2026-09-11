@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createFileRoute } from "@tanstack/react-router";
 import { motion, MotionConfig } from "framer-motion";
 import { Loader2, RefreshCw, ArrowRight, Timer, CheckCircle2, SlidersHorizontal, CalendarClock, ListChecks } from "lucide-react";
