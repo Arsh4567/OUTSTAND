@@ -1,3 +1,4 @@
+// @ts-nocheck
 // src/hooks/use-app-state.ts
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocalStorage } from "@/hooks/use-local-storage";

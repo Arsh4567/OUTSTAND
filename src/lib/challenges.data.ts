@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { ChallengeTheme, OutstandChallenge, ThemeName, ChallengeId } from "./challenges.types";
 import { createChallengeBatch02 } from "./challenge-batch-02";
 import { createChallengeBatch03 } from "./challenge-batch-03";

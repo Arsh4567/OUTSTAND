@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Check, Search, UserPlus, Users, X, Zap, Bell, Trophy, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";

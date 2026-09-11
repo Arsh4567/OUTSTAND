@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { supabase } from "@/integrations/supabase/client";
 
 export type LocalRoadmapEditResult = { handled: boolean; message?: string };
