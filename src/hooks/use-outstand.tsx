@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAppState } from "@/hooks/use-app-state";

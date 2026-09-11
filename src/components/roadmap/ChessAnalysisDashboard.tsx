@@ -12,7 +12,7 @@ type Props = { username: string };
 type TrainerPosition = { fen: string; san: string; moveNumber: number; side: "w" | "b"; uci: string };
 
 function pct(value: number) { return `${value}%`; }
-function readableError(value: unknown, fallback: string) { if (value instanceof Error && value.message) return value.message; if (typeof value === "string" && value.trim()) return value; if (value && typeof value === "object") { const obj = value as Record<string, unknown>; for (const key of ["message", "error", "detail"]) if (typeof obj[key] === "string" && obj[key].trim()) return obj[key] as string; try { return JSON.stringify(value); } catch { return fallback; } } return fallback; }
+function readableError(value: unknown, fallback: string) { if (value instanceof Error && value.message) return value.message; if (typeof value === "string" && value.trim()) return value; if (value && typeof value === "object") { const obj = value as Record<string, unknown>; const m = obj.message; if (typeof m === "string" && m.trim()) return m; const e = obj.error; if (typeof e === "string" && e.trim()) return e; const d = obj.detail; if (typeof d === "string" && d.trim()) return d; try { return JSON.stringify(value); } catch { return fallback; } } return fallback; }
 async function readJson(response: Response) { const text = await response.text(); if (!text.trim()) return {}; try { return JSON.parse(text) as Record<string, unknown>; } catch { return { error: text.slice(0, 240) }; } }
 
 function buildPositions(game: ChessComGame, username: string): TrainerPosition[] {

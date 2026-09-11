@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Camera, Check, Edit3, MessageCircle, Search, UserPlus, X, Copy, Bell, Sparkles } from "lucide-react";

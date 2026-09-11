@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/use-auth';

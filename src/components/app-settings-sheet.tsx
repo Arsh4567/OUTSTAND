@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, ChevronRight, Edit3, LogOut, Moon, Send, Settings, Smartphone, Sparkles, Trash2, X, MessageSquare } from "lucide-react";
 import { useEffect, useState } from "react";

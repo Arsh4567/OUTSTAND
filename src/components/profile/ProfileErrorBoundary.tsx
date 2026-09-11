@@ -6,8 +6,8 @@ interface Props {
 
 interface State {
   hasError: boolean;
-  error: any;
-  errorInfo: any;
+  error: Error | null;
+  errorInfo: React.ErrorInfo | null;
 }
 
 export class ProfileErrorBoundary extends Component<Props, State> {
@@ -15,21 +15,23 @@ export class ProfileErrorBoundary extends Component<Props, State> {
     super(props);
     this.state = { hasError: false, error: null, errorInfo: null };
   }
-  
-  static getDerivedStateFromError(error: any) { 
-    return { hasError: true, error }; 
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
   }
-  
-  componentDidCatch(error: any, errorInfo: any) { 
-    this.setState({ errorInfo }); 
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    this.setState({ errorInfo });
   }
-  
+
   render() {
     if (this.state.hasError) {
       return (
         <div className="p-6 m-4 mt-24 border-2 border-rose-500 bg-rose-500/10 rounded-2xl text-white backdrop-blur-xl shadow-2xl">
           <h2 className="text-2xl font-black text-rose-500 mb-4">CRASH DETECTED!</h2>
-          <p className="mb-4 text-sm text-slate-300 font-medium">Please screenshot this red box and send it to me so we can see exactly what is missing:</p>
+          <p className="mb-4 text-sm text-slate-300 font-medium">
+            Please screenshot this red box and send it to me so we can see exactly what is missing:
+          </p>
           <div className="bg-black/80 p-4 rounded-xl text-xs font-mono text-rose-300 overflow-auto whitespace-pre-wrap border border-rose-500/30">
             {this.state.error && this.state.error.toString()}
           </div>
