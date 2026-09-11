@@ -64,7 +64,7 @@ function LeaguePage() {
         if (data) {
           let hasCurrentUser = false;
 
-          const formatted: LeaderboardEntry[] = data.map((item: any, index) => {
+          const formatted: LeaderboardEntry[] = data.map((item, index) => {
             const isMe = user?.id && item.id === user.id;
             if (isMe) hasCurrentUser = true;
 
@@ -114,7 +114,7 @@ function LeaguePage() {
     }
   };
 
-  const itemVariants: any = {
+  const itemVariants = {
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
   };
