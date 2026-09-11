@@ -160,8 +160,8 @@ export function computeScore(positives?: string[], negatives?: string[]): number
   const safeNeg = Array.isArray(negatives) ? negatives : [];
 
   let s = BASE;
-  for (const k of safePos) s += POSITIVES.find((p) => p.key === k)?.points ?? 0;
-  for (const k of safeNeg) s += NEGATIVES.find((n) => n.key === k)?.points ?? 0;
+  for (const k of safePos) s += POSITIVE_POINTS_MAP.get(k as PositiveKey) ?? 0;
+  for (const k of safeNeg) s += NEGATIVE_POINTS_MAP.get(k as NegativeKey) ?? 0;
 
   return Math.max(0, Math.min(100, s));
 }
@@ -192,7 +192,7 @@ export function generateInsights(
   // Defensive guard: Ensure arrays exist before running .includes()
   const safePos = Array.isArray(positives) ? positives : [];
   const safeNeg = Array.isArray(negatives) ? negatives : [];
-  const safeScore = typeof score === "number" && !isNaN(score) ? score : 50;
+  const localSafeScore = typeof score === "number" && !isNaN(score) ? score : 50;
 
   const has = (k: string, arr: string[]) => arr.includes(k);
 
@@ -233,13 +233,13 @@ export function generateInsights(
     );
 
   // Global State Insights
-  if (safeScore >= 85)
+  if (localSafeScore >= 85)
     out.push("🔥 You are in a rare flow state. Protect your momentum fiercely tomorrow morning.");
-  else if (safeScore >= 65)
+  else if (localSafeScore >= 65)
     out.push(
       "Solid baseline established. One more high-leverage habit tomorrow pushes you into the elite zone.",
     );
-  else if (safeScore >= 40)
+  else if (localSafeScore >= 40)
     out.push(
       "You are in the middle ground. Pick just one vital action tomorrow: hit the bed on time, or do one deep work block.",
     );

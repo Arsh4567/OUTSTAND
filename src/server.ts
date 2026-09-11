@@ -35,7 +35,7 @@ function isH3SwallowedErrorBody(body: string): boolean {
 }
 
 export default createServerEntry({
-  async fetch(request: Request): Promise<Response> {
+  async fetch(request): Promise<ServerResponse> {
     try {
       const response = await handler.fetch(request);
       return await normalizeCatastrophicSsrResponse(response);
