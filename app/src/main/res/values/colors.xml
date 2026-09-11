@@ -1,0 +1,14 @@
+<resources>
+    <color name="primary">#6366F1</color>
+    <color name="primary_dark">#4F46E5</color>
+    <color name="accent_cyan">#06B6D4</color>
+    <color name="accent_purple">#8B5CF6</color>
+    <color name="background">#080C14</color>
+    <color name="surface">#111827</color>
+    <color name="card">#161F30</color>
+    <color name="text_primary">#F8FAFC</color>
+    <color name="text_secondary">#94A3B8</color>
+    <color name="success">#10B981</color>
+    <color name="warning">#F59E0B</color>
+    <color name="destructive">#EF4444</color>
+</resources>

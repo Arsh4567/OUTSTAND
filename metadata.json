@@ -1,0 +1,8 @@
+{
+  "name": "OUTSTAND",
+  "description": "Turn attention into momentum. AI-powered productivity system that turns goals into daily execution with roadmaps, focus timer, and habit tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

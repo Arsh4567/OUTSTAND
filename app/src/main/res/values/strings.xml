@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">OUTSTAND</string>
+    <string name="tagline">Turn attention into momentum</string>
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_roadmap">Roadmap</string>
+    <string name="nav_focus">Focus</string>
+    <string name="nav_habits">Habits</string>
+    <string name="nav_momentum">Momentum</string>
+    <string name="nav_coach">AI Coach</string>
+    <string name="nav_profile">Profile</string>
+    <string name="right_now">Right now</string>
+    <string name="welcome_back">Welcome back</string>
+    <string name="daily_focus_title">Focus on what matters</string>
+</resources>

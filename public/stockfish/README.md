@@ -1,1 +1,0 @@
-Place the browser Stockfish distribution here as `stockfish.js` (and any worker/WASM files it requires). The analysis worker loads `/stockfish/stockfish.js` at runtime so Stockfish stays off the main UI thread.
