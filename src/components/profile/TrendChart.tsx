@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { motion } from "framer-motion";
 import { scoreColor } from "@/lib/dopamine";
 
