@@ -11,10 +11,10 @@ export function useDPP() {
   const [error, setError] = useState<string | null>(null);
 
   const completeDPP = async (
-    subject: string, 
-    chapterId: string, 
-    difficulty: 'easy' | 'medium' | 'hard', 
-    xpAmount: number
+    subject: string,
+    chapterId: string,
+    difficulty: "easy" | "medium" | "hard",
+    xpAmount: number,
   ) => {
     if (!user) {
       setError("Agent not authenticated.");
@@ -25,12 +25,12 @@ export function useDPP() {
     setError(null);
 
     try {
-      const { data, error: rpcError } = await supabase.rpc('complete_dpp_and_award_xp', {
+      const { data, error: rpcError } = await supabase.rpc("complete_dpp_and_award_xp", {
         p_user_id: user.id,
         p_subject: subject,
         p_chapter_id: chapterId,
         p_difficulty: difficulty,
-        p_xp_amount: xpAmount
+        p_xp_amount: xpAmount,
       });
 
       if (rpcError) throw rpcError;
@@ -43,9 +43,9 @@ export function useDPP() {
         setError("Mission already completed today. No duplicate XP awarded.");
         return false;
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("DPP Submission Error:", err);
-      setError(err.message || "Failed to log mission.");
+      setError(err instanceof Error ? err.message : "Failed to log mission.");
       return false;
     } finally {
       setIsSubmitting(false);
