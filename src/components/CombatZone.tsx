@@ -43,7 +43,7 @@ export function CombatZone({ dppId, onClose, onComplete }: CombatZoneProps) {
         if (error) throw error;
         if (!cancelled) {
           setQuestions(
-            (data ?? []).map((question: Record<string, unknown>) => ({
+            ((data as Record<string, unknown>[]) ?? []).map((question) => ({
               id: question.id as string,
               dpp_id: question.dpp_id as string | null,
               question_text: question.question_text as string,
