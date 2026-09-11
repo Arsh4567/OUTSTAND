@@ -152,11 +152,13 @@ async function smartChange(client: any, userId: string, roadmapId: string, reque
         (!weekday || dayFor(roadmap.start_date, Number(t.day_number)) === weekday),
     );
     if (!matches.length) throw new Error(`No roadmap tasks matched “${remove[1].trim()}”.`);
-    const taskIds = matches.map((t: any) => t.id);
     const { error: deleteError } = await client
       .from("roadmap_tasks")
       .delete()
-      .in("id", taskIds)
+      .in(
+        "id",
+        matches.map((t: any) => t.id),
+      )
       .eq("roadmap_id", roadmapId)
       .eq("user_id", userId);
     if (deleteError) throw deleteError;
@@ -178,11 +180,13 @@ async function smartChange(client: any, userId: string, roadmapId: string, reque
         (!weekday || dayFor(roadmap.start_date, Number(t.day_number)) === weekday),
     );
     if (!matches.length) throw new Error(`No roadmap tasks matched “${replace[1].trim()}”.`);
-    const taskIds = matches.map((t: any) => t.id);
     const { error: updateError } = await client
       .from("roadmap_tasks")
       .update({ title: replace[2].trim().slice(0, 200) })
-      .in("id", taskIds)
+      .in(
+        "id",
+        matches.map((t: any) => t.id),
+      )
       .eq("roadmap_id", roadmapId)
       .eq("user_id", userId);
     if (updateError) throw updateError;
